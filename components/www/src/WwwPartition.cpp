@@ -9,6 +9,10 @@ const char* const TAG = "WwwPartition";
 
 using namespace OpenShock;
 
+static constexpr esp_partition_type_t kPartitionType       = static_cast<esp_partition_type_t>(0x40);
+static constexpr esp_partition_subtype_t kPartitionSubtype = static_cast<esp_partition_subtype_t>(0x00);
+static constexpr const char* kPartitionLabel               = "www";
+
 const esp_partition_t* Www::FindPartition()
 {
   return esp_partition_find_first(kPartitionType, kPartitionSubtype, kPartitionLabel);

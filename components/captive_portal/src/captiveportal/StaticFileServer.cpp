@@ -51,10 +51,7 @@ static const char* contentTypeForPath(std::string_view path)
   };
 
   for (const auto& entry : kContentTypes) {
-    if (entry.extension.size() != ext.size()) continue;
-    std::size_t j = 0;
-    while (j < ext.size() && CharToLower(ext[j]) == entry.extension[j]) ++j;
-    if (j == ext.size()) {
+    if (StringIEquals(entry.extension, ext)) {
       return entry.contentType;
     }
   }
@@ -120,17 +117,13 @@ static constexpr const char* kCacheControlImmutable = "public, max-age=31536000,
 // What a static response says about itself, shared by the full response, the 304 and the HEAD response.
 struct Representation {
   const char* contentType;
-  bool gzip;
   const char* cacheControl;
-  const char* etag;  // quoted, or null when unknown
+  const char* etag;  // quoted
   std::size_t size;
 };
 
 static bool matchesIfNoneMatch(httpd_req_t* req, const char* etag)
 {
-  if (etag == nullptr) {
-    return false;
-  }
   char inm[80];
   return httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK && std::strcmp(etag, inm) == 0;
 }
@@ -141,9 +134,7 @@ static void setHeaders(httpd_req_t* req, const Representation& rep)
   httpd_resp_set_type(req, rep.contentType);
   httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
   httpd_resp_set_hdr(req, "Cache-Control", rep.cacheControl);
-  if (rep.etag != nullptr) {
-    httpd_resp_set_hdr(req, "ETag", rep.etag);
-  }
+  httpd_resp_set_hdr(req, "ETag", rep.etag);
 }
 
 static esp_err_t sendNotModified(httpd_req_t* req, const Representation& rep)
@@ -173,15 +164,10 @@ static esp_err_t sendHeadResponse(httpd_req_t* req, const Representation& rep)
   head += rep.contentType;
   head += "\r\nContent-Length: ";
   head += std::to_string(rep.size);
-  if (rep.gzip) {
-    head += "\r\nContent-Encoding: gzip";
-  }
-  head += "\r\nVary: Accept-Encoding\r\nCache-Control: ";
+  head += "\r\nContent-Encoding: gzip\r\nVary: Accept-Encoding\r\nCache-Control: ";
   head += rep.cacheControl;
-  if (rep.etag != nullptr) {
-    head += "\r\nETag: ";
-    head += rep.etag;
-  }
+  head += "\r\nETag: ";
+  head += rep.etag;
   head += "\r\n\r\n";
 
   std::size_t sent = 0;
@@ -197,12 +183,7 @@ static esp_err_t sendHeadResponse(httpd_req_t* req, const Representation& rep)
 
 CaptivePortal::StaticFileServer::StaticFileServer()
 {
-  const esp_partition_t* www = Www::FindPartition();
-  if (www == nullptr) {
-    OS_LOGE(TAG, "No www partition, serving the error page");
-    return;
-  }
-  if (!m_www.mount(www)) {
+  if (!m_www.mount(Www::FindPartition())) {
     OS_LOGE(TAG, "The portal has no assets until a www image is flashed, serving the error page");  // mount() logged why
     return;
   }
@@ -224,11 +205,11 @@ void CaptivePortal::StaticFileServer::registerHandler(httpd_handle_t server)
     CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::staticFileHandler, this);
     CaptivePortal::registerHandler(server, "/*", HTTP_HEAD, &StaticFileServer::staticFileHandler, this);
   } else {
-    CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::missingFsHandler, nullptr);
+    CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::missingAssetsHandler, nullptr);
   }
 }
 
-esp_err_t CaptivePortal::StaticFileServer::missingFsHandler(httpd_req_t* req)
+esp_err_t CaptivePortal::StaticFileServer::missingAssetsHandler(httpd_req_t* req)
 {
   // No usable assets on the device; serve the help page for any request.
   return sendResp(
@@ -262,26 +243,20 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
     uri = "/index.html";
   }
 
-  return self->serveFromImage(req, uri, clientAcceptsGzip(req));
-}
-
-esp_err_t CaptivePortal::StaticFileServer::serveFromImage(httpd_req_t* req, std::string_view uri, bool wantsGzip)
-{
   // Stored without the leading slash. Every body in the image is gzipped.
-  auto asset = m_www.find(uri.substr(1));
+  auto asset = self->m_www.find(uri.substr(1));
   if (!asset) {
     // Unknown path -> captive redirect (the index fallback of a static server).
     return RFC8908::EmitRedirect(req);
   }
-  if (!wantsGzip) {
+  if (!clientAcceptsGzip(req)) {
     return sendNotAcceptable(req);
   }
 
   Representation rep {
     .contentType  = contentTypeForPath(uri),
-    .gzip         = true,
     .cacheControl = asset->immutable() ? kCacheControlImmutable : kCacheControl,
-    .etag         = m_etag.empty() ? nullptr : m_etag.c_str(),
+    .etag         = self->m_etag.c_str(),
     .size         = asset->body.size(),
   };
 

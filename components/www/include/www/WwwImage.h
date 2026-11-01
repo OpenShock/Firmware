@@ -40,6 +40,7 @@ namespace OpenShock::Www {
   inline constexpr std::size_t kHeaderSize   = 64;
   inline constexpr std::size_t kNodeSize     = 16;
   inline constexpr std::size_t kBodyHashSize = 32;
+  inline constexpr std::size_t kHashOffset   = 12;  // body_hash in the header
   inline constexpr std::size_t kAlign        = 4;
 
   inline constexpr uint16_t kFlagDirectory = 1u << 0;
@@ -101,7 +102,7 @@ namespace OpenShock::Www {
     /// @brief Bytes from the header to the end of the last body's padding: what an OTA hash of the image covers.
     [[nodiscard]] std::size_t ImageSize() const { return m_size; }
     /// @brief The image's own hash; it changes whenever any byte of the image does.
-    [[nodiscard]] std::span<const uint8_t, kBodyHashSize> BodyHash() const { return m_bytes.subspan<12, kBodyHashSize>(); }
+    [[nodiscard]] std::span<const uint8_t, kBodyHashSize> BodyHash() const { return m_bytes.subspan<kHashOffset, kBodyHashSize>(); }
     [[nodiscard]] std::span<const uint8_t> Bytes() const { return m_bytes.first(m_size); }
 
   private:

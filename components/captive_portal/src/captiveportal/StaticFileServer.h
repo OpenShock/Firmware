@@ -6,7 +6,6 @@
 #include <esp_http_server.h>
 
 #include <string>
-#include <string_view>
 
 namespace OpenShock::CaptivePortal {
   /// @brief Serves the portal UI from the flat www image (mapped, served by pointer), mounted for this object's lifetime.
@@ -21,9 +20,8 @@ namespace OpenShock::CaptivePortal {
     void registerHandler(httpd_handle_t server);
 
   private:
-    static esp_err_t missingFsHandler(httpd_req_t* req);
+    static esp_err_t missingAssetsHandler(httpd_req_t* req);
     static esp_err_t staticFileHandler(httpd_req_t* req);
-    esp_err_t serveFromImage(httpd_req_t* req, std::string_view uri, bool wantsGzip);
 
     Www::Partition m_www;
     std::string m_etag;  // the www image's hash, quoted
