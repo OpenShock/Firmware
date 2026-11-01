@@ -11,13 +11,12 @@ const char* const TAG = "Config::SerialInputConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace = "serial";
 static constexpr const char* kKeyEcho   = "echo";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<SerialInputConfig> s_section({.name = "serialInput", .order = 4, .hubConfigField = Fbs::HubConfig::VT_SERIAL_INPUT, .namespaces = kNamespaces});
+static Section<SerialInputConfig> s_section({.name = "serialInput", .order = 4, .namespaces = kNamespaces});
 
 SerialInputConfig::SerialInputConfig()
   : echoEnabled(true)
@@ -27,11 +26,6 @@ SerialInputConfig::SerialInputConfig()
 SerialInputConfig::SerialInputConfig(bool echoEnabled)
   : echoEnabled(echoEnabled)
 {
-}
-
-flatbuffers::Offset<OpenShock::Serialization::Configuration::SerialInputConfig> SerialInputConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  return Serialization::Configuration::CreateSerialInputConfig(builder, echoEnabled);
 }
 
 bool SerialInputConfig::FromJSON(JSON::JsonView json)

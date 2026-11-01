@@ -17,7 +17,7 @@ idf_component_register(
                     "src/captiveportal/WebSocketEndpoint.cpp"
   INCLUDE_DIRS      "include"
   PRIV_INCLUDE_DIRS "src"
-  REQUIRES          config serialization                              # its config section (captiveportal/CaptivePortalConfig.h)
+  REQUIRES          config                                            # its config section (captiveportal/CaptivePortalConfig.h)
   PRIV_REQUIRES     core device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
                     common chipset logging temporal osjson serialization   # foundation utilities, json, HubToLocalMessage fbs
                     dns_server http rfc8908 www                # DNSServer, ContentTypes, RFC8908Handler, the www image

@@ -13,7 +13,6 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
               FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
-#include "HubConfig_generated.h"
 #include "WifiNetwork_generated.h"
 #include "WifiNetworkEventType_generated.h"
 #include "WifiScanStatus_generated.h"
@@ -21,6 +20,9 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
 namespace OpenShock {
 namespace Serialization {
 namespace Local {
+
+struct OtaSettings;
+struct OtaSettingsBuilder;
 
 struct ReadyMessage;
 struct ReadyMessageBuilder;
@@ -45,6 +47,39 @@ struct AccountLinkStatusEventBuilder;
 
 struct HubToLocalMessage;
 struct HubToLocalMessageBuilder;
+
+enum class OtaChannel : uint8_t {
+  Stable = 0,
+  Beta = 1,
+  Develop = 2,
+  MIN = Stable,
+  MAX = Develop
+};
+
+inline const OtaChannel (&EnumValuesOtaChannel())[3] {
+  static const OtaChannel values[] = {
+    OtaChannel::Stable,
+    OtaChannel::Beta,
+    OtaChannel::Develop
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesOtaChannel() {
+  static const char * const names[4] = {
+    "Stable",
+    "Beta",
+    "Develop",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameOtaChannel(OtaChannel e) {
+  if (::flatbuffers::IsOutRange(e, OtaChannel::Stable, OtaChannel::Develop)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesOtaChannel()[index];
+}
 
 enum class HubToLocalMessagePayload : uint8_t {
   NONE = 0,
@@ -131,6 +166,128 @@ bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier
 template <bool B = false>
 bool VerifyHubToLocalMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<HubToLocalMessagePayload> *types);
 
+/// The OTA settings the portal shows and edits.
+struct OtaSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef OtaSettingsBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.OtaSettings";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ENABLED = 4,
+    VT_CDN_DOMAIN = 6,
+    VT_CHANNEL = 8,
+    VT_CHECK_INTERVAL = 10,
+    VT_ALLOW_BACKEND_MANAGEMENT = 12,
+    VT_REQUIRE_MANUAL_APPROVAL = 14
+  };
+  bool enabled() const {
+    return GetField<uint8_t>(VT_ENABLED, 0) != 0;
+  }
+  const ::flatbuffers::String *cdn_domain() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_CDN_DOMAIN);
+  }
+  OpenShock::Serialization::Local::OtaChannel channel() const {
+    return static_cast<OpenShock::Serialization::Local::OtaChannel>(GetField<uint8_t>(VT_CHANNEL, 0));
+  }
+  uint16_t check_interval() const {
+    return GetField<uint16_t>(VT_CHECK_INTERVAL, 0);
+  }
+  bool allow_backend_management() const {
+    return GetField<uint8_t>(VT_ALLOW_BACKEND_MANAGEMENT, 0) != 0;
+  }
+  bool require_manual_approval() const {
+    return GetField<uint8_t>(VT_REQUIRE_MANUAL_APPROVAL, 0) != 0;
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_ENABLED, 1) &&
+           VerifyOffset(verifier, VT_CDN_DOMAIN) &&
+           verifier.VerifyString(cdn_domain()) &&
+           VerifyField<uint8_t>(verifier, VT_CHANNEL, 1) &&
+           VerifyField<uint16_t>(verifier, VT_CHECK_INTERVAL, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ALLOW_BACKEND_MANAGEMENT, 1) &&
+           VerifyField<uint8_t>(verifier, VT_REQUIRE_MANUAL_APPROVAL, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct OtaSettingsBuilder {
+  typedef OtaSettings Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_enabled(bool enabled) {
+    fbb_.AddElement<uint8_t>(OtaSettings::VT_ENABLED, static_cast<uint8_t>(enabled), 0);
+  }
+  void add_cdn_domain(::flatbuffers::Offset<::flatbuffers::String> cdn_domain) {
+    fbb_.AddOffset(OtaSettings::VT_CDN_DOMAIN, cdn_domain);
+  }
+  void add_channel(OpenShock::Serialization::Local::OtaChannel channel) {
+    fbb_.AddElement<uint8_t>(OtaSettings::VT_CHANNEL, static_cast<uint8_t>(channel), 0);
+  }
+  void add_check_interval(uint16_t check_interval) {
+    fbb_.AddElement<uint16_t>(OtaSettings::VT_CHECK_INTERVAL, check_interval, 0);
+  }
+  void add_allow_backend_management(bool allow_backend_management) {
+    fbb_.AddElement<uint8_t>(OtaSettings::VT_ALLOW_BACKEND_MANAGEMENT, static_cast<uint8_t>(allow_backend_management), 0);
+  }
+  void add_require_manual_approval(bool require_manual_approval) {
+    fbb_.AddElement<uint8_t>(OtaSettings::VT_REQUIRE_MANUAL_APPROVAL, static_cast<uint8_t>(require_manual_approval), 0);
+  }
+  explicit OtaSettingsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<OtaSettings> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<OtaSettings>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<OtaSettings> CreateOtaSettings(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool enabled = false,
+    ::flatbuffers::Offset<::flatbuffers::String> cdn_domain = 0,
+    OpenShock::Serialization::Local::OtaChannel channel = OpenShock::Serialization::Local::OtaChannel::Stable,
+    uint16_t check_interval = 0,
+    bool allow_backend_management = false,
+    bool require_manual_approval = false) {
+  OtaSettingsBuilder builder_(_fbb);
+  builder_.add_cdn_domain(cdn_domain);
+  builder_.add_check_interval(check_interval);
+  builder_.add_require_manual_approval(require_manual_approval);
+  builder_.add_allow_backend_management(allow_backend_management);
+  builder_.add_channel(channel);
+  builder_.add_enabled(enabled);
+  return builder_.Finish();
+}
+
+struct OtaSettings::Traits {
+  using type = OtaSettings;
+  static auto constexpr Create = CreateOtaSettings;
+};
+
+inline ::flatbuffers::Offset<OtaSettings> CreateOtaSettingsDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool enabled = false,
+    const char *cdn_domain = nullptr,
+    OpenShock::Serialization::Local::OtaChannel channel = OpenShock::Serialization::Local::OtaChannel::Stable,
+    uint16_t check_interval = 0,
+    bool allow_backend_management = false,
+    bool require_manual_approval = false) {
+  auto cdn_domain__ = cdn_domain ? _fbb.CreateString(cdn_domain) : 0;
+  return OpenShock::Serialization::Local::CreateOtaSettings(
+      _fbb,
+      enabled,
+      cdn_domain__,
+      channel,
+      check_interval,
+      allow_backend_management,
+      require_manual_approval);
+}
+
 struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReadyMessageBuilder Builder;
   struct Traits;
@@ -141,10 +298,14 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_POGGIES = 4,
     VT_CONNECTED_WIFI = 6,
     VT_ACCOUNT_LINKED = 8,
-    VT_CONFIG = 10,
-    VT_GPIO_VALID_INPUTS = 12,
-    VT_GPIO_VALID_OUTPUTS = 14,
-    VT_HAS_STANDARDIZED_PINS = 16
+    VT_GPIO_VALID_INPUTS = 10,
+    VT_GPIO_VALID_OUTPUTS = 12,
+    VT_HAS_STANDARDIZED_PINS = 14,
+    VT_RF_TX_PIN = 16,
+    VT_ESTOP_ENABLED = 18,
+    VT_ESTOP_GPIO_PIN = 20,
+    VT_SAVED_SSIDS = 22,
+    VT_OTA = 24
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -155,9 +316,6 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool account_linked() const {
     return GetField<uint8_t>(VT_ACCOUNT_LINKED, 0) != 0;
   }
-  const OpenShock::Serialization::Configuration::HubConfig *config() const {
-    return GetPointer<const OpenShock::Serialization::Configuration::HubConfig *>(VT_CONFIG);
-  }
   const ::flatbuffers::Vector<int8_t> *gpio_valid_inputs() const {
     return GetPointer<const ::flatbuffers::Vector<int8_t> *>(VT_GPIO_VALID_INPUTS);
   }
@@ -167,6 +325,22 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool has_standardized_pins() const {
     return GetField<uint8_t>(VT_HAS_STANDARDIZED_PINS, 0) != 0;
   }
+  int8_t rf_tx_pin() const {
+    return GetField<int8_t>(VT_RF_TX_PIN, -1);
+  }
+  bool estop_enabled() const {
+    return GetField<uint8_t>(VT_ESTOP_ENABLED, 0) != 0;
+  }
+  int8_t estop_gpio_pin() const {
+    return GetField<int8_t>(VT_ESTOP_GPIO_PIN, -1);
+  }
+  /// SSIDs of the saved networks. Passwords never leave the hub.
+  const ::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>> *saved_ssids() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>> *>(VT_SAVED_SSIDS);
+  }
+  const OpenShock::Serialization::Local::OtaSettings *ota() const {
+    return GetPointer<const OpenShock::Serialization::Local::OtaSettings *>(VT_OTA);
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -174,13 +348,19 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyOffset(verifier, VT_CONNECTED_WIFI) &&
            verifier.VerifyTable(connected_wifi()) &&
            VerifyField<uint8_t>(verifier, VT_ACCOUNT_LINKED, 1) &&
-           VerifyOffset(verifier, VT_CONFIG) &&
-           verifier.VerifyTable(config()) &&
            VerifyOffset(verifier, VT_GPIO_VALID_INPUTS) &&
            verifier.VerifyVector(gpio_valid_inputs()) &&
            VerifyOffset(verifier, VT_GPIO_VALID_OUTPUTS) &&
            verifier.VerifyVector(gpio_valid_outputs()) &&
            VerifyField<uint8_t>(verifier, VT_HAS_STANDARDIZED_PINS, 1) &&
+           VerifyField<int8_t>(verifier, VT_RF_TX_PIN, 1) &&
+           VerifyField<uint8_t>(verifier, VT_ESTOP_ENABLED, 1) &&
+           VerifyField<int8_t>(verifier, VT_ESTOP_GPIO_PIN, 1) &&
+           VerifyOffset(verifier, VT_SAVED_SSIDS) &&
+           verifier.VerifyVector(saved_ssids()) &&
+           verifier.VerifyVectorOfStrings(saved_ssids()) &&
+           VerifyOffset(verifier, VT_OTA) &&
+           verifier.VerifyTable(ota()) &&
            verifier.EndTable();
   }
 };
@@ -198,9 +378,6 @@ struct ReadyMessageBuilder {
   void add_account_linked(bool account_linked) {
     fbb_.AddElement<uint8_t>(ReadyMessage::VT_ACCOUNT_LINKED, static_cast<uint8_t>(account_linked), 0);
   }
-  void add_config(::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config) {
-    fbb_.AddOffset(ReadyMessage::VT_CONFIG, config);
-  }
   void add_gpio_valid_inputs(::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs) {
     fbb_.AddOffset(ReadyMessage::VT_GPIO_VALID_INPUTS, gpio_valid_inputs);
   }
@@ -209,6 +386,21 @@ struct ReadyMessageBuilder {
   }
   void add_has_standardized_pins(bool has_standardized_pins) {
     fbb_.AddElement<uint8_t>(ReadyMessage::VT_HAS_STANDARDIZED_PINS, static_cast<uint8_t>(has_standardized_pins), 0);
+  }
+  void add_rf_tx_pin(int8_t rf_tx_pin) {
+    fbb_.AddElement<int8_t>(ReadyMessage::VT_RF_TX_PIN, rf_tx_pin, -1);
+  }
+  void add_estop_enabled(bool estop_enabled) {
+    fbb_.AddElement<uint8_t>(ReadyMessage::VT_ESTOP_ENABLED, static_cast<uint8_t>(estop_enabled), 0);
+  }
+  void add_estop_gpio_pin(int8_t estop_gpio_pin) {
+    fbb_.AddElement<int8_t>(ReadyMessage::VT_ESTOP_GPIO_PIN, estop_gpio_pin, -1);
+  }
+  void add_saved_ssids(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> saved_ssids) {
+    fbb_.AddOffset(ReadyMessage::VT_SAVED_SSIDS, saved_ssids);
+  }
+  void add_ota(::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota) {
+    fbb_.AddOffset(ReadyMessage::VT_OTA, ota);
   }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -226,15 +418,23 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     bool poggies = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
     ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_inputs = 0,
     ::flatbuffers::Offset<::flatbuffers::Vector<int8_t>> gpio_valid_outputs = 0,
-    bool has_standardized_pins = false) {
+    bool has_standardized_pins = false,
+    int8_t rf_tx_pin = -1,
+    bool estop_enabled = false,
+    int8_t estop_gpio_pin = -1,
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> saved_ssids = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_ota(ota);
+  builder_.add_saved_ssids(saved_ssids);
   builder_.add_gpio_valid_outputs(gpio_valid_outputs);
   builder_.add_gpio_valid_inputs(gpio_valid_inputs);
-  builder_.add_config(config);
   builder_.add_connected_wifi(connected_wifi);
+  builder_.add_estop_gpio_pin(estop_gpio_pin);
+  builder_.add_estop_enabled(estop_enabled);
+  builder_.add_rf_tx_pin(rf_tx_pin);
   builder_.add_has_standardized_pins(has_standardized_pins);
   builder_.add_account_linked(account_linked);
   builder_.add_poggies(poggies);
@@ -251,21 +451,30 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
     bool poggies = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> connected_wifi = 0,
     bool account_linked = false,
-    ::flatbuffers::Offset<OpenShock::Serialization::Configuration::HubConfig> config = 0,
     const std::vector<int8_t> *gpio_valid_inputs = nullptr,
     const std::vector<int8_t> *gpio_valid_outputs = nullptr,
-    bool has_standardized_pins = false) {
+    bool has_standardized_pins = false,
+    int8_t rf_tx_pin = -1,
+    bool estop_enabled = false,
+    int8_t estop_gpio_pin = -1,
+    const std::vector<::flatbuffers::Offset<::flatbuffers::String>> *saved_ssids = nullptr,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0) {
   auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<int8_t>(*gpio_valid_inputs) : 0;
   auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<int8_t>(*gpio_valid_outputs) : 0;
+  auto saved_ssids__ = saved_ssids ? _fbb.CreateVector<::flatbuffers::Offset<::flatbuffers::String>>(*saved_ssids) : 0;
   return OpenShock::Serialization::Local::CreateReadyMessage(
       _fbb,
       poggies,
       connected_wifi,
       account_linked,
-      config,
       gpio_valid_inputs__,
       gpio_valid_outputs__,
-      has_standardized_pins);
+      has_standardized_pins,
+      rf_tx_pin,
+      estop_enabled,
+      estop_gpio_pin,
+      saved_ssids__,
+      ota);
 }
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

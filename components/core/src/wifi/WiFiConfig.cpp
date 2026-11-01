@@ -18,7 +18,6 @@ const char* const TAG = "Config::WiFiConfig";
 #include <cstring>
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "CONFIG_OPENSHOCK_FW_HOSTNAME must be 1-32 letters, digits or hyphens, not starting or ending with a hyphen");
 
@@ -28,7 +27,7 @@ static constexpr const char* kKeyApSsid      = "ap_ssid";
 static constexpr const char* kKeyHostname    = "hostname";
 
 static constexpr const char* kNamespaces[] = {kNamespaceCfg, kNamespaceCreds};
-static Section<WiFiConfig> s_section({.name = "wifi", .order = 1, .hubConfigField = Fbs::HubConfig::VT_WIFI, .namespaces = kNamespaces});
+static Section<WiFiConfig> s_section({.name = "wifi", .order = 1, .namespaces = kNamespaces});
 
 WiFiConfig::WiFiConfig()
   : accessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX)
@@ -42,18 +41,6 @@ WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostna
   , hostname(hostname)
   , credentialsList(credentialsList)
 {
-}
-
-flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiConfig> WiFiConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  std::vector<flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials>> fbsCredentialsList;
-  fbsCredentialsList.reserve(credentialsList.size());
-
-  for (auto& credentials : credentialsList) {
-    fbsCredentialsList.push_back(credentials.ToFlatbuffers(builder, withSensitiveData));
-  }
-
-  return Serialization::Configuration::CreateWiFiConfig(builder, builder.CreateString(accessPointSSID), builder.CreateString(hostname), builder.CreateVector(fbsCredentialsList));
 }
 
 bool WiFiConfig::FromJSON(JSON::JsonView json)

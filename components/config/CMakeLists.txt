@@ -5,19 +5,15 @@
 #   config/Section.h  the section template: RAM cache, serialized writers, saving only what changed, the registry
 #   config/Store.h    opening the `cfg` store, filling an empty one with the defaults, factory reset, the
 #                     whole-config JSON
-#   config/Wire.h     the whole config as the FlatBuffers HubConfig (local protocol Ready message, rawconfig), and
-#                     HubConfig -> JSON
 #   config/Parse.h    field parsing helpers for sections' FromJSON
 idf_component_register(
   SRCS          "src/Nvs.cpp"
                 "src/Parse.cpp"
                 "src/Section.cpp"
                 "src/Store.cpp"
-                "src/Wire.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      common osjson                      # OpenShock.h, SimpleMutex.h, TinyVec.h, util/FunctionRef.h; json/Json.h and json_generator.h
                 nvs_flash                          # nvs.h in Nvs.h
-                serialization flatbuffers          # HubConfig in Wire.h
                 esp_hal_gpio                       # hal/gpio_types.h in Parse.h
   PRIV_REQUIRES logging                            # OS_LOG*/OS_PANIC
 )

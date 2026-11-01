@@ -1,15 +1,17 @@
 #include "serialization/WSLocal.h"
 
-const char* const TAG = "WSLocal";
-
 #include "Chipset.h"
-#include "config/Wire.h"
-#include "Logging.h"
+#include "estop/EStopConfig.h"
+#include "OtaUpdateConfig.h"
+#include "radio/RFConfig.h"
 #include "util/HexUtils.h"
 #include "wifi/WiFiAuthMode.h"
+#include "wifi/WiFiConfig.h"
 #include "wifi/WiFiNetwork.h"
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
+
+#include <vector>
 
 using namespace OpenShock::Serialization;
 
@@ -28,6 +30,15 @@ static flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> createW
   auto authMode = OpenShock::Config::ToFbsAuthMode(network.authMode);
 
   return Types::CreateWifiNetworkDirect(builder, network.ssid, bssid.data(), network.channel, network.rssi, authMode, network.IsSaved());
+}
+
+static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::FlatBufferBuilder& builder)
+{
+  const auto ota = OpenShock::Config::GetOtaUpdateConfig();
+
+  auto cdnDomain = builder.CreateString(ota.cdnDomain);
+
+  return Local::CreateOtaSettings(builder, ota.isEnabled, cdnDomain, static_cast<Local::OtaChannel>(ota.updateChannel), ota.checkInterval, ota.allowBackendManagement, ota.requireManualApproval);
 }
 
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)
@@ -49,19 +60,25 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
     fbsNetwork = createWiFiNetwork(builder, *connectedNetwork);
   }
 
-  auto configOffset = OpenShock::Config::GetAsFlatBuffer(builder, false);
-  if (configOffset.IsNull()) {
-    OS_LOGE(TAG, "Failed to serialize config");
-    return false;
-  }
-
   auto inputPins       = OpenShock::GetValidInputPinsVector();
   auto inputPinsOffset = builder.CreateVector(inputPins);
 
   auto outputPins       = OpenShock::GetValidOutputPinsVector();
   auto outputPinsOffset = builder.CreateVector(outputPins);
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, configOffset, inputPinsOffset, outputPinsOffset);
+  // Only what the portal shows. The whole config has no wire form, and secrets never go into this message.
+  std::vector<flatbuffers::Offset<flatbuffers::String>> savedSsids;
+  for (const auto& credentials : OpenShock::Config::GetWiFiCredentials()) {
+    savedSsids.push_back(builder.CreateString(credentials.ssid));
+  }
+  auto savedSsidsOffset = builder.CreateVector(savedSsids);
+
+  auto otaOffset = createOtaSettings(builder);
+
+  const auto rfTxPin = static_cast<int8_t>(OpenShock::Config::GetRFConfigTxPin());
+  const auto estop   = OpenShock::Config::GetEStopConfig();
+
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset);
 
   return finishMessage(builder, Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset, callback);
 }

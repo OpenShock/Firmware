@@ -42,27 +42,6 @@ bool WiFiCredentials::HasPinnedBSSID() const
   return false;
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::WiFiCredentials> WiFiCredentials::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  auto ssidOffset = builder.CreateString(ssid);
-
-  flatbuffers::Offset<flatbuffers::String> passwordOffset;
-  if (withSensitiveData) {
-    passwordOffset = builder.CreateString(password);
-  } else {
-    passwordOffset = 0;
-  }
-
-  const Serialization::Configuration::MacAddress* bssidPtr = nullptr;
-  Serialization::Configuration::MacAddress bssidStruct;
-  if (HasPinnedBSSID()) {
-    bssidStruct = Serialization::Configuration::MacAddress(flatbuffers::span<const uint8_t, 6>(bssid.data(), 6));
-    bssidPtr    = &bssidStruct;
-  }
-
-  return Serialization::Configuration::CreateWiFiCredentials(builder, id, ssidOffset, passwordOffset, ToFbsAuthMode(authMode), bssidPtr);
-}
-
 bool WiFiCredentials::FromJSON(JSON::JsonView json)
 {
   if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {

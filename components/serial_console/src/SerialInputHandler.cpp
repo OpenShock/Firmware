@@ -25,6 +25,7 @@ const char* const TAG = "SerialInputHandler";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>

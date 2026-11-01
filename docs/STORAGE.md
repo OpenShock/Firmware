@@ -43,9 +43,9 @@ reads as its default and an unknown key is ignored, so adding or removing a fiel
 
 To add a section, define a value type whose default constructor is the defaults, with `Normalize` (its validation,
 run on every value the section takes in), `LoadNvs`, `SaveNvs`, `FromJSON` (opened with `Parse::ObjectOrDefault`,
-booleans through `Parse::JsonBool`), `ToJSON` and `ToFlatbuffers`, and one
-`Config::Section<T>` for it in the module (the `SectionValue` concept in `config/Section.h` is the contract). It
-joins `jsonconfig`, `rawconfig`, the local protocol's Ready message and factory reset through the section registry.
+booleans through `Parse::JsonBool`) and `ToJSON`, and one `Config::Section<T>` for it in the module (the
+`SectionValue` concept in `config/Section.h` is the contract). It joins `jsonconfig` and factory reset through the
+section registry. The config has no FlatBuffers form: the portal's Ready message carries only the settings it shows.
 A load opens its namespace with `Nvs::Handle::OpenForLoad`: a namespace never written reads every key as its
 default, an open that failed fails the load, and a failed load runs the section on its defaults without trusting
 flash. A save goes through `Nvs::Saver`, which writes only the members that differ from the previous value.

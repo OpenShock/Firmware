@@ -18,7 +18,6 @@ namespace OpenShock::SerialCmds::CommandHandlers {
   OpenShock::SerialCmds::CommandGroup NetworksHandler();
   OpenShock::SerialCmds::CommandGroup KeepAliveHandler();
   OpenShock::SerialCmds::CommandGroup JsonConfigHandler();
-  OpenShock::SerialCmds::CommandGroup RawConfigHandler();
   OpenShock::SerialCmds::CommandGroup RfTransmitHandler();
   OpenShock::SerialCmds::CommandGroup FactoryResetHandler();
   OpenShock::SerialCmds::CommandGroup LedTestHandler();
@@ -39,7 +38,6 @@ namespace OpenShock::SerialCmds::CommandHandlers {
       NetworksHandler(),
       KeepAliveHandler(),
       JsonConfigHandler(),
-      RawConfigHandler(),
       RfTransmitHandler(),
       FactoryResetHandler(),
       LedTestHandler(),

@@ -6,7 +6,6 @@ const char* const TAG = "Config";
 
 #include "config/Nvs.h"
 #include "config/Section.h"
-#include "config/Wire.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
 

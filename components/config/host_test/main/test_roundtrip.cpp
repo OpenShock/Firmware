@@ -143,19 +143,6 @@ TEST_CASE("One credential that does not read is dropped; the others load and sur
   TEST_ASSERT_EQUAL_UINT8(7, creds[2].id);
 }
 
-TEST_CASE("rawconfig keeps a boolean that equals its schema default", "[config][roundtrip]")
-{
-  // The builder omits a field equal to its schema default, and the reader takes the omission as that default.
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(true));
-
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(false));
-  TEST_ASSERT_TRUE(Config::SetRaw(raw.data(), raw.size()));
-  TEST_ASSERT_TRUE(Config::GetRFConfig().keepAliveEnabled);
-}
-
 TEST_CASE("A save writes only what changed", "[config][roundtrip]")
 {
   const Full sample = MakeSampleConfig();
@@ -279,20 +266,6 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
 }
 
-TEST_CASE("The wire form for the portal omits secrets and carries every section", "[config][roundtrip]")
-{
-  const Full sample = MakeSampleConfig();
-  InitWith(sample);
-
-  flatbuffers::FlatBufferBuilder builder;
-  Serialization::Configuration::FinishHubConfigBuffer(builder, Config::GetAsFlatBuffer(builder, false));
-  std::vector<uint8_t> exported(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
-
-  Full decoded;
-  TEST_ASSERT_TRUE(Deserialize(exported.data(), exported.size(), decoded));
-  AssertConfigEqual(sample, decoded, false);
-}
-
 TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves only on change", "[config][roundtrip]")
 {
   const Full sample = MakeSampleConfig();
@@ -338,25 +311,4 @@ TEST_CASE("Factory reset wipes every setting and survives a reload", "[config][r
   AssertConfigEqual(Full(), Snapshot());
   Reload();
   AssertConfigEqual(Full(), Snapshot());
-}
-
-TEST_CASE("rawconfig get and set round trip the whole config", "[config][roundtrip]")
-{
-  InitWith(MakeSampleConfig());
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  const std::vector<uint8_t> exported(raw.data(), raw.data() + raw.size());
-
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRaw(exported.data(), exported.size()));
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-  Reload();
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-
-  // A buffer that does not verify changes nothing
-  const std::size_t before = UsedEntries();
-  TEST_ASSERT_FALSE(Config::SetRaw(exported.data(), exported.size() / 2));
-  TEST_ASSERT_FALSE(Config::SetRaw(nullptr, 0));
-  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
 }

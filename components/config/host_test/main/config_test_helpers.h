@@ -6,7 +6,6 @@
 // real NVS on the linux flash emulation.
 #include "config/Nvs.h"
 #include "config/Store.h"
-#include "config/Wire.h"
 
 #include "BackendConfig.h"
 #include "captiveportal/CaptivePortalConfig.h"
@@ -83,12 +82,6 @@ namespace ConfigTest {
 
   // Every field differs from the defaults.
   Full MakeSampleConfig();
-
-  // Each section's FlatBuffers form in a HubConfig: what rawconfig carries.
-  std::vector<uint8_t> Serialize(const Full& config, bool withSensitiveData = true);
-
-  // Decodes a HubConfig the way rawconfig set does (HubConfig -> jsonconfig document -> each section's FromJSON).
-  bool Deserialize(const uint8_t* data, std::size_t size, Full& out);
 
   // Erases the `cfg` and shared `nvs` partitions: a hub with nothing stored.
   void WipeStore();

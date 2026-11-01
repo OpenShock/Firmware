@@ -13,7 +13,6 @@ const char* const TAG = "Config::OtaUpdateConfig";
 #include <utility>
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace      = "ota";
 static constexpr const char* kKeyEnabled     = "enabled";
@@ -30,7 +29,7 @@ static constexpr const char* kKeyStep        = "step";
 static constexpr uint16_t kDefaultCheckInterval = 30;  // minutes
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .hubConfigField = Fbs::HubConfig::VT_OTA_UPDATE, .namespaces = kNamespaces});
+static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .namespaces = kNamespaces});
 
 using namespace std::string_view_literals;
 
@@ -64,26 +63,6 @@ OtaUpdateConfig::OtaUpdateConfig(
 {
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::OtaUpdateConfig> OtaUpdateConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  namespace Fbs = Serialization::Configuration;
-
-  auto cdnDomainOffset = builder.CreateString(cdnDomain);
-
-  Fbs::OtaUpdateConfigBuilder otaBuilder(builder);
-  otaBuilder.add_update_id(updateId);
-  otaBuilder.add_cdn_domain(cdnDomainOffset);
-  otaBuilder.add_check_interval(checkInterval);
-  otaBuilder.add_update_step(static_cast<Fbs::OtaUpdateStep>(updateStep));
-  otaBuilder.add_require_manual_approval(requireManualApproval);
-  otaBuilder.add_allow_backend_management(allowBackendManagement);
-  otaBuilder.add_check_periodically(checkPeriodically);
-  otaBuilder.add_check_on_startup(checkOnStartup);
-  otaBuilder.add_update_channel(static_cast<Fbs::OtaUpdateChannel>(updateChannel));
-  otaBuilder.add_is_enabled(isEnabled);
-  return otaBuilder.Finish();
-}
-
 bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
 {
   if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
@@ -111,14 +90,14 @@ void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
   JSON::objBegin(gen, name);
   json_gen_obj_set_bool(gen, "isEnabled", isEnabled);
   JSON::objSetString(gen, "cdnDomain", cdnDomain);
-  JSON::objSetString(gen, "updateChannel", OpenShock::Serialization::Configuration::EnumNameOtaUpdateChannel(static_cast<Serialization::Configuration::OtaUpdateChannel>(updateChannel)));
+  JSON::objSetString(gen, "updateChannel", OpenShock::OtaUpdateChannelName(updateChannel));
   json_gen_obj_set_bool(gen, "checkOnStartup", checkOnStartup);
   json_gen_obj_set_bool(gen, "checkPeriodically", checkPeriodically);
   json_gen_obj_set_int(gen, "checkInterval", checkInterval);
   json_gen_obj_set_bool(gen, "allowBackendManagement", allowBackendManagement);
   json_gen_obj_set_bool(gen, "requireManualApproval", requireManualApproval);
   json_gen_obj_set_int(gen, "updateId", updateId);
-  JSON::objSetString(gen, "updateStep", OpenShock::Serialization::Configuration::EnumNameOtaUpdateStep(static_cast<Serialization::Configuration::OtaUpdateStep>(updateStep)));
+  JSON::objSetString(gen, "updateStep", OpenShock::OtaUpdateStepName(updateStep));
   JSON::objEnd(gen, name);
 }
 

@@ -6,7 +6,6 @@
 //   namespace "wifi":     one blob per credential, key = its id in decimal ("1".."255"); enumerated, never counted
 
 #include "config/Section.h"
-#include "serialization/_fbs/HubConfig_generated.h"
 #include "util/FunctionRef.h"
 #include "wifi/WiFiCredentials.h"
 
@@ -36,7 +35,6 @@ namespace OpenShock::Config {
     bool FromJSON(JSON::JsonView json);
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
 
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::WiFiConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
   };
 
   [[nodiscard]] WiFiConfig GetWiFiConfig();

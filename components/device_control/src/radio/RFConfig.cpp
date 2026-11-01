@@ -12,14 +12,13 @@ const char* const TAG = "Config::RFConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace    = "rf";
 static constexpr const char* kKeyTxPin     = "tx_pin";
 static constexpr const char* kKeyKeepAlive = "keepalive";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<RFConfig> s_section({.name = "rf", .order = 0, .hubConfigField = Fbs::HubConfig::VT_RF, .namespaces = kNamespaces});
+static Section<RFConfig> s_section({.name = "rf", .order = 0, .namespaces = kNamespaces});
 
 RFConfig::RFConfig()
   : txPin(static_cast<gpio_num_t>(Board::Get().rfTxGpio))
@@ -88,15 +87,6 @@ void RFConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveD
   json_gen_obj_set_int(gen, "txPin", static_cast<int>(txPin));
   json_gen_obj_set_bool(gen, "keepAliveEnabled", keepAliveEnabled);
   JSON::objEnd(gen, name);
-}
-
-flatbuffers::Offset<Fbs::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  (void)withSensitiveData;
-  Fbs::RFConfigBuilder rfBuilder(builder);
-  rfBuilder.add_tx_pin(txPin);
-  rfBuilder.add_keepalive_enabled(keepAliveEnabled);
-  return rfBuilder.Finish();
 }
 
 RFConfig OpenShock::Config::GetRFConfig()

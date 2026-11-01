@@ -63,36 +63,6 @@ namespace ConfigTest {
     return config;
   }
 
-  std::vector<uint8_t> Serialize(const Full& config, bool withSensitiveData)
-  {
-    flatbuffers::FlatBufferBuilder builder;
-    auto rf            = config.rf.ToFlatbuffers(builder, withSensitiveData);
-    auto wifi          = config.wifi.ToFlatbuffers(builder, withSensitiveData);
-    auto captivePortal = config.captivePortal.ToFlatbuffers(builder, withSensitiveData);
-    auto backend       = config.backend.ToFlatbuffers(builder, withSensitiveData);
-    auto serialInput   = config.serialInput.ToFlatbuffers(builder, withSensitiveData);
-    auto otaUpdate     = config.otaUpdate.ToFlatbuffers(builder, withSensitiveData);
-    auto estop         = config.estop.ToFlatbuffers(builder, withSensitiveData);
-    auto root          = Serialization::Configuration::CreateHubConfig(builder, rf, wifi, captivePortal, backend, serialInput, otaUpdate, estop);
-    Serialization::Configuration::FinishHubConfigBuffer(builder, root);
-    return std::vector<uint8_t>(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
-  }
-
-  bool Deserialize(const uint8_t* data, std::size_t size, Full& out)
-  {
-    auto json = Config::HubConfigToJSON(std::span<const uint8_t>(data, size));
-    if (!json) {
-      return false;
-    }
-    JSON::JsonDocument doc;
-    if (!doc.parse(*json)) {
-      return false;
-    }
-    JSON::JsonView root = doc.root();
-    return out.rf.FromJSON(root["rf"]) && out.wifi.FromJSON(root["wifi"]) && out.captivePortal.FromJSON(root["captivePortal"]) && out.backend.FromJSON(root["backend"]) && out.serialInput.FromJSON(root["serialInput"])
-        && out.otaUpdate.FromJSON(root["otaUpdate"]) && out.estop.FromJSON(root["estop"]);
-  }
-
   static void wipePartition(const char* label)
   {
     nvs_flash_deinit_partition(label);  // ESP_ERR_NVS_NOT_INITIALIZED when it is not up, which is fine

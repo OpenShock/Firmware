@@ -1,6 +1,5 @@
 #pragma once
 
-#include "serialization/_fbs/HubConfig_generated.h"
 
 #include <json_generator.h>
 
@@ -36,8 +35,6 @@ namespace OpenShock::Config {
     [[nodiscard]] std::vector<uint8_t> ToBlob() const;
     /// @brief Decodes a blob written by ToBlob (any version it ever wrote). False on a malformed blob.
     bool FromBlob(std::span<const uint8_t> blob);
-
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::WiFiCredentials> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
 
     bool FromJSON(JSON::JsonView json);
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;

@@ -4,7 +4,6 @@
 // NVS through the config framework (config/Section.h); NVS namespace "estop", keys enabled (u8) and gpio (i8).
 
 #include "config/Section.h"
-#include "serialization/_fbs/HubConfig_generated.h"
 
 #include <hal/gpio_types.h>
 
@@ -33,7 +32,6 @@ namespace OpenShock::Config {
     bool FromJSON(JSON::JsonView json);
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
 
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::EStopConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
   };
 
   [[nodiscard]] EStopConfig GetEStopConfig();
