@@ -4,8 +4,6 @@
 
 const char* const TAG = "GatewayConnectionManager";
 
-#include "visual/VisualStateManager.h"
-
 #include "AppHooks.h"
 #include "BackendConfig.h"
 #include "events/Events.h"
@@ -28,9 +26,6 @@ const char* const TAG = "GatewayConnectionManager";
 #include <utility>
 #include <vector>
 
-const char* const AUTH_TOKEN_FILE = "/authToken";
-
-const uint8_t FLAG_NONE   = 0;
 const uint8_t FLAG_HAS_IP = 1 << 0;
 const uint8_t FLAG_LINKED = 1 << 1;
 

@@ -132,7 +132,7 @@ NON_SOURCE_CHANGES = [
     'components/rf/README.md',
     'docs/flashing.png',
     'LICENSE',
-    'components/fs/data/.gitkeep',
+    'components/www/data/.gitkeep',
     '.gitkeep',
     '.claude/settings.json',
     '.github/ISSUE_TEMPLATE/bug_report.yml',
