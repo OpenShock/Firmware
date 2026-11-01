@@ -1,8 +1,7 @@
 #pragma once
 
 // The config half of the 1.x -> 2.x storage migration (docs/STORAGE.md): retype the 1.x littlefs `config` partition
-// as the `cfg` NVS store, in place. Not called by anything yet; the release that pipelines the storage migrations
-// decides when it runs.
+// as the `cfg` NVS store, in place. Run by the storage migration task (migration/StorageMigration.h).
 //
 // What happens around it is Store's: before it, a 1.x hub keeps its config (imported from the 1.x file) in the shared
 // `nvs`; on the first boot after it, Store erases the littlefs left in `cfg` and moves the config over.

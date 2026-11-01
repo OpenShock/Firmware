@@ -75,6 +75,9 @@ static OpenShock::FirmwareBootType _bootType;
 static TaskHandle_t _taskHandle = nullptr;
 static OpenShock::SemVer _requestedVersion;
 static OpenShock::SimpleMutex _requestedVersionMutex = {};
+// Held by whoever writes the flash an install writes: the update task for the whole install (until the restart on
+// success), the storage migration from before its first flash write to its restart (TryLockFlashWrites).
+static OpenShock::SimpleMutex _flashWriteMutex = {};
 
 using namespace OpenShock;
 
@@ -429,6 +432,13 @@ static void otaum_updatetask(void* arg)
 
     if (versionStr == OpenShock::Constants::FW_VERSION) {
       OS_LOGI(TAG, "Requested version is already installed");
+      continue;
+    }
+
+    // Never alongside the storage migration's www and partition table writes; it restarts the hub when it is done
+    ScopedTryLock flashWrites(&_flashWriteMutex, 0);
+    if (!flashWrites.isLocked()) {
+      OS_LOGW(TAG, "The storage migration is writing flash; not updating now");
       continue;
     }
 
@@ -851,6 +861,16 @@ bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
   OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
 
   return otaum_try_queue_update_request(version);
+}
+
+bool OtaUpdateManager::TryLockFlashWrites()
+{
+  return _flashWriteMutex.lock(0);
+}
+
+void OtaUpdateManager::UnlockFlashWrites()
+{
+  _flashWriteMutex.unlock();
 }
 
 bool OtaUpdateManager::RequestUpdateCheck()

@@ -9,6 +9,7 @@ const char* const TAG = "WwwMigration";
 #include "www/WwwImage.h"
 #include "www/WwwPartition.h"
 
+#include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <esp_system.h>
 
@@ -21,17 +22,50 @@ using namespace OpenShock;
 namespace PT = OpenShock::PartitionTable;
 
 namespace {
-  constexpr const char* kStaticLabel = "static0";  // the 1.x entry the www partition takes over
+  constexpr const char* kStaticLabel    = "static0";  // the 1.x entry the www partition takes over
+  constexpr std::size_t kCopyBufferSize = 4096;
+  constexpr std::size_t kEraseStep      = 64 * 1024;
 
-  // Downloads `url` into `partition` (FlashPartitionFromUrl: streamed, hashed, erased just ahead of the data), refusing
-  // anything that does not start like a www image before the first erase; then checks what is on flash, so a write that
-  // did not stick fails too.
-  bool downloadInto(HTTP::Client& client, const esp_partition_t* partition, std::string_view url, const uint8_t (&hash)[32])
+  bool copyImage(const esp_partition_t* source, const esp_partition_t* destination, std::size_t size)
   {
+    std::array<uint8_t, kCopyBufferSize> buffer;
+    std::size_t erasedTo = 0;
+    for (std::size_t offset = 0; offset < size;) {
+      const std::size_t length = std::min(buffer.size(), size - offset);
+      while (erasedTo < offset + length) {
+        const std::size_t eraseLength = std::min(kEraseStep, static_cast<std::size_t>(destination->size) - erasedTo);
+        if (eraseLength == 0 || esp_partition_erase_range(destination, erasedTo, eraseLength) != ESP_OK) {
+          OS_LOGE(TAG, "Failed to erase static0 at offset %zu", erasedTo);
+          return false;
+        }
+        erasedTo += eraseLength;
+      }
+      if (esp_partition_read(source, offset, buffer.data(), length) != ESP_OK) {
+        OS_LOGE(TAG, "Failed to read the staged www image");
+        return false;
+      }
+      if (esp_partition_write(destination, offset, buffer.data(), length) != ESP_OK) {
+        OS_LOGE(TAG, "Failed to write static0");
+        return false;
+      }
+      offset += length;
+    }
+    return true;
+  }
+
+  // Downloads into the inactive app slot first. Its contents are disposable once this firmware has booted, while
+  // static0 still holds the 1.x portal until the supplied image has passed both integrity checks.
+  bool downloadInto(HTTP::Client& client, const esp_partition_t* staticPartition, std::string_view url, const uint8_t (&hash)[32])
+  {
+    const esp_partition_t* staging = esp_ota_get_next_update_partition(nullptr);
+    if (staging == nullptr) {
+      OS_LOGE(TAG, "No inactive OTA partition is available to stage the www image");
+      return false;
+    }
+
     auto noProgress = [](std::size_t, std::size_t, float) -> bool {
       return true;
     };
-    // A littlefs image (a 1.x release's staticfs) must not end up in what becomes www
     auto startsLikeWwwImage = [](std::span<const uint8_t> chunk) -> bool {
       if (!Www::StartsLikeImage(chunk)) {
         OS_LOGE(TAG, "The download is not a www image");
@@ -39,14 +73,35 @@ namespace {
       }
       return true;
     };
-    if (!FlashPartitionFromUrl(client, partition, url, hash, noProgress, startsLikeWwwImage)) {
-      OS_LOGE(TAG, "Failed to download the www image");
+    if (!FlashPartitionFromUrl(client, staging, url, hash, noProgress, startsLikeWwwImage)) {
+      OS_LOGE(TAG, "Failed to download the www image into the staging partition");
       return false;
     }
 
-    // What is on flash now: an image that parses, with the published hash
+    Www::Partition staged;
+    if (!staged.mount(staging)) {
+      OS_LOGE(TAG, "The staged www image does not parse");
+      return false;
+    }
+    const std::size_t size = staged.image().ImageSize();
+    if (size > staticPartition->size) {
+      OS_LOGE(TAG, "The staged www image is too large for static0");
+      return false;
+    }
+
+    std::array<uint8_t, 32> stagedDigest;
+    if (!Www::ImageSha256(staging, stagedDigest) || memcmp(stagedDigest.data(), hash, 32) != 0) {
+      OS_LOGE(TAG, "The staged www image does not match the supplied hash");
+      return false;
+    }
+
+    OS_LOGI(TAG, "Writing the verified www image over static0 (0x%06x)", static_cast<unsigned>(staticPartition->address));
+    if (!copyImage(staging, staticPartition, size)) {
+      return false;
+    }
+
     std::array<uint8_t, 32> digest;
-    if (!Www::ImageSha256(partition, digest) || memcmp(digest.data(), hash, 32) != 0) {
+    if (!Www::ImageSha256(staticPartition, digest) || memcmp(digest.data(), hash, 32) != 0) {
       OS_LOGE(TAG, "The www image does not read back as written");
       return false;
     }
@@ -89,8 +144,7 @@ Www::MigrationResult Www::MigrateToWwwPartition(HTTP::Client& client, std::strin
     return MigrationResult::Refused;
   }
 
-  // From here the 1.x assets are gone
-  OS_LOGI(TAG, "Writing the www image over static0 (0x%06x)", static_cast<unsigned>(staticPartition->address));
+  // static0 is not touched until the image has downloaded and verified in the inactive OTA partition.
   if (!downloadInto(client, staticPartition, url, sha256)) {
     return MigrationResult::Failed;
   }

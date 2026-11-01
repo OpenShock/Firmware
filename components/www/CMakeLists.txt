@@ -5,7 +5,7 @@
 #
 #   include/www/WwwImage.h      the format: a parser/validator over a byte span, pure C++ (host-tested)
 #   include/www/WwwPartition.h  the device side: find the partition, map it, verify, serve
-#   include/www/Migration.h     writing the image over the 1.x static0 and retyping it as www (not wired up yet)
+#   include/www/Migration.h     writing the image over the 1.x static0 and retyping it as www (run by components/migration)
 #
 # scripts/utils/wwwimage.py writes the format; change both together.
 idf_component_register(
@@ -18,5 +18,6 @@ idf_component_register(
   PRIV_REQUIRES crypto logging             # SHA256 for the image hash; OS_LOG*
                 spi_flash                  # esp_partition_mmap
                 hwutil partition_layout    # the migration: FindStaticPartition/FlashPartitionFromUrl, retyping static0
+                app_update                 # esp_ota_get_next_update_partition staging slot
                 esp_system                 # esp_restart
 )

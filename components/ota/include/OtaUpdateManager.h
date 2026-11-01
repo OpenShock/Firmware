@@ -34,6 +34,12 @@ namespace OpenShock::OtaUpdateManager {
 
   bool TryStartFirmwareUpdate(const OpenShock::SemVer& version);
 
+  /// @brief Keeps installs out while the caller writes flash an install also writes (the storage migration's www image
+  ///        and partition table). False while an install is running. Held by the calling task until
+  ///        UnlockFlashWrites() or a restart; an install that comes up meanwhile is dropped, not queued.
+  [[nodiscard]] bool TryLockFlashWrites();
+  void UnlockFlashWrites();
+
   /// @brief Asks the update task to check the configured channel for a new version as soon as it can.
   bool RequestUpdateCheck();
 

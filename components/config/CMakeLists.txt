@@ -7,7 +7,7 @@
 #                     filling an empty store (the 1.x file, else defaults), factory reset, the whole-config JSON
 #   config/Wire.h     the whole config as the FlatBuffers HubConfig (local protocol Ready message, rawconfig), and
 #                     HubConfig -> JSON, which is also how the 1.x config file is imported
-#   config/Migration.h retyping the 1.x littlefs `config` partition as the `cfg` store (not wired up yet)
+#   config/Migration.h retyping the 1.x littlefs `config` partition as the `cfg` store (run by components/migration)
 #   config/Parse.h    field parsing helpers for sections' FromJSON
 #
 # The 1.x import (Store.cpp's readLegacyConfig, littlefs through fs) is 1.x compatibility code: it goes away on
