@@ -1,8 +1,8 @@
 #include "serial_console/command_handlers/common.h"
 
 #include "migration/StorageMigration.h"
-#include "util/HexUtils.h"
 #include "StringHelpers.h"
+#include "util/HexUtils.h"
 
 #include <span>
 
