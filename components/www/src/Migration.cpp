@@ -89,6 +89,12 @@ namespace {
       return false;
     }
 
+    std::array<uint8_t, 32> stagedDigest;
+    if (!Www::ImageSha256(staging, stagedDigest) || memcmp(stagedDigest.data(), hash, 32) != 0) {
+      OS_LOGE(TAG, "The staged www image does not match the supplied hash");
+      return false;
+    }
+
     OS_LOGI(TAG, "Writing the verified www image over static0 (0x%06x)", static_cast<unsigned>(staticPartition->address));
     if (!copyImage(staging, staticPartition, size)) {
       return false;
