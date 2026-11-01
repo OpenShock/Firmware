@@ -80,9 +80,9 @@ TEST_CASE("OtaUpdateChannel: stable/beta/develop/dev + case", "[common][enums]")
 
 TEST_CASE("OtaUpdateChannel: every name parses back", "[common][enums]")
 {
-  TEST_ASSERT_EQUAL_STRING("Stable", OtaUpdateChannelName(OtaUpdateChannel::Stable));
-  TEST_ASSERT_EQUAL_STRING("Beta", OtaUpdateChannelName(OtaUpdateChannel::Beta));
-  TEST_ASSERT_EQUAL_STRING("Develop", OtaUpdateChannelName(OtaUpdateChannel::Develop));
+  TEST_ASSERT_EQUAL_STRING("stable", OtaUpdateChannelName(OtaUpdateChannel::Stable));
+  TEST_ASSERT_EQUAL_STRING("beta", OtaUpdateChannelName(OtaUpdateChannel::Beta));
+  TEST_ASSERT_EQUAL_STRING("develop", OtaUpdateChannelName(OtaUpdateChannel::Develop));
 
   for (OtaUpdateChannel channel : {OtaUpdateChannel::Stable, OtaUpdateChannel::Beta, OtaUpdateChannel::Develop}) {
     TEST_ASSERT_TRUE(TryParseOtaUpdateChannel(OtaUpdateChannelName(channel)) == channel);

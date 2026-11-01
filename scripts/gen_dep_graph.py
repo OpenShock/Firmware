@@ -52,7 +52,6 @@ LABEL_OVERRIDES = {
     'http': 'HTTP',
     'dns_server': 'DnsServer',
     'rfc8908': 'RFC8908',
-    'hwutil': 'HwUtil',
 }
 
 

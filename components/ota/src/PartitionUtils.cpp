@@ -1,4 +1,4 @@
-#include "hwutil/PartitionUtils.h"
+#include "PartitionUtils.h"
 
 const char* const TAG = "PartitionUtils";
 

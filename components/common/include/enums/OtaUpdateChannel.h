@@ -18,11 +18,11 @@ namespace OpenShock {
   {
     switch (channel) {
       case OtaUpdateChannel::Stable:
-        return "Stable";
+        return "stable";
       case OtaUpdateChannel::Beta:
-        return "Beta";
+        return "beta";
       case OtaUpdateChannel::Develop:
-        return "Develop";
+        return "develop";
     }
     return "";
   }
