@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <json_generator.h>
 
 #include <esp_wifi_types.h>

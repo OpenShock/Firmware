@@ -29,7 +29,6 @@ namespace OpenShock::Config {
 
     bool FromJSON(JSON::JsonView json);
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
-
   };
 
   /// @brief The section itself, for whole-value reads and read-modify-writes.

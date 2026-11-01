@@ -16,10 +16,10 @@ const char* const TAG = "Config";
 
 using namespace OpenShock;
 
-static constexpr const char* kPartitionCfg    = "cfg";
-static constexpr const char* kRootNamespace   = "root";
-static constexpr const char* kSchemaKey       = "schema";
-static constexpr uint8_t kSchemaVersion       = 1;
+static constexpr const char* kPartitionCfg  = "cfg";
+static constexpr const char* kRootNamespace = "root";
+static constexpr const char* kSchemaKey     = "schema";
+static constexpr uint8_t kSchemaVersion     = 1;
 
 // Written by Init() alone, under the write lock, before anything else reads a section.
 static const char* s_partition = nullptr;

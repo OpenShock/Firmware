@@ -31,7 +31,6 @@ namespace OpenShock::Config {
 
     bool FromJSON(JSON::JsonView json);
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
-
   };
 
   [[nodiscard]] EStopConfig GetEStopConfig();
