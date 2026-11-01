@@ -1,7 +1,7 @@
 # TEMPORARY: fielded 1.x hubs only update through the flat files on this CDN, so the firmware that migrates them has to
 # be published here too. Delete this action and ci-build's legacy-cdn job once the fleet is on the repository server.
 name: legacy-cdn-publish
-description: Upload a develop build to the 1.x firmware CDN and advance its develop channel pointer
+description: Upload a build to the 1.x firmware CDN and advance its develop channel pointer
 inputs:
   hostname:
     required: true
@@ -91,7 +91,7 @@ runs:
           current="$(tr -d ' \t\r\n' < current.txt)"
         fi
         case "$current" in
-          *-develop+*)
+          *+*) # A build of any branch; a release has no commit to compare with
             if git merge-base --is-ancestor "$GITHUB_SHA" "${current##*+}" 2>/dev/null; then
               echo "version-develop.txt: keeping $current, which already contains this commit"
               exit 0

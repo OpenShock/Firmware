@@ -1,8 +1,8 @@
 # Compiles once per build variant (scripts/utils/boards.py) and stamps each board from it. Runs on:
 #   - release tags: every board, published to prod;
-#   - nightly on develop when firmware sources changed, published to prod and (temporarily) the 1.x CDN;
+#   - nightly on develop when firmware sources changed, published to prod;
 #   - pull requests: one canary board, or every board with the ci:full-build label;
-#   - dispatch: every board, on demand.
+#   - dispatch: every board, on demand, and (temporarily, with legacy-cdn) published to the 1.x CDN as well.
 # Per-commit checks are host-tests.yml, script-tests.yml, frontend-checks.yml and cpp-linter.yml.
 name: ci-build
 
@@ -32,6 +32,11 @@ on:
         type: choice
         default: derive
         options: [derive, develop, beta, stable]
+      legacy-cdn:
+        description: 'Also publish to the 1.x CDN and offer it to 1.x hubs on the develop channel (needs a ref the cdn environment admits)'
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: '0 3 * * *' # Runs on the default branch, develop
 
@@ -298,16 +303,16 @@ jobs:
           version: ${{ needs.plan.outputs.version }}
           mode: publish
 
-  # TEMPORARY: 1.x hubs only update from the old CDN, so the nightly carries the migration firmware there as well.
+  # TEMPORARY: 1.x hubs only update from the old CDN, so the migration firmware has to be published there as well.
   # After repo-server: once a 2.x-numbered build is installed, its www migration fetches the image from that release.
-  # Nightly only: this starts a rollout to fielded hubs, which a manual dispatch on develop should not do by default.
+  # Opt-in on a dispatch only: this starts a rollout to fielded hubs.
   legacy-cdn:
     name: Legacy 1.x CDN (develop channel)
     runs-on: ubuntu-latest
     needs: [gate, plan, repo-server]
     timeout-minutes: 20
-    if: ${{ github.event_name == 'schedule' && needs.gate.outputs.publish == 'true' }}
-    environment: cdn # Carries the Bunny credentials; its branch policy admits develop
+    if: ${{ inputs.legacy-cdn && needs.gate.outputs.publish == 'true' }}
+    environment: cdn # Carries the Bunny credentials; its branch policy admits develop and feature/ci-*
     permissions:
       contents: read
     # The group master and beta's cdn-bump holds: a tag cut from them still cascades into version-develop.txt.
