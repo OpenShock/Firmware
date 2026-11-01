@@ -115,9 +115,9 @@ runs it once `cfg` exists and the hub is online, with the portal closed and no O
 1. It refuses unless the live table has the 1.x littlefs `static0` partition and no `www`.
 2. It retypes `static0` as `www` (type 0x40) in a copy of the live table and re-seals the MD5
    (`components/partition_layout`). Every offset and size stays, so the bootloader that boots the 1.x table boots it.
-3. It downloads the release's www image over `static0`, checks its SHA-256 against the published one, and checks that
-   what is on flash parses and hashes the same. From here the 1.x assets are gone; a failure leaves the portal without
-   assets until a retry succeeds.
+3. It downloads the release's www image into the inactive OTA app slot, checks its SHA-256 against the published one,
+   and checks that it parses and hashes the same. Only then does it copy the image over `static0` and verify the
+   copied bytes, so a failed download or invalid image leaves the 1.x assets intact.
 4. The table sector is erased and written through the OTA path and read back. A write that will not stick puts the
    old table back; the hub never restarts without a table that parses.
 5. The hub restarts and the portal serves from `www`.

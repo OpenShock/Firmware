@@ -139,8 +139,8 @@ namespace {
       OS_LOGI(TAG, "An update is being installed; migrating the www partition later");
       return;
     }
-    // From here the 1.x assets in static0 are overwritten: the portal stays closed until the restart. A close that
-    // timed out still leaves the portal force-closed, so every return from here releases it.
+    // The portal stays closed until the restart. A close that timed out still leaves the portal force-closed, so every
+    // return from here releases it.
     struct ReleasePortalOnReturn {
       ~ReleasePortalOnReturn() { CaptivePortal::ReleaseForceClose(); }
     } releasePortal;
@@ -156,7 +156,7 @@ namespace {
         OS_LOGE(TAG, "The www partition migration was refused; the portal keeps serving from static0");
         break;
       case Www::MigrationResult::Failed:
-        OS_LOGE(TAG, "The www image did not download or verify; static0 holds no portal assets until a retry succeeds");
+        OS_LOGE(TAG, "The www image did not migrate; retrying later");
         break;
     }
   }

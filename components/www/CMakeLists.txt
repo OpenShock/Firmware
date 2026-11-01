@@ -18,5 +18,6 @@ idf_component_register(
   PRIV_REQUIRES crypto logging             # SHA256 for the image hash; OS_LOG*
                 spi_flash                  # esp_partition_mmap
                 hwutil partition_layout    # the migration: FindStaticPartition/FlashPartitionFromUrl, retyping static0
+                app_update                 # esp_ota_get_next_update_partition staging slot
                 esp_system                 # esp_restart
 )
