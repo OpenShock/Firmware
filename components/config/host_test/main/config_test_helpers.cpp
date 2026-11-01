@@ -4,8 +4,6 @@
 
 #include "unity.h"
 
-#include "json/Json.h"
-
 #include <nvs_flash.h>
 
 #include <cstring>
@@ -17,29 +15,8 @@ using namespace OpenShock;
 namespace ConfigTest {
   bool Full::SaveNvs(const char* partition) const
   {
-    if (!rf.SaveNvs(partition, nullptr) || !wifi.SaveNvs(partition, nullptr) || !captivePortal.SaveNvs(partition, nullptr) || !backend.SaveNvs(partition, nullptr) || !serialInput.SaveNvs(partition, nullptr) || !otaUpdate.SaveNvs(partition, nullptr)
-        || !estop.SaveNvs(partition, nullptr))
-    {
-      return false;
-    }
-    auto root = Config::Nvs::Handle::Open(partition, Keys::Ns::kRoot, true);
-    return root && root->SetU8(Keys::Root::kSchema, Keys::kSchemaVersion) && root->Commit();
-  }
-
-  std::string Full::ToJSON(bool withSensitiveData) const
-  {
-    JSON::StringWriter writer;
-    json_gen_str_t* gen = writer.gen();
-    json_gen_start_object(gen);
-    rf.ToJSON(gen, "rf", withSensitiveData);
-    wifi.ToJSON(gen, "wifi", withSensitiveData);
-    captivePortal.ToJSON(gen, "captivePortal", withSensitiveData);
-    backend.ToJSON(gen, "backend", withSensitiveData);
-    serialInput.ToJSON(gen, "serialInput", withSensitiveData);
-    otaUpdate.ToJSON(gen, "otaUpdate", withSensitiveData);
-    estop.ToJSON(gen, "estop", withSensitiveData);
-    json_gen_end_object(gen);
-    return writer.finish();
+    return rf.SaveNvs(partition, nullptr) && wifi.SaveNvs(partition, nullptr) && captivePortal.SaveNvs(partition, nullptr) && backend.SaveNvs(partition, nullptr) && serialInput.SaveNvs(partition, nullptr) && otaUpdate.SaveNvs(partition, nullptr)
+        && estop.SaveNvs(partition, nullptr);
   }
 
   Full MakeSampleConfig()
@@ -63,19 +40,12 @@ namespace ConfigTest {
     return config;
   }
 
-  static void wipePartition(const char* label)
-  {
-    nvs_flash_deinit_partition(label);  // ESP_ERR_NVS_NOT_INITIALIZED when it is not up, which is fine
-    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_erase_partition(label));
-  }
-
   void WipeStore()
   {
-    wipePartition(Keys::kPartitionCfg);
-    wipePartition(Keys::kPartitionShared);
-    // Back up right away, so a test can write straight into either store; Config::Init's own init is then a no-op
+    nvs_flash_deinit_partition(Keys::kPartitionCfg);  // ESP_ERR_NVS_NOT_INITIALIZED when it is not up, which is fine
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_erase_partition(Keys::kPartitionCfg));
+    // Back up right away, so a test can write straight into the store; Config::Init's own init is then a no-op
     TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionCfg));
-    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionShared));
   }
 
   void InitDefault()
@@ -105,18 +75,8 @@ namespace ConfigTest {
 
   bool NamespaceExists(const char* partition, const char* ns)
   {
-    return OpenShock::Config::Nvs::Handle::Open(partition, ns, false).has_value();
-  }
-
-  std::size_t KeyCount(const char* partition, const char* ns)
-  {
-    auto handle = OpenShock::Config::Nvs::Handle::Open(partition, ns, false);
-    if (!handle) {
-      return 0;
-    }
-    std::size_t count = 0;
-    TEST_ASSERT_TRUE(handle->ForEachKey(NVS_TYPE_ANY, [&](const char*) { ++count; }));
-    return count;
+    auto handle = OpenShock::Config::Nvs::Handle::OpenForLoad(partition, ns);
+    return handle && handle->Exists();
   }
 
   Full Snapshot()

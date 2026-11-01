@@ -55,7 +55,7 @@ bool RFConfig::LoadNvs(const char* partition)
 
 bool RFConfig::SaveNvs(const char* partition, const RFConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

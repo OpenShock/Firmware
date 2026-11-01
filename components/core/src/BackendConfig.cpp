@@ -66,7 +66,7 @@ bool BackendConfig::LoadNvs(const char* partition)
 
 bool BackendConfig::SaveNvs(const char* partition, const BackendConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

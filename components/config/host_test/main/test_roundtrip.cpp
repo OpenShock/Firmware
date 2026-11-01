@@ -121,7 +121,7 @@ TEST_CASE("One credential that does not read is dropped; the others load and sur
   const Full sample = MakeSampleConfig();
   InitWith(sample);
   {
-    auto wifi = Config::Nvs::Handle::Open(Keys::kPartitionCfg, Keys::Ns::kWifi, true);
+    auto wifi = Config::Nvs::Handle::OpenForWrite(Keys::kPartitionCfg, Keys::Ns::kWifi);
     TEST_ASSERT_TRUE(wifi.has_value());
     const uint8_t garbage[] = {0xFF, 0x02, 0x00};  // unknown blob version, id 2
     TEST_ASSERT_TRUE(wifi->SetBlob("2", garbage));
@@ -222,7 +222,7 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(json));
 
-  // Escaped exactly once on the way out (as the cJSON firmware did), decoded on the way in.
+  // Escaped exactly once on the way out (not double-escaped), decoded on the way in.
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("Office \"5G\"")"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("p@ss w0rd/\\")"));
 

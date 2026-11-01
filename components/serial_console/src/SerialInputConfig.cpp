@@ -59,7 +59,7 @@ bool SerialInputConfig::LoadNvs(const char* partition)
 
 bool SerialInputConfig::SaveNvs(const char* partition, const SerialInputConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

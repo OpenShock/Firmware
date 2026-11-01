@@ -59,7 +59,7 @@ bool CaptivePortalConfig::LoadNvs(const char* partition)
 
 bool CaptivePortalConfig::SaveNvs(const char* partition, const CaptivePortalConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

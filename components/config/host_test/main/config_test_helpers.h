@@ -24,10 +24,8 @@ namespace ConfigTest {
   // The storage format the tests check against: the store's own names and each module's. Written out here on purpose,
   // so a renamed key or namespace (which would orphan what devices hold) fails a test.
   namespace Keys {
-    inline constexpr const char* kPartitionCfg    = "cfg";
-    inline constexpr const char* kPartitionShared = "nvs";
+    inline constexpr const char* kPartitionCfg = "cfg";
     namespace Ns {
-      inline constexpr const char* kRoot    = "root";
       inline constexpr const char* kBackend = "backend";
       inline constexpr const char* kWifi    = "wifi";
       inline constexpr const char* kWifiCfg = "wifi.cfg";
@@ -36,12 +34,8 @@ namespace ConfigTest {
       inline constexpr const char* kPortal  = "portal";
       inline constexpr const char* kSerial  = "serial";
       inline constexpr const char* kOta     = "ota";
-      inline constexpr const char* kAll[]   = {kRoot, kBackend, kWifi, kWifiCfg, kRf, kEstop, kPortal, kSerial, kOta};
+      inline constexpr const char* kAll[]   = {kBackend, kWifi, kWifiCfg, kRf, kEstop, kPortal, kSerial, kOta};
     }  // namespace Ns
-    namespace Root {
-      inline constexpr const char* kSchema = "schema";
-    }
-    inline constexpr uint8_t kSchemaVersion = 1;
     namespace Backend {
       inline constexpr const char* kDomain = "domain";
       inline constexpr const char* kToken  = "token";
@@ -63,8 +57,7 @@ namespace ConfigTest {
     }
   }  // namespace Keys
 
-  // Every section's value at once: what a hub's whole config is (the role RootConfig had before the sections moved
-  // into their modules). Default-constructed, every member holds its defaults.
+  // Every section's value at once: what a hub's whole config is. Default-constructed, every member holds its defaults.
   struct Full {
     OpenShock::Config::RFConfig rf;
     OpenShock::Config::WiFiConfig wifi;
@@ -74,19 +67,17 @@ namespace ConfigTest {
     OpenShock::Config::OtaUpdateConfig otaUpdate;
     OpenShock::Config::EStopConfig estop;
 
-    // Every section's keys, plus the store's schema marker, so the store loads rather than fills it
+    // Every section's keys
     bool SaveNvs(const char* partition) const;
-    // As the jsonconfig document renders it
-    std::string ToJSON(bool withSensitiveData = true) const;
   };
 
   // Every field differs from the defaults.
   Full MakeSampleConfig();
 
-  // Erases the `cfg` and shared `nvs` partitions: a hub with nothing stored.
+  // Erases the `cfg` partition: a hub with nothing stored.
   void WipeStore();
 
-  // WipeStore + Config::Init: a hub booting on the defaults, which Init writes to the store.
+  // WipeStore + Config::Init: a hub booting on the defaults.
   void InitDefault();
 
   // A reboot: Config::Init again on whatever the store holds.
@@ -101,9 +92,6 @@ namespace ConfigTest {
   // Whether `ns` exists in `partition`: it was created by a write once, and stays even when every key of it has since
   // been erased.
   bool NamespaceExists(const char* partition, const char* ns);
-
-  // The number of keys in `ns` of `partition`; 0 for a namespace that does not exist.
-  std::size_t KeyCount(const char* partition, const char* ns);
 
   // Reads back every section through the modules' public accessors.
   Full Snapshot();

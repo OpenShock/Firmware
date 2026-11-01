@@ -19,7 +19,8 @@ The flash past 4 MB on bigger boards stays unused.
 
 This firmware only runs on this table. A hub on the 1.x table reaches it through the migration firmware on the
 `migration/firmware-2.0` branch, which is the only place that code lives; only after that can it install a release from
-here.
+here. Going back is not supported: the migration firmware treats a store without its `root/schema` marker as empty, so
+a hub set up on this firmware would lose its config.
 
 ## Config
 
@@ -37,9 +38,9 @@ always kept free for compaction) it holds the whole config with some 32 long WiF
 | `otaUpdate` | core (`OtaUpdateConfig.h`) | `ota` |
 | `estop` | device_control (`estop/EStopConfig.h`) | `estop` |
 
-The store's own namespace is `root`, with `schema` (u8, 1) marking a filled store. Namespace and key names are at
+Namespace and key names are at
 most 15 characters and are permanent once hubs hold them: renaming one is a migration, not an edit. A missing key
-reads as its default and an unknown key is ignored, so adding or removing a field never changes the schema.
+reads as its default and an unknown key is ignored, so adding or removing a field needs no migration.
 
 To add a section, define a value type whose default constructor is the defaults, with `Normalize` (its validation,
 run on every value the section takes in), `LoadNvs`, `SaveNvs`, `FromJSON` (opened with `Parse::ObjectOrDefault`,
@@ -52,8 +53,8 @@ flash. A save goes through `Nvs::Saver`, which writes only the members that diff
 
 Where the store is:
 
-- `cfg`. An empty store is filled once from every section's defaults, and marked filled only once every section reads
-  back from flash as written; a fill that failed part-way is redone on the next boot.
+- `cfg`. An empty store reads as the defaults; nothing is written until a value changes, so a value left at its
+  default follows the firmware's default.
 - Without a usable `cfg`, the hub runs on defaults in RAM and logs it.
 
 The shared `nvs` belongs to ESP-IDF (PHY calibration cache) and may be erased at any time; nothing of OpenShock's is

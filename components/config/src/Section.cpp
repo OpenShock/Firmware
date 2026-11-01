@@ -4,8 +4,6 @@
 
 #include "config/Nvs.h"
 
-#include "json/Json.h"
-
 using namespace OpenShock;
 
 // Constant-initialized, so it is valid before any section's constructor runs, whatever the static init order.
@@ -42,16 +40,4 @@ bool Config::Internal::EraseNamespaces(const char* partition, std::span<const ch
     ok &= Nvs::EraseNamespace(partition, ns);
   }
   return ok;
-}
-
-bool Config::Internal::SameJson(Util::FunctionRef<void(json_gen_str_t*)> renderA, Util::FunctionRef<void(json_gen_str_t*)> renderB)
-{
-  JSON::StringWriter a, b;
-  json_gen_start_object(a.gen());
-  renderA(a.gen());
-  json_gen_end_object(a.gen());
-  json_gen_start_object(b.gen());
-  renderB(b.gen());
-  json_gen_end_object(b.gen());
-  return a.finish() == b.finish();
 }

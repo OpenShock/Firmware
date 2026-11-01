@@ -3,15 +3,13 @@
 // The config store: where every module's section (config/Section.h) lives, and the operations over all of them.
 //
 // The store is the NVS partition labelled `cfg`. A hub whose `cfg` cannot be used runs on defaults in RAM and says so.
-//
-// The `root` namespace is the store's own: `schema` (u8) marks a store that has been filled. An unmarked store is
-// filled once, from every section's defaults.
+// An empty store reads as the defaults, so nothing is written until a value changes.
 
 #include <string>
 #include <string_view>
 
 namespace OpenShock::Config {
-  /// @brief Opens the store, fills it if it is empty, then loads every section. Call once, after Board::Init (section
+  /// @brief Opens the store and loads every section. Call once, after Board::Init (section
   ///        defaults read the board) and before anything reads a section.
   void Init();
 
@@ -19,7 +17,7 @@ namespace OpenShock::Config {
   [[nodiscard]] const char* StorageLabel();
 
   /**
-   * @brief Resets every section to its defaults: erases its namespaces and writes the defaults.
+   * @brief Resets every section to its defaults by erasing its namespaces.
    *
    * @note A restart after calling this function is HIGHLY recommended.
    */

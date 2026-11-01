@@ -194,7 +194,7 @@ bool WiFiConfig::LoadNvs(const char* partition)
 bool WiFiConfig::SaveNvs(const char* partition, const WiFiConfig* previous) const
 {
   {
-    auto handle = Nvs::Handle::Open(partition, kNamespaceCfg, true);
+    auto handle = Nvs::Handle::OpenForWrite(partition, kNamespaceCfg);
     if (!handle) {
       return false;
     }
@@ -203,7 +203,7 @@ bool WiFiConfig::SaveNvs(const char* partition, const WiFiConfig* previous) cons
     }
   }
 
-  auto handle = Nvs::Handle::Open(partition, kNamespaceCreds, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespaceCreds);
   if (!handle) {
     return false;
   }

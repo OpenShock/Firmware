@@ -19,20 +19,12 @@ namespace Keys = ConfigTest::Keys;
 namespace Nvs  = OpenShock::Config::Nvs;
 
 namespace {
-  // Writes a few keys straight into the store, as a different firmware version might have, then marks the schema
-  // so Init loads rather than imports.
+  // Writes a few keys straight into the store, as a different firmware version might have.
   Nvs::Handle Open(const char* ns)
   {
-    auto handle = Nvs::Handle::Open(Keys::kPartitionCfg, ns, true);
+    auto handle = Nvs::Handle::OpenForWrite(Keys::kPartitionCfg, ns);
     TEST_ASSERT_TRUE(handle.has_value());
     return std::move(*handle);
-  }
-
-  void MarkSchema()
-  {
-    auto root = Open(Keys::Ns::kRoot);
-    TEST_ASSERT_TRUE(root.SetU8(Keys::Root::kSchema, Keys::kSchemaVersion));
-    TEST_ASSERT_TRUE(root.Commit());
   }
 }  // namespace
 
@@ -66,20 +58,25 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   TEST_ASSERT_FALSE(config.estop.enabled);
 }
 
-TEST_CASE("An empty store: Init writes a default config that reloads", "[config][defaults]")
+TEST_CASE("An empty store reads as the defaults and Init writes nothing", "[config][defaults]")
 {
-  InitDefault();
+  WipeStore();
+  const std::size_t before = UsedEntries();
+  Config::Init();
   TEST_ASSERT_EQUAL_STRING("cfg", Config::StorageLabel());
   AssertConfigEqual(Full(), Snapshot());
-
-  // Every section namespace and the schema marker are now on flash
-  for (const char* ns : Keys::Ns::kAll) {
-    TEST_ASSERT_TRUE_MESSAGE(NamespaceExists(Keys::kPartitionCfg, ns), ns);
-  }
-  TEST_ASSERT_TRUE(UsedEntries() > 0);
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
 
   Reload();
   AssertConfigEqual(Full(), Snapshot());
+}
+
+TEST_CASE("Every section is saved under its own namespaces", "[config][defaults]")
+{
+  InitWith(MakeSampleConfig());
+  for (const char* ns : Keys::Ns::kAll) {
+    TEST_ASSERT_TRUE_MESSAGE(NamespaceExists(Keys::kPartitionCfg, ns), ns);
+  }
 }
 
 TEST_CASE("Missing sections default while present ones are kept", "[config][defaults]")
@@ -95,7 +92,6 @@ TEST_CASE("Missing sections default while present ones are kept", "[config][defa
     TEST_ASSERT_TRUE(estop.SetI8(Keys::Estop::kGpio, 13));
     TEST_ASSERT_TRUE(estop.Commit());
   }
-  MarkSchema();
   Reload();
 
   Full expected;
@@ -121,7 +117,6 @@ TEST_CASE("Missing keys inside a section take their defaults", "[config][default
     TEST_ASSERT_TRUE(ota.SetI32(Keys::Ota::kUpdateId, 77));  // the rest at their defaults
     TEST_ASSERT_TRUE(ota.Commit());
   }
-  MarkSchema();
   Reload();
   const Full loaded = Snapshot();
 
@@ -189,7 +184,6 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
     TEST_ASSERT_TRUE(estop.SetI8(Keys::Estop::kGpio, 0));  // strapping pin: not a valid E-Stop input
     TEST_ASSERT_TRUE(estop.Commit());
   }
-  MarkSchema();
   Reload();
 
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
@@ -202,7 +196,6 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
     TEST_ASSERT_TRUE(rf.SetI8(Keys::Rf::kTxPin, -1));
     TEST_ASSERT_TRUE(rf.Commit());
   }
-  MarkSchema();
   Reload();
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
 }
@@ -232,7 +225,7 @@ TEST_CASE("jsonconfig set with partial sections fills in defaults", "[config][de
 
 TEST_CASE("jsonconfig set requires the wifi credentials array when wifi is given", "[config][defaults][json]")
 {
-  // Same rule as the develop firmware: a wifi object without "credentials" is rejected.
+  // A wifi object without "credentials" is rejected.
   InitDefault();
   const std::size_t before = UsedEntries();
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub"}})"));

@@ -37,9 +37,8 @@ namespace OpenShock::Config::Nvs {
 
   class Handle {
   public:
-    /// @brief Opens `ns` in `partition`. A read-only open of a namespace that does not exist yet fails with nullopt
-    ///        and no error logged; a load cannot tell that from a failed open, so a load uses OpenForLoad instead.
-    [[nodiscard]] static std::optional<Handle> Open(const char* partition, const char* ns, bool write);
+    /// @brief Opens `ns` in `partition` read-write, creating it if it does not exist yet. Nullopt when the open failed.
+    [[nodiscard]] static std::optional<Handle> OpenForWrite(const char* partition, const char* ns);
 
     /// @brief Opens `ns` in `partition` read-only for a load. A namespace that was never written is an empty handle
     ///        (Exists() false) on which every read is Missing: every key is its default. Nullopt only when the open

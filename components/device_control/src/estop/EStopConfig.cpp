@@ -67,7 +67,7 @@ bool EStopConfig::LoadNvs(const char* partition)
 
 bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }

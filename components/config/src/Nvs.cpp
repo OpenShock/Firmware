@@ -34,15 +34,12 @@ bool Nvs::InitPartition(const char* label, bool eraseNewer)
   return true;
 }
 
-std::optional<Nvs::Handle> Nvs::Handle::Open(const char* partition, const char* ns, bool write)
+std::optional<Nvs::Handle> Nvs::Handle::OpenForWrite(const char* partition, const char* ns)
 {
   nvs_handle_t handle = 0;
-  esp_err_t err       = nvs_open_from_partition(partition, ns, write ? NVS_READWRITE : NVS_READONLY, &handle);
+  esp_err_t err       = nvs_open_from_partition(partition, ns, NVS_READWRITE, &handle);
   if (err == ESP_OK) {
     return Handle(handle);
-  }
-  if (err == ESP_ERR_NVS_NOT_FOUND && !write) {
-    return std::nullopt;  // The namespace was never written: every key is a default
   }
   OS_LOGE(TAG, "Failed to open %s/%s: %s", partition, ns, esp_err_to_name(err));
   return std::nullopt;
@@ -295,6 +292,6 @@ bool Nvs::EraseNamespace(const char* partition, const char* ns)
     return true;
   }
   existing.reset();
-  auto handle = Handle::Open(partition, ns, true);
+  auto handle = Handle::OpenForWrite(partition, ns);
   return handle && handle->EraseAll() && handle->Commit();
 }

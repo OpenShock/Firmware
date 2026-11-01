@@ -1,4 +1,4 @@
-// Where the config lives: the `cfg` partition, never the shared `nvs`.
+// Where the config lives: the `cfg` partition.
 #include <freertos/FreeRTOS.h>
 
 #include "unity.h"
@@ -12,22 +12,10 @@ using namespace ConfigTest;
 namespace Keys = ConfigTest::Keys;
 namespace Nvs  = OpenShock::Config::Nvs;
 
-namespace {
-  bool HasSchema(const char* partition)
-  {
-    auto root = Nvs::Handle::Open(partition, Keys::Ns::kRoot, false);
-    if (!root) return false;
-    uint8_t schema = 0;
-    return root->GetU8(Keys::Root::kSchema, schema) == Nvs::Result::Found && schema == Keys::kSchemaVersion;
-  }
-}  // namespace
-
 TEST_CASE("The store is the cfg partition", "[config][storage]")
 {
   InitDefault();
   TEST_ASSERT_EQUAL_STRING(Keys::kPartitionCfg, Config::StorageLabel());
-  TEST_ASSERT_TRUE(HasSchema(Keys::kPartitionCfg));
-  TEST_ASSERT_FALSE(HasSchema(Keys::kPartitionShared));  // nothing of ours goes in the shared partition
 }
 
 TEST_CASE("Sections link themselves into the registry in document order", "[config][storage]")
@@ -46,7 +34,7 @@ TEST_CASE("A key stored with another type reads as missing, so as its default", 
   InitWith(MakeSampleConfig());
   {
     // NVS looks keys up by name and type: a string where the rf section reads an i8 is not its pin
-    auto rf = Nvs::Handle::Open(Keys::kPartitionCfg, Keys::Ns::kRf, true);
+    auto rf = Nvs::Handle::OpenForWrite(Keys::kPartitionCfg, Keys::Ns::kRf);
     TEST_ASSERT_TRUE(rf.has_value());
     TEST_ASSERT_TRUE(rf->Erase(Keys::Rf::kTxPin));
     TEST_ASSERT_TRUE(rf->SetStr(Keys::Rf::kTxPin, "not a number"));
