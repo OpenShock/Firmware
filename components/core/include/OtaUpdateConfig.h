@@ -41,7 +41,8 @@ namespace OpenShock::Config {
     OtaUpdateStep updateStep;
 
     /// @brief The section runs it on every value it takes in: a zero check interval would check on every wake-up
-    ///        of the update task, so it becomes the default (the captive portal refuses it, JSON and NVS do not).
+    ///        of the update task, so it becomes the default (the captive portal refuses it, JSON and NVS do not). The
+    ///        1.x CDN domain, which every fielded hub stores and which serves no repository API, becomes the default too.
     void Normalize();
 
     [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::OtaUpdateConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;

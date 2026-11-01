@@ -231,6 +231,17 @@ TEST_CASE("jsonconfig get emits the same document develop did", "[config][legacy
   TEST_ASSERT_EQUAL_STRING(kDevelopJson, Config::GetAsJSON(true).c_str());
 }
 
+TEST_CASE("The 1.x CDN domain in an imported file moves to the repository server", "[config][legacy]")
+{
+  namespace Fbs = Serialization::Configuration;
+  flatbuffers::FlatBufferBuilder builder;
+  auto ota  = Fbs::CreateOtaUpdateConfigDirect(builder, true, "firmware.openshock.org");
+  auto root = Fbs::CreateHubConfig(builder, 0, 0, 0, 0, 0, ota);
+  Fbs::FinishHubConfigBuffer(builder, root);
+  TEST_ASSERT_TRUE(InitFromLegacy(builder.GetBufferPointer(), builder.GetSize()));
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_CDN_DOMAIN, Snapshot().otaUpdate.cdnDomain.c_str());
+}
+
 TEST_CASE("Fields from a newer 1.x schema are tolerated on import", "[config][legacy]")
 {
   // The schema has grown fields this firmware does not read (wifi AP password / disable flags, LAN config). A
