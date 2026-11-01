@@ -223,16 +223,18 @@ TEST_CASE("jsonconfig set with partial sections fills in defaults", "[config][de
   AssertConfigEqual(expected, Snapshot());
 }
 
-TEST_CASE("The 1.x CDN domain already in NVS moves to the repository server; a custom one stays", "[config][defaults]")
+TEST_CASE("The 1.x CDN domains already in NVS move to the repository server; a custom one stays", "[config][defaults]")
 {
   InitWith(MakeSampleConfig());
-  {
-    auto ota = Open(Keys::Ns::kOta);
-    TEST_ASSERT_TRUE(ota.SetStr("domain", "firmware.openshock.org"));
-    TEST_ASSERT_TRUE(ota.Commit());
+  for (const char* legacy : {"firmware.openshock.org", "fw.openshock.org"}) {
+    {
+      auto ota = Open(Keys::Ns::kOta);
+      TEST_ASSERT_TRUE(ota.SetStr("domain", legacy));
+      TEST_ASSERT_TRUE(ota.Commit());
+    }
+    Reload();
+    TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_CDN_DOMAIN, Snapshot().otaUpdate.cdnDomain.c_str());
   }
-  Reload();
-  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_CDN_DOMAIN, Snapshot().otaUpdate.cdnDomain.c_str());
 
   {
     auto ota = Open(Keys::Ns::kOta);

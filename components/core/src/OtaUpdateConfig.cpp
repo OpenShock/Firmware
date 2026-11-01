@@ -10,6 +10,8 @@ const char* const TAG = "Config::OtaUpdateConfig";
 
 #include "json/Json.h"
 
+#include <algorithm>
+#include <iterator>
 #include <string_view>
 #include <utility>
 
@@ -29,8 +31,8 @@ static constexpr const char* kKeyStep        = "step";
 
 static constexpr uint16_t kDefaultCheckInterval = 30;  // minutes
 
-// The domain 1.x firmware defaulted to: it serves flat files for 1.x hubs, not the repository API this firmware asks for.
-static constexpr std::string_view kLegacyCdnDomain = "firmware.openshock.org";
+// The domains of the 1.x firmware CDN: they serve flat files for 1.x hubs, not the repository API this firmware asks for.
+static constexpr std::string_view kLegacyCdnDomains[] = {"firmware.openshock.org", "fw.openshock.org"};
 
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .namespaces = kNamespaces});
@@ -115,7 +117,7 @@ void OtaUpdateConfig::Normalize()
   }
   // Rewritten on every load rather than once: it needs no migration state, and a hub that restores an old config still
   // lands here. Remove it once no hub or config backup can hold the 1.x domain.
-  if (cdnDomain == kLegacyCdnDomain) {
+  if (std::ranges::find(kLegacyCdnDomains, cdnDomain) != std::end(kLegacyCdnDomains)) {
     OS_LOGI(TAG, "Moving OTA updates from the 1.x CDN to %s", CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
     cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
   }
