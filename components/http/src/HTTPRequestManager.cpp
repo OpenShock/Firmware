@@ -196,6 +196,8 @@ HTTP::Response<std::size_t>
       config.user_data                = this;
       config.crt_bundle_attach        = esp_crt_bundle_attach;  // verify HTTPS servers against the compiled-in CA bundle
       config.save_client_session      = true;                   // resume the TLS session when reconnecting, see above
+      // Each transport read is capped at this; the 512-byte default turns a 4 KB body read into eight TLS reads
+      config.buffer_size = CONFIG_OPENSHOCK_HTTP_RX_BUFFER_SIZE;
 
       m_handle = esp_http_client_init(&config);
       if (m_handle == nullptr) {

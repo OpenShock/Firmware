@@ -198,6 +198,7 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.headers                       = m_headers.c_str();
   config.disable_auto_reconnect        = true;                                      // GatewayConnectionManager owns reconnection
   config.ext_transport                 = transport;                                 // Verifies the server, see _prepareTransport()
+  config.buffer_size                   = CONFIG_OPENSHOCK_GATEWAY_WS_BUFFER_SIZE;
   config.task_stack                    = CONFIG_OPENSHOCK_GATEWAY_TASK_STACK_SIZE;  // Message handlers (config reads, flash writes, FlatBuffers verification) run on it
   // TLS work stays on core 0 with the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.task_core_id_set = true;
