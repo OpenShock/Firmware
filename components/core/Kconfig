@@ -73,9 +73,17 @@ menu "OpenShock gateway"
         default 300000
 
     config OPENSHOCK_GATEWAY_CONNECT_RETRY_MS
-        int "Retry between gateway connection attempts (ms)"
+        int "Retry between gateway connection attempts, cap (ms)"
         range 1000 600000
         default 20000
+
+    config OPENSHOCK_GATEWAY_CONNECT_RETRY_MIN_MS
+        int "Retry between gateway connection attempts, first (ms)"
+        range 1000 OPENSHOCK_GATEWAY_CONNECT_RETRY_MS
+        default 2000
+        help
+            The delay before each connection attempt doubles from this up to the cap. It
+            starts over once a connection has stayed up for the cap.
 
     config OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS
         int "Hub info fetch retry, first (ms)"
