@@ -29,6 +29,7 @@ const char* const TAG = "SerialInputHandler";
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <string_view>
 
 using namespace OpenShock;
@@ -49,50 +50,20 @@ static SerialCmds::CommandGroup* findCommandGroup(std::string_view name)
 }
 
 namespace {
-  // Streams console output through a small stack buffer, flushing whenever it fills: long help text without
-  // assembling it all on the heap first.
-  class ChunkWriter {
+  // Collects help output and prints it in one Print call when it goes out of scope. One write holds the serial lock for
+  // the whole text, so a concurrent log line can't land in the middle of it (or split one of its lines).
+  class HelpWriter {
   public:
-    ChunkWriter()                              = default;
-    ChunkWriter(const ChunkWriter&)            = delete;
-    ChunkWriter& operator=(const ChunkWriter&) = delete;
-    ~ChunkWriter() { flush(); }
+    HelpWriter() { m_text.reserve(1024); }
+    HelpWriter(const HelpWriter&)            = delete;
+    HelpWriter& operator=(const HelpWriter&) = delete;
+    ~HelpWriter() { SerialInputHandler::Print(m_text); }
 
-    void append(std::string_view str)
-    {
-      while (!str.empty()) {
-        if (m_len == sizeof(m_buf)) {
-          flush();
-        }
-        std::size_t n = std::min(str.size(), sizeof(m_buf) - m_len);
-        std::memcpy(m_buf + m_len, str.data(), n);
-        m_len += n;
-        str.remove_prefix(n);
-      }
-    }
-    void append(std::size_t count, char c)
-    {
-      while (count > 0) {
-        if (m_len == sizeof(m_buf)) {
-          flush();
-        }
-        std::size_t n = std::min(count, sizeof(m_buf) - m_len);
-        std::memset(m_buf + m_len, c, n);
-        m_len += n;
-        count -= n;
-      }
-    }
-    void flush()
-    {
-      if (m_len > 0) {
-        SerialInputHandler::Print(std::string_view(m_buf, m_len));
-        m_len = 0;
-      }
-    }
+    void append(std::string_view str) { m_text.append(str); }
+    void append(std::size_t count, char c) { m_text.append(count, c); }
 
   private:
-    char m_buf[256];
-    std::size_t m_len = 0;
+    std::string m_text;
   };
 }  // namespace
 
@@ -116,7 +87,7 @@ static void printCompleteHelp()
 
   SerialInputHandler::PrintWelcomeHeader();
 
-  ChunkWriter out;
+  HelpWriter out;
   for (const auto& group : s_commandGroups) {
     for (const auto& command : group.commands()) {
       out.append(group.name());
@@ -144,7 +115,7 @@ static void printCompleteHelp()
 
 static void printCommandHelp(const SerialCmds::CommandGroup& group)
 {
-  ChunkWriter out;
+  HelpWriter out;
   for (const auto& command : group.commands()) {
     out.append("\r\n");
     out.append(group.name());
