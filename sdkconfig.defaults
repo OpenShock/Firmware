@@ -93,6 +93,10 @@ CONFIG_LWIP_MAX_SOCKETS=16
 # device (PartitionUtils logs the breakdown) before keeping this.
 CONFIG_LWIP_TCP_WND_DEFAULT=16384
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=16
+# The same for sending: lwIP stops accepting writes once this much is unacknowledged, so at the 5760-byte default a
+# portal asset or a websocket burst goes out one round trip per 5.7 KB. Like the window it bounds queued data, it is
+# not allocated up front.
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=16384
 
 # Resume TLS sessions: a reconnect then skips certificate chain verification and the key exchange, about a second
 # of CPU each. GatewayClient and HTTP::Client keep the session of their last connection and only offer it to the host
