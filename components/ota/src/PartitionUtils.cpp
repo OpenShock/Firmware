@@ -41,7 +41,7 @@ bool OpenShock::FlashPartitionFromUrl(
     int64_t erase, write, hash, progress;
   } spent = {};
 
-  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
+  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress, &spent](std::size_t size) -> bool {
     if (size > partition->size) {
       OS_LOGE(TAG, "Remote partition binary is too large");
       return false;
@@ -51,7 +51,9 @@ bool OpenShock::FlashPartitionFromUrl(
     contentLength = size;
 
     lastProgress = OpenShock::millis();
+    int64_t t0   = OpenShock::micros();
     progressCallback(0, contentLength, 0.0f);
+    spent.progress += OpenShock::micros() - t0;
 
     return true;
   };
