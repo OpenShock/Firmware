@@ -110,7 +110,7 @@ static void commandhandler_keepalivetask()
 
       uint32_t key = (static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId;
       if (activityMap.size() >= CONFIG_OPENSHOCK_KEEPALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
-        auto oldest = std::min_element(activityMap.begin(), activityMap.end(), [](const auto& a, const auto& b) { return a.second.lastActivityTimestamp < b.second.lastActivityTimestamp; });
+        auto oldest = std::ranges::min_element(activityMap, {}, [](const auto& entry) { return entry.second.lastActivityTimestamp; });
         OS_LOGW(TAG, "Keeping more than %d shockers alive, dropping shocker %u", CONFIG_OPENSHOCK_KEEPALIVE_MAX_SHOCKERS, oldest->second.shockerId);
         activityMap.erase(oldest);
       }

@@ -274,7 +274,7 @@ HTTP::Response<std::size_t>
     OS_LOGW(TAG, "The server refused to brew coffee because it is, permanently, a teapot.");
   }
 
-  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
+  if (!std::ranges::contains(acceptedCodes, responseCode)) {
     OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
     return fail(RequestResult::CodeRejected, responseCode, 0);  // body not drained
   }

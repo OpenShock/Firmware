@@ -340,7 +340,7 @@ void RFTransmitter::TransmitTask()
       }
 
       uint32_t key = shockerKey(cmd.modelType, cmd.shockerId);
-      auto stop    = std::find_if(stops.begin(), stops.end(), [key](const auto& entry) { return entry.first == key; });
+      auto stop    = std::ranges::find(stops, key, [](const auto& entry) { return entry.first; });
       if ((cmd.flags & kFlagStop) != 0) {
         if (stop == stops.end()) {
           stops.emplace_back(key, cmd.seq);

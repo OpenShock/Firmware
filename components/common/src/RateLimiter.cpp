@@ -26,7 +26,7 @@ void OpenShock::RateLimiter::addLimit(uint32_t durationMs, uint16_t count)
   OpenShock::ScopedLock lock__(&m_mutex);
 
   // Insert sorted
-  m_limits.insert(std::upper_bound(m_limits.begin(), m_limits.end(), durationMs, [](int64_t durationMs, const Limit& limit) { return durationMs < limit.durationMs; }), {durationMs, count});
+  m_limits.insert(std::ranges::upper_bound(m_limits, static_cast<int64_t>(durationMs), {}, &Limit::durationMs), {durationMs, count});
 
   m_nextSlot    = 0;
   m_nextCleanup = 0;
@@ -58,7 +58,7 @@ bool OpenShock::RateLimiter::tryRequest()
 
     // Erase everything that left the longest window. A request exactly at the window start still counts (see the
     // `*it < windowStart` check below), so only strictly older ones are dropped.
-    auto firstAlive = std::lower_bound(m_requests.begin(), m_requests.end(), expiresAt);
+    auto firstAlive = std::ranges::lower_bound(m_requests, expiresAt);
     m_requests.erase(m_requests.begin(), firstAlive);
 
     if (!m_requests.empty()) {

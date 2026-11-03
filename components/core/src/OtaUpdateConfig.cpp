@@ -113,7 +113,7 @@ void OtaUpdateConfig::Normalize()
   }
   // Rewritten on every load rather than once: it needs no migration state, and a hub that restores an old config still
   // lands here. Remove it once no hub or config backup can hold the 1.x domain.
-  if (std::ranges::find(kLegacyCdnDomains, cdnDomain) != std::end(kLegacyCdnDomains)) {
+  if (std::ranges::contains(kLegacyCdnDomains, cdnDomain)) {
     OS_LOGI(TAG, "Moving OTA updates from the 1.x CDN to %s", CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
     cdnDomain = CONFIG_OPENSHOCK_FW_CDN_DOMAIN;
   }

@@ -157,7 +157,7 @@ static bool isConnectRateLimited(const WiFiNetwork& net)
 // return the strongest matching BSSID; nothing else may reorder it.
 static std::vector<WiFiNetwork>::iterator findNetwork(Util::FunctionRef<bool(WiFiNetwork&)> predicate)
 {
-  return std::find_if(s_wifiNetworks.begin(), s_wifiNetworks.end(), predicate);
+  return std::ranges::find_if(s_wifiNetworks, predicate);
 }
 static std::vector<WiFiNetwork>::iterator findNetworkBySSID(const char* ssid)
 {
@@ -452,7 +452,7 @@ static void evWiFiScanStatusChanged(OpenShock::WiFiScanStatus status)
   // If the scan completed, sort the networks by RSSI
   if (status == OpenShock::WiFiScanStatus::Completed || status == OpenShock::WiFiScanStatus::Aborted || status == OpenShock::WiFiScanStatus::Error) {
     // Sort the networks by RSSI
-    std::sort(s_wifiNetworks.begin(), s_wifiNetworks.end(), [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; });
+    std::ranges::sort(s_wifiNetworks, std::ranges::greater {}, &WiFiNetwork::rssi);
   }
 
   // Send the scan status changed event
@@ -495,7 +495,7 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
     OS_LOGV(TAG, "Discovered new network %s (" BSSID_FMT ")", network.ssid, BSSID_ARG(network.bssid));
 
     // Insert the network into the list of networks sorted by RSSI
-    s_wifiNetworks.insert(std::lower_bound(s_wifiNetworks.begin(), s_wifiNetworks.end(), network, [](const WiFiNetwork& a, const WiFiNetwork& b) { return a.rssi > b.rssi; }), std::move(network));
+    s_wifiNetworks.insert(std::ranges::lower_bound(s_wifiNetworks, network.rssi, std::ranges::greater {}, &WiFiNetwork::rssi), std::move(network));
   }
 
   if (!updatedNetworks.empty()) {

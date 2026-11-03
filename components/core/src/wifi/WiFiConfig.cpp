@@ -94,19 +94,15 @@ namespace {
   template<typename List>
   auto findById(List& list, uint8_t id) -> decltype(list.data())
   {
-    for (auto& creds : list) {
-      if (creds.id == id) return &creds;
-    }
-    return nullptr;
+    auto it = std::ranges::find(list, id, &WiFiCredentials::id);
+    return it != list.end() ? &*it : nullptr;
   }
 
   template<typename List>
   auto findBySsid(List& list, std::string_view ssid) -> decltype(list.data())
   {
-    for (auto& creds : list) {
-      if (creds.ssid == ssid) return &creds;
-    }
-    return nullptr;
+    auto it = std::ranges::find(list, ssid, &WiFiCredentials::ssid);
+    return it != list.end() ? &*it : nullptr;
   }
 
   // The lowest id in 1..255 no credential in `list` holds; 0 when every id is taken
@@ -187,7 +183,7 @@ bool WiFiConfig::LoadNvs(const char* partition)
     }
     credentialsList.push_back(std::move(creds));
   }
-  std::sort(credentialsList.begin(), credentialsList.end(), [](const WiFiCredentials& a, const WiFiCredentials& b) { return a.id < b.id; });
+  std::ranges::sort(credentialsList, {}, &WiFiCredentials::id);
   return true;
 }
 

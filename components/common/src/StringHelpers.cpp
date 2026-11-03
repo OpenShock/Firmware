@@ -46,7 +46,7 @@ bool OpenShock::StringIContains(std::string_view haystack, std::string_view need
   if (haystack.size() < needle.size()) return false;
   if (haystack.size() == needle.size()) return std::ranges::equal(haystack, needle, lowercaseEqual);
 
-  return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), lowercaseEqual) != haystack.end();
+  return std::ranges::search(haystack, needle, lowercaseEqual).begin() != haystack.end();
 }
 bool OpenShock::StringHasPrefixIC(std::string_view view, std::string_view prefix) noexcept
 {
