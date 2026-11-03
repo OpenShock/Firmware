@@ -220,6 +220,11 @@ void CaptivePortal::StaticFileServer::registerHandler(httpd_handle_t server)
 
 esp_err_t CaptivePortal::StaticFileServer::missingAssetsHandler(httpd_req_t* req)
 {
+  // A probe still has to fail the connectivity check, or the OS never opens the portal to show this page
+  if (RFC8908::IsProbeRequest(req)) {
+    return RFC8908::EmitRedirect(req);
+  }
+
   // No usable assets on the device; serve the help page for any request.
   return sendResp(
     req,

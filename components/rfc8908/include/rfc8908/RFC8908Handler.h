@@ -9,7 +9,7 @@ namespace OpenShock::RFC8908 {
   // request for another host (IsForeignHost), and the static file handler's HandleMiss catches the same probes sent to
   // our address. The full list is in the .cpp.
   //
-  // Assumes the server only accepts connections from the portal AP; the portal refuses the rest when they open.
+  // Assumes the server only accepts connections from the portal AP; the portal binds it to the AP interface.
   //
   // `apIpv4` is the portal AP address (e.g. "4.3.2.1"); the portal URL is built from it once, here.
   esp_err_t RegisterProbeHandlers(httpd_handle_t server, const char* apIpv4);
@@ -18,6 +18,9 @@ namespace OpenShock::RFC8908 {
   // requested by IP, so a name is one the wildcard DNS server sent here: a connectivity probe or a user browsing
   // elsewhere, which should get the captive redirect whatever the path.
   bool IsForeignHost(httpd_req_t* req);
+
+  // True when the request's path is one of the known connectivity probe URLs (/generate_204, ...).
+  bool IsProbeRequest(httpd_req_t* req);
 
   // Emit the standard captive redirect (302 -> http://<apIpv4>/).
   esp_err_t EmitRedirect(httpd_req_t* req);

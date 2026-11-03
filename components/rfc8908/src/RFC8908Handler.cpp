@@ -111,13 +111,16 @@ static bool IsProbePath(std::string_view path)
   return false;
 }
 
-esp_err_t RFC8908::HandleMiss(httpd_req_t* req)
+bool RFC8908::IsProbeRequest(httpd_req_t* req)
 {
   // Path only: httpd leaves the query string in req->uri
   std::string_view path(req->uri);
-  path = path.substr(0, path.find('?'));
+  return IsProbePath(path.substr(0, path.find('?')));
+}
 
-  if (IsForeignHost(req) || IsProbePath(path)) {
+esp_err_t RFC8908::HandleMiss(httpd_req_t* req)
+{
+  if (IsForeignHost(req) || IsProbeRequest(req)) {
     return EmitRedirect(req);
   }
 
