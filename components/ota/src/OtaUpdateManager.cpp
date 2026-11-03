@@ -7,14 +7,13 @@ const char* const TAG = "OtaUpdateManager";
 #include "AppHooks.h"
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
-#include "fs/FsCheck.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
 #include "http/HTTPRequestManager.h"
-#include "hwutil/PartitionUtils.h"
 #include "Logging.h"
 #include "OpenShock.h"
 #include "OtaUpdateConfig.h"
+#include "PartitionUtils.h"
 #include "SemVer.h"
 #include "serialization/WSGateway.h"
 #include "SimpleMutex.h"
@@ -154,13 +153,7 @@ static void otaum_evh_ipevent(void* event_handler_arg, esp_event_base_t event_ba
 
 static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask task, float progress)
 {
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return false;
-  }
-
-  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(*updateId, task, progress, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateProgressMessage(Config::GetOtaUpdateId(), task, progress, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install progress message");
     return false;
   }
@@ -169,13 +162,7 @@ static bool otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask 
 }
 static bool _sendFailureMessage(std::string_view message, bool fatal = false)
 {
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return false;
-  }
-
-  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(*updateId, message, fatal, GatewayConnectionManager::SendMessageBIN)) {
+  if (!Serialization::Gateway::SerializeOtaUpdateFailedMessage(Config::GetOtaUpdateId(), message, fatal, GatewayConnectionManager::SendMessageBIN)) {
     OS_LOGE(TAG, "Failed to send OTA install failed message");
     return false;
   }
@@ -185,12 +172,10 @@ static bool _sendFailureMessage(std::string_view message, bool fatal = false)
 
 /// @brief Whether the descriptor in `slot` names the board this hub is, logging the verdict.
 ///
-/// A slot with no descriptor at all passes: the repository server keyed pre-descriptor builds by board, and
-/// refusing them would block every downgrade to one. A descriptor that is present but corrupt, or a placeholder
-/// from an image nobody stamped, is not that case: such an image would run with no pins, so it is refused when
-/// strict. Running unstamped ourselves passes, since there is nothing to compare to.
-/// @param strict True for an image about to be made bootable: an unreadable, corrupt or unstamped descriptor is a
-///               refusal. False for the first-boot check against the slot we came from, where a problem reading
+/// An image with no descriptor at all, a corrupt one, or a placeholder nobody stamped would run with no pins, so it is
+/// refused when strict. Running unstamped ourselves passes, since there is nothing to compare to.
+/// @param strict True for an image about to be made bootable: an unreadable, missing, corrupt or unstamped descriptor
+///               is a refusal. False for the first-boot check against the slot we came from, where a problem reading
 ///               the old slot must not roll back a good image.
 static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const char* what, bool strict)
 {
@@ -204,8 +189,8 @@ static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const cha
   BoardDescriptor other;
   switch (Board::Parse(bytes, other)) {
     case Board::ParseResult::Absent:
-      OS_LOGW(TAG, "%s carries no board descriptor (built before descriptors existed), cannot check it against this board", what);
-      return true;
+      OS_LOGE(TAG, "%s carries no board descriptor", what);
+      return !strict;
     case Board::ParseResult::Invalid:
       OS_LOGE(TAG, "%s carries a corrupt board descriptor", what);
       return !strict;
@@ -274,43 +259,37 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
   return true;
 }
 
-static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_partition_t* parition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
 {
-  OS_LOGD(TAG, "Flashing filesystem partition");
+  OS_LOGD(TAG, "Flashing www partition");
 
   if (!otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, 0.0f)) {
     return false;
   }
 
   auto onProgress = [](std::size_t current, std::size_t total, float progress) -> bool {
-    OS_LOGD(TAG, "Flashing filesystem partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
+    OS_LOGD(TAG, "Flashing www partition: %u / %u (%.2f%%)", current, total, progress * 100.0f);
 
     otaum_send_progress_msg(Serialization::Types::OtaUpdateProgressTask::FlashingFilesystem, progress);
 
     return true;
   };
 
-  // Refuse an image in the other format before the first erase: a www image written over littlefs static0 (a 2.x
-  // release on the 1.x table, before the www migration has run) or a littlefs image over www would fail the check
-  // below only after the portal assets are gone.
-  const bool isWwwPartition = parition->type == Www::kPartitionType;
-  bool formatMismatch       = false;
-  auto matchesPartition     = [isWwwPartition, &formatMismatch](std::span<const uint8_t> chunk) -> bool {
-    if (Www::StartsLikeImage(chunk) != isWwwPartition) {
-      if (isWwwPartition) {
-        OS_LOGE(TAG, "The filesystem image is not a www image");
-      } else {
-        OS_LOGE(TAG, "The filesystem image is a www image, but this partition table has no www partition");
-      }
+  // Refuse anything that is not a www image before the first erase: it would fail the check below only after the
+  // portal assets are gone.
+  bool formatMismatch   = false;
+  auto matchesPartition = [&formatMismatch](std::span<const uint8_t> chunk) -> bool {
+    if (!Www::StartsLikeImage(chunk)) {
+      OS_LOGE(TAG, "The downloaded image is not a www image");
       formatMismatch = true;
       return false;
     }
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, parition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
-    OS_LOGE(TAG, "Failed to flash filesystem partition");
-    _sendFailureMessage(formatMismatch ? "The filesystem image does not match this hub's partition table"sv : "Failed to flash filesystem partition"sv);
+  if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
+    OS_LOGE(TAG, "Failed to flash www partition");
+    _sendFailureMessage(formatMismatch ? "The downloaded image is not a www image"sv : "Failed to flash www partition"sv);
     return false;
   }
 
@@ -318,12 +297,10 @@ static bool otaum_flash_fs_partition(OpenShock::HTTP::Client& client, const esp_
     return false;
   }
 
-  // Verify the freshly flashed image: the www format where the table has a www partition, else (1.x layout) that the
-  // littlefs image mounts.
-  const bool valid = isWwwPartition ? Www::VerifyPartition(parition) : OpenShock::TestFilesystem(parition);
-  if (!valid) {
-    OS_LOGE(TAG, "The flashed filesystem image is not valid");
-    _sendFailureMessage("The flashed filesystem image is not valid"sv);
+  // Verify the freshly flashed image
+  if (!Www::VerifyPartition(partition)) {
+    OS_LOGE(TAG, "The flashed www image is not valid");
+    _sendFailureMessage("The flashed www image is not valid"sv);
     return false;
   }
 
@@ -372,12 +349,7 @@ static void otaum_updatetask(void* arg)
 
     int64_t now = OpenShock::millis();
 
-    auto maybeConfig = Config::GetOtaUpdateConfig();
-    if (!maybeConfig) {
-      OS_LOGE(TAG, "Failed to get OTA update config");
-      continue;
-    }
-    const Config::OtaUpdateConfig& config = *maybeConfig;
+    const Config::OtaUpdateConfig config = Config::GetOtaUpdateConfig();
 
     if (!config.isEnabled) {
       OS_LOGD(TAG, "OTA updates are disabled, skipping update check");
@@ -417,7 +389,7 @@ static void otaum_updatetask(void* arg)
     }
 
     // Reuse a single connection for this update's sequential CDN requests
-    // (version -> release -> filesystem binary -> app binary).
+    // (version -> release -> www image -> app binary).
     OpenShock::HTTP::Client client;
 
     OpenShock::SemVer version;
@@ -495,8 +467,8 @@ static void otaum_updatetask(void* arg)
     OS_LOGD(TAG, "  Version:                %.*s", static_cast<int>(versionStr.length()), versionStr.data());
     OS_LOGD(TAG, "  App binary URL:         %.*s", static_cast<int>(release.appBinaryUrl.length()), release.appBinaryUrl.data());
     OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
-    OS_LOGD(TAG, "  Filesystem binary URL:  %.*s", static_cast<int>(release.filesystemBinaryUrl.length()), release.filesystemBinaryUrl.data());
-    OS_LOGD(TAG, "  Filesystem binary hash: %s", HexUtils::ToHex<32>(release.filesystemBinaryHash).data());
+    OS_LOGD(TAG, "  www image URL:  %.*s", static_cast<int>(release.wwwBinaryUrl.length()), release.wwwBinaryUrl.data());
+    OS_LOGD(TAG, "  www image hash: %s", HexUtils::ToHex<32>(release.wwwBinaryHash).data());
 
     // Get available app update partition.
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
@@ -506,16 +478,11 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // The portal assets go into the www partition; on the 1.x layout, which has none, into littlefs static0. The
-    // staticfs artifact of a 1.x-numbered release is the littlefs image (scripts/repo_server_publish.py), which is
-    // what every hub still on the 1.x layout installs, by this code or by the 1.x firmware's own.
-    const esp_partition_t* filesystemPartition = Www::FindPartition();
-    if (filesystemPartition == nullptr) {
-      filesystemPartition = FindStaticPartition();
-    }
-    if (filesystemPartition == nullptr) {
-      OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
-      _sendFailureMessage("Failed to find filesystem partition"sv);
+    // The portal assets go into the www partition
+    const esp_partition_t* wwwPartition = Www::FindPartition();
+    if (wwwPartition == nullptr) {
+      OS_LOGE(TAG, "Failed to find the www partition");
+      _sendFailureMessage("Failed to find www partition"sv);
       continue;
     }
 
@@ -541,13 +508,12 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
-    // Flash app and filesystem partitions. An unchanged www image (the same hash) is not written again; a littlefs
-    // static0 always is, as the 1.x firmware does.
+    // Flash the app and www partitions. An unchanged www image (the same hash) is not written again.
     std::array<uint8_t, 32> currentWwwHash {};
-    const bool wwwCurrent = filesystemPartition->type == Www::kPartitionType && Www::ImageSha256(filesystemPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.filesystemBinaryHash, 32) == 0;
+    const bool wwwCurrent = Www::ImageSha256(wwwPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.wwwBinaryHash, 32) == 0;
     if (wwwCurrent) {
       OS_LOGI(TAG, "The www image is already current, not flashing it");
-    } else if (!otaum_flash_fs_partition(client, filesystemPartition, release.filesystemBinaryUrl, release.filesystemBinaryHash)) {
+    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl, release.wwwBinaryHash)) {
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
@@ -576,20 +542,6 @@ static void otaum_updatetask(void* arg)
   esp_restart();
 }
 
-static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
-{
-  switch (channel) {
-    case OtaUpdateChannel::Stable:
-      return "stable";
-    case OtaUpdateChannel::Beta:
-      return "beta";
-    case OtaUpdateChannel::Develop:
-      return "develop";
-  }
-
-  return nullptr;  // Channel comes from config and may be out of range
-}
-
 /// @brief Fetches the repository server domain from runtime config.
 ///
 /// Historically named cdnDomain, from when OTA metadata was flat files served straight off the CDN.
@@ -597,18 +549,12 @@ static const char* otaum_channel_name(OpenShock::OtaUpdateChannel channel)
 /// so the CDN host no longer has to be known by the hub.
 [[nodiscard]] static std::optional<std::string> otaum_try_get_repo_domain()
 {
-  auto config = Config::GetOtaUpdateConfig();
-  if (!config) {
-    OS_LOGE(TAG, "Failed to get OTA update config");
-    return std::nullopt;
-  }
-
-  if (config->cdnDomain.empty()) {
+  std::string domain = Config::GetOtaUpdateConfig().cdnDomain;
+  if (domain.empty()) {
     OS_LOGE(TAG, "OTA repository domain is not configured");
     return std::nullopt;
   }
-
-  return std::move(config->cdnDomain);
+  return domain;
 }
 
 /// @brief Issues a GET against the repository API and parses the body as JSON.
@@ -673,12 +619,7 @@ bool OtaUpdateManager::Init()
   _otaImageState = imageState;
 
   OS_LOGD(TAG, "Fetching previous update step");
-  auto maybeUpdateStep = Config::GetOtaUpdateStep();
-  if (!maybeUpdateStep) {
-    OS_LOGE(TAG, "Failed to get OTA update step");
-    return false;
-  }
-  OtaUpdateStep updateStep = *maybeUpdateStep;
+  const OtaUpdateStep updateStep = Config::GetOtaUpdateStep();
 
   // Infer boot type from update step.
   _bootType = OpenShock::InferFirmwareBootType(updateStep);
@@ -712,11 +653,7 @@ bool OtaUpdateManager::Init()
 
 std::optional<OpenShock::SemVer> OtaUpdateManager::TryGetFirmwareVersion(HTTP::Client& client, OtaUpdateChannel channel)
 {
-  const char* channelName = otaum_channel_name(channel);
-  if (channelName == nullptr) {
-    OS_LOGE(TAG, "Unknown channel: %u", std::to_underlying(channel));
-    return std::nullopt;
-  }
+  const char* channelName = OtaUpdateChannelName(channel);
 
   auto domain = otaum_try_get_repo_domain();
   if (!domain) {
@@ -780,7 +717,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 ///
 /// OTA is per-partition, so the hub wants exactly these two. The 'merged' artifact is deliberately
 /// ignored: it is a full-flash esptool image (bootloader at 0x1000, partition table at 0x8000, app at
-/// 0x10000, filesystem at its offset) meant for USB flashing a blank device. Writing it into an OTA app
+/// 0x10000, www image at its offset) meant for USB flashing a blank device. Writing it into an OTA app
 /// slot would put a bootloader image where the app belongs. See firmware-api-spec.md §9.2.
 [[nodiscard]] static std::optional<OtaUpdateManager::FirmwareRelease> otaum_parse_board_artifacts(JSON::JsonView root)
 {
@@ -792,7 +729,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 
   OtaUpdateManager::FirmwareRelease release {};
 
-  bool foundApp = false, foundFilesystem = false;
+  bool foundApp = false, foundWww = false;
 
   int count = artifacts.count();
   for (int i = 0; i < count; i++) {
@@ -822,15 +759,15 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
       release.appBinaryUrl = std::move(*urlStr);
       foundApp             = true;
     } else if (*typeStr == "staticfs"sv) {
-      if (foundFilesystem) {
+      if (foundWww) {
         OS_LOGE(TAG, "Duplicate 'staticfs' artifact");
         return std::nullopt;
       }
-      if (!_tryParseIntoHash(*hashStr, release.filesystemBinaryHash)) {
+      if (!_tryParseIntoHash(*hashStr, release.wwwBinaryHash)) {
         return std::nullopt;
       }
-      release.filesystemBinaryUrl = std::move(*urlStr);
-      foundFilesystem             = true;
+      release.wwwBinaryUrl = std::move(*urlStr);
+      foundWww             = true;
     }
   }
 
@@ -839,7 +776,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
     return std::nullopt;
   }
 
-  if (!foundFilesystem) {
+  if (!foundWww) {
     OS_LOGE(TAG, "Release is missing a 'staticfs' artifact");
     return std::nullopt;
   }

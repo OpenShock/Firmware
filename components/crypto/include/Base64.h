@@ -5,8 +5,7 @@
 #include <span>
 #include <string>
 #include <string_view>
-
-#include "TinyVec.h"
+#include <vector>
 
 namespace OpenShock::Base64 {
   /// @brief Encodes a byte array to base64.
@@ -19,5 +18,5 @@ namespace OpenShock::Base64 {
   /// @param data The base64 text to decode.
   /// @param output Receives the decoded bytes (sized to exactly what was decoded); cleared on failure.
   /// @return True on success, false on invalid input.
-  bool Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept;
+  bool Decode(std::string_view data, std::vector<uint8_t>& output);
 }  // namespace OpenShock::Base64

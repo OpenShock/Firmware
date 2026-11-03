@@ -6,6 +6,7 @@ const char* const TAG = "main";
 #include "captiveportal/Manager.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
+#include "config/Nvs.h"
 #include "config/Store.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
@@ -110,17 +111,9 @@ extern "C" void app_main()
   // WiFi persists calibration/config in the default NVS partition, so NVS must be
   // initialized before esp_wifi_init() (or any other NVS user) runs. Arduino used
   // to do this implicitly during startup; under the IDF entry point we do it
-  // explicitly. If the partition is from an incompatible/older layout, reformat it.
-  esp_err_t nvsResult = nvs_flash_init();
-  if (nvsResult == ESP_ERR_NVS_NO_FREE_PAGES || nvsResult == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    OS_LOGW(TAG, "NVS partition unusable (%s), erasing and reformatting", esp_err_to_name(nvsResult));
-    if (nvs_flash_erase() != ESP_OK) {
-      OS_PANIC(TAG, "Failed to erase NVS partition");
-    }
-    nvsResult = nvs_flash_init();
-  }
-  if (nvsResult != ESP_OK) {
-    OS_PANIC(TAG, "Failed to initialize NVS: %s", esp_err_to_name(nvsResult));
+  // explicitly. A damaged or newer-format partition is reformatted: everything in it regenerates.
+  if (!OpenShock::Config::Nvs::InitPartition(NVS_DEFAULT_PART_NAME, true)) {
+    OS_PANIC(TAG, "Failed to initialize NVS");
   }
 
   // Who we are. The descriptor is stamped into the image per board (BoardDescriptor.h); everything that needs a

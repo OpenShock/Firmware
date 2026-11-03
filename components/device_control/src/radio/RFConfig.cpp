@@ -12,19 +12,13 @@ const char* const TAG = "Config::RFConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace    = "rf";
 static constexpr const char* kKeyTxPin     = "tx_pin";
 static constexpr const char* kKeyKeepAlive = "keepalive";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<RFConfig> s_section({.name = "rf", .order = 0, .hubConfigField = Fbs::HubConfig::VT_RF, .namespaces = kNamespaces});
-
-Section<RFConfig>& OpenShock::Config::RFSection()
-{
-  return s_section;
-}
+static Section<RFConfig> s_section({.name = "rf", .order = 0, .namespaces = kNamespaces});
 
 RFConfig::RFConfig()
   : txPin(static_cast<gpio_num_t>(Board::Get().rfTxGpio))
@@ -40,10 +34,9 @@ RFConfig::RFConfig(gpio_num_t txPin, bool keepAliveEnabled)
 
 bool RFConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    *this = RFConfig();
-    return true;
+    return false;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().rfTxGpio);
@@ -62,25 +55,17 @@ bool RFConfig::LoadNvs(const char* partition)
 
 bool RFConfig::SaveNvs(const char* partition, const RFConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }
-  const int8_t pin     = static_cast<int8_t>(txPin);
-  const int8_t prevPin = previous != nullptr ? static_cast<int8_t>(previous->txPin) : 0;
-  return handle->SetI8(kKeyTxPin, pin, previous != nullptr ? &prevPin : nullptr) && handle->SetBool(kKeyKeepAlive, keepAliveEnabled, previous != nullptr ? &previous->keepAliveEnabled : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set<int8_t>(kKeyTxPin, &RFConfig::txPin).Set(kKeyKeepAlive, &RFConfig::keepAliveEnabled).Commit();
 }
 
 bool RFConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    *this = RFConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   if (auto pin = Parse::JsonGpioNum(json, "txPin"); pin && *pin != GPIO_NUM_NC) {
@@ -88,7 +73,9 @@ bool RFConfig::FromJSON(JSON::JsonView json)
   } else {
     txPin = static_cast<gpio_num_t>(Board::Get().rfTxGpio);
   }
-  keepAliveEnabled = json["keepAliveEnabled"].tryGetBool().value_or(true);
+  if (!Parse::JsonBool(keepAliveEnabled, json, "keepAliveEnabled", true, TAG)) {
+    return false;
+  }
 
   return true;
 }
@@ -102,18 +89,7 @@ void RFConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveD
   JSON::objEnd(gen, name);
 }
 
-flatbuffers::Offset<Fbs::RFConfig> RFConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  (void)withSensitiveData;
-  // keepalive_enabled is stored even when it equals the schema default, so the value reads back the same under every
-  // schema version (up to 1.5.x it defaulted to false): Config::HubConfigToJSON never has to infer it.
-  Fbs::RFConfigBuilder rfBuilder(builder);
-  rfBuilder.add_tx_pin(txPin);
-  builder.AddElement<uint8_t>(Fbs::RFConfig::VT_KEEPALIVE_ENABLED, static_cast<uint8_t>(keepAliveEnabled));
-  return rfBuilder.Finish();
-}
-
-std::optional<RFConfig> OpenShock::Config::GetRFConfig()
+RFConfig OpenShock::Config::GetRFConfig()
 {
   return s_section.Get();
 }
@@ -123,7 +99,7 @@ bool OpenShock::Config::SetRFConfig(const RFConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetRFConfigTxPin()
+gpio_num_t OpenShock::Config::GetRFConfigTxPin()
 {
   return s_section.Read([](const RFConfig& rf) { return rf.txPin; });
 }
@@ -136,7 +112,7 @@ bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
   });
 }
 
-std::optional<bool> OpenShock::Config::GetRFConfigKeepAliveEnabled()
+bool OpenShock::Config::GetRFConfigKeepAliveEnabled()
 {
   return s_section.Read([](const RFConfig& rf) { return rf.keepAliveEnabled; });
 }

@@ -10,7 +10,6 @@
 #include "enums/FirmwareBootType.h"
 #include "enums/OtaUpdateChannel.h"
 #include "enums/OtaUpdateStep.h"
-#include "serialization/_fbs/HubConfig_generated.h"
 
 #include "util/FunctionRef.h"
 
@@ -40,10 +39,10 @@ namespace OpenShock::Config {
     int32_t updateId;
     OtaUpdateStep updateStep;
 
-    /// @brief No rules to apply yet. The section runs it on every value it takes in.
-    void Normalize() { }
-
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::OtaUpdateConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
+    /// @brief The section runs it on every value it takes in: a zero check interval would check on every wake-up
+    ///        of the update task, so it becomes the default (the captive portal refuses it, JSON and NVS do not). The
+    ///        1.x CDN domains, which serve no repository API, become the default too.
+    void Normalize();
 
     /// @brief Reads this section from `partition`; a missing key is its default, a read error fails.
     bool LoadNvs(const char* partition);
@@ -54,18 +53,16 @@ namespace OpenShock::Config {
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
   };
 
-  Section<OtaUpdateConfig>& OtaUpdateSection();
-
-  [[nodiscard]] std::optional<OtaUpdateConfig> GetOtaUpdateConfig();
+  [[nodiscard]] OtaUpdateConfig GetOtaUpdateConfig();
   bool SetOtaUpdateConfig(const OtaUpdateConfig& config);
   /// @brief Read-modify-write that no other writer can interleave with. `update` edits the current config in place and
   ///        returns whether it changed anything (nothing is saved otherwise). It runs under the config write lock: keep
   ///        it to plain field updates.
   bool UpdateOtaUpdateConfig(Util::FunctionRef<bool(OtaUpdateConfig&)> update);
 
-  [[nodiscard]] std::optional<int32_t> GetOtaUpdateId();
+  [[nodiscard]] int32_t GetOtaUpdateId();
   bool SetOtaUpdateId(int32_t updateId);
-  [[nodiscard]] std::optional<OtaUpdateStep> GetOtaUpdateStep();
+  [[nodiscard]] OtaUpdateStep GetOtaUpdateStep();
   bool SetOtaUpdateStep(OtaUpdateStep updateStep);
   /// @brief Sets the step only if it is still `expected`, so a stale writer can't clobber an update started meanwhile.
   /// @return True if the step was `expected` and is now `desired`

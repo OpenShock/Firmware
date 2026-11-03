@@ -1,5 +1,5 @@
 // The E-Stop latch: state the estop section's module keeps in the section's namespace, outside the section's value.
-// A fresh hub starts usable, a stored latch survives a reboot and the move into cfg, and only a factory reset (which
+// A fresh hub starts usable, a stored latch survives a reboot, and only a factory reset (which
 // erases the section) drops it.
 #include <freertos/FreeRTOS.h>
 
@@ -8,8 +8,6 @@
 #include "config_test_helpers.h"
 
 #include "config/Section.h"
-
-#include <nvs_flash.h>
 
 #include <string>
 
@@ -72,29 +70,12 @@ TEST_CASE("Saving the latch never waits for another config writer", "[config][es
   TEST_ASSERT_TRUE(Config::LoadEStopLatched());
 }
 
-TEST_CASE("A latch stored in the shared nvs moves into cfg with the estop section", "[config][estop][storage]")
-{
-  WipeStore();
-  TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionShared));
-  TEST_ASSERT_TRUE(MakeSampleConfig().SaveNvs(Keys::kPartitionShared));
-  {
-    auto estop = Nvs::Handle::Open(Keys::kPartitionShared, Keys::Ns::kEstop, true);
-    TEST_ASSERT_TRUE(estop.has_value());
-    TEST_ASSERT_TRUE(estop->SetU8(Keys::Estop::kLatched, 1));
-    TEST_ASSERT_TRUE(estop->Commit());
-  }
-
-  Config::Init();
-  TEST_ASSERT_EQUAL_STRING(Keys::kPartitionCfg, Config::StorageLabel());
-  TEST_ASSERT_TRUE(Config::LoadEStopLatched());
-}
-
 TEST_CASE("A latch stored with another type reads as not latched", "[config][estop]")
 {
   InitWith(MakeSampleConfig());
   {
     // NVS looks keys up by name and type, so this is a missing key, not a read error
-    auto estop = Nvs::Handle::Open(Keys::kPartitionCfg, Keys::Ns::kEstop, true);
+    auto estop = Nvs::Handle::OpenForWrite(Keys::kPartitionCfg, Keys::Ns::kEstop);
     TEST_ASSERT_TRUE(estop.has_value());
     TEST_ASSERT_TRUE(estop->SetStr(Keys::Estop::kLatched, "yes"));
     TEST_ASSERT_TRUE(estop->Commit());

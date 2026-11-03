@@ -41,7 +41,7 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
       : null
   );
   hubState.accountLinked = payload.accountLinked();
-  hubState.config = mapConfig(payload.config());
+  hubState.config = mapConfig(payload);
 
   const gpioValidInputs = payload.gpioValidInputsArray();
   if (gpioValidInputs) {

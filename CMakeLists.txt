@@ -140,6 +140,7 @@ if(_os_idf_activated)
 endif()
 
 project(firmware)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/cxx_standard.cmake)
 
 # --- ccache by absolute path ---------------------------------------------------
 # idf.py configures with CCACHE_ENABLE, and ESP-IDF then launches compiles through a bare `ccache`,
@@ -186,27 +187,25 @@ if(NOT CMAKE_BINARY_DIR STREQUAL _os_compile_db_dir)
 endif()
 
 # --- Captive-portal asset image (www) ----------------------------------------
-# gen_staticfs.py packs the frontend into the flat `www` image; skipped when the partition table has no such partition.
+# gen_staticfs.py packs the frontend into the flat `www` image, which the firmware needs for its captive portal.
 partition_table_get_partition_info(_www_offset "--partition-name www" "offset")
-partition_table_get_partition_info(_www_size   "--partition-name www" "size")
 
-if("${_www_offset}" STREQUAL "" OR "${_www_size}" STREQUAL "")
-  message(WARNING "No `www` partition in the active partition table; "
-                  "skipping asset image generation.")
-else()
-  set(_www_image ${CMAKE_BINARY_DIR}/www.bin)
-
-  # CI never builds this target: its staticfs job runs gen_staticfs.py --skip-frontend-build once for every variant.
-  add_custom_target(www ALL
-    BYPRODUCTS ${_www_image}
-    COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
-            --frontend-dir ${CMAKE_CURRENT_LIST_DIR}/frontend
-            --output       ${_www_image}
-            --max-size     ${_www_size}
-    COMMENT "Building captive-portal asset image (www.bin) for www"
-    VERBATIM USES_TERMINAL)
-
-  # Register the image with the flasher so `idf.py flash` writes it to the
-  # www offset alongside the app and partition table.
-  esptool_py_flash_target_image(flash "www" "${_www_offset}" "${_www_image}")
+if("${_www_offset}" STREQUAL "")
+  message(FATAL_ERROR "No `www` partition in the active partition table.")
 endif()
+
+set(_www_image ${CMAKE_BINARY_DIR}/www.bin)
+
+# CI never builds this target: its staticfs job runs gen_staticfs.py --skip-frontend-build once for every variant.
+add_custom_target(www ALL
+  BYPRODUCTS ${_www_image}
+  COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
+          --frontend-dir  ${CMAKE_CURRENT_LIST_DIR}/frontend
+          --output        ${_www_image}
+          --partition-csv ${CMAKE_CURRENT_LIST_DIR}/${CONFIG_PARTITION_TABLE_CUSTOM_FILENAME}
+  COMMENT "Building captive-portal asset image (www.bin) for www"
+  VERBATIM USES_TERMINAL)
+
+# Register the image with the flasher so `idf.py flash` writes it to the
+# www offset alongside the app and partition table.
+esptool_py_flash_target_image(flash "www" "${_www_offset}" "${_www_image}")

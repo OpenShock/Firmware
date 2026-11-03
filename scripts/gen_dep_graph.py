@@ -50,10 +50,8 @@ CMAKE_KEYWORDS = {
 LABEL_OVERRIDES = {
     'osjson': 'OSJson',
     'http': 'HTTP',
-    'fs': 'FS',
     'dns_server': 'DnsServer',
     'rfc8908': 'RFC8908',
-    'hwutil': 'HwUtil',
 }
 
 

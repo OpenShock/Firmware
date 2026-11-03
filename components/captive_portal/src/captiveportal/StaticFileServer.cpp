@@ -6,88 +6,20 @@ const char* const TAG = "CaptivePortalStatic";
 
 #include "captiveportal/HttpUtils.h"
 #include "http/ContentTypes.h"
-#include "hwutil/PartitionUtils.h"
 #include "Logging.h"
 #include "rfc8908/RFC8908Handler.h"
-#include "SimpleMutex.h"
 #include "StringHelpers.h"
 #include "util/HexUtils.h"
 
 #include <cstddef>
 #include <cstring>
-#include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 
 using namespace OpenShock;
 
-namespace {
-  // Hashing a whole partition takes a noticeable time and its content only changes through OTA, which restarts the
-  // device, so each partition is hashed once per boot. Entries are only ever appended, under the mutex, so a pointer
-  // into the table stays valid.
-  struct PartitionHash {
-    const esp_partition_t* partition;
-    char hash[65];
-  };
-  constexpr std::size_t kMaxHashedPartitions = 2;
-  PartitionHash s_partitionHashes[kMaxHashedPartitions];
-  std::size_t s_partitionHashCount = 0;
-  SimpleMutex s_partitionHashesMutex;
-
-  // Caller holds s_partitionHashesMutex
-  const char* findPartitionHash(const esp_partition_t* partition)
-  {
-    for (std::size_t i = 0; i < s_partitionHashCount; ++i) {
-      if (s_partitionHashes[i].partition == partition) {
-        return s_partitionHashes[i].hash;
-      }
-    }
-    return nullptr;
-  }
-}  // namespace
-
-/// @brief The partition's SHA-256 as hex, computed on first use. Null for a null partition, if hashing failed, or if
-///        the table is full.
-static const char* getPartitionHash(const esp_partition_t* partition)
-{
-  if (partition == nullptr) {
-    return nullptr;
-  }
-  {
-    ScopedLock lock__(&s_partitionHashesMutex);
-    if (const char* hash = findPartitionHash(partition)) {
-      return hash;
-    }
-  }
-
-  // Hash with the mutex released: a retired instance's httpd task may be looking up its own tag meanwhile
-  char hash[65];
-  if (!TryGetPartitionHash(partition, hash)) {
-    return nullptr;
-  }
-
-  ScopedLock lock__(&s_partitionHashesMutex);
-  if (const char* existing = findPartitionHash(partition)) {
-    return existing;  // Another task hashed the same partition meanwhile
-  }
-  if (s_partitionHashCount == kMaxHashedPartitions) {
-    OS_LOGW(TAG, "Partition hash table full, not caching");
-    return nullptr;
-  }
-  PartitionHash& entry = s_partitionHashes[s_partitionHashCount++];
-  entry.partition      = partition;
-  std::memcpy(entry.hash, hash, sizeof(hash));
-  return entry.hash;
-}
-
 static const char* contentTypeForPath(std::string_view path)
 {
-  // Assets are stored pre-compressed as <name>.gz: the type is that of the content inside, not of the wrapper
-  if (path.size() >= 3 && path[path.size() - 3] == '.' && CharToLower(path[path.size() - 2]) == 'g' && CharToLower(path[path.size() - 1]) == 'z') {
-    path.remove_suffix(3);
-  }
-
   // Walk back to the dot. The longest known extension is 5 characters, so give up after that many, or at a '/'.
   static constexpr std::size_t kMaxExtensionLen = 5;
   std::size_t i                                 = path.size();
@@ -119,10 +51,7 @@ static const char* contentTypeForPath(std::string_view path)
   };
 
   for (const auto& entry : kContentTypes) {
-    if (entry.extension.size() != ext.size()) continue;
-    std::size_t j = 0;
-    while (j < ext.size() && CharToLower(ext[j]) == entry.extension[j]) ++j;
-    if (j == ext.size()) {
+    if (StringIEquals(entry.extension, ext)) {
       return entry.contentType;
     }
   }
@@ -188,17 +117,13 @@ static constexpr const char* kCacheControlImmutable = "public, max-age=31536000,
 // What a static response says about itself, shared by the full response, the 304 and the HEAD response.
 struct Representation {
   const char* contentType;
-  bool gzip;
   const char* cacheControl;
-  const char* etag;  // quoted, or null when unknown
+  const char* etag;  // quoted
   std::size_t size;
 };
 
 static bool matchesIfNoneMatch(httpd_req_t* req, const char* etag)
 {
-  if (etag == nullptr) {
-    return false;
-  }
   char inm[80];
   return httpd_req_get_hdr_value_str(req, "If-None-Match", inm, sizeof(inm)) == ESP_OK && std::strcmp(etag, inm) == 0;
 }
@@ -209,9 +134,7 @@ static void setHeaders(httpd_req_t* req, const Representation& rep)
   httpd_resp_set_type(req, rep.contentType);
   httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
   httpd_resp_set_hdr(req, "Cache-Control", rep.cacheControl);
-  if (rep.etag != nullptr) {
-    httpd_resp_set_hdr(req, "ETag", rep.etag);
-  }
+  httpd_resp_set_hdr(req, "ETag", rep.etag);
 }
 
 static esp_err_t sendNotModified(httpd_req_t* req, const Representation& rep)
@@ -241,15 +164,10 @@ static esp_err_t sendHeadResponse(httpd_req_t* req, const Representation& rep)
   head += rep.contentType;
   head += "\r\nContent-Length: ";
   head += std::to_string(rep.size);
-  if (rep.gzip) {
-    head += "\r\nContent-Encoding: gzip";
-  }
-  head += "\r\nVary: Accept-Encoding\r\nCache-Control: ";
+  head += "\r\nContent-Encoding: gzip\r\nVary: Accept-Encoding\r\nCache-Control: ";
   head += rep.cacheControl;
-  if (rep.etag != nullptr) {
-    head += "\r\nETag: ";
-    head += rep.etag;
-  }
+  head += "\r\nETag: ";
+  head += rep.etag;
   head += "\r\n\r\n";
 
   std::size_t sent = 0;
@@ -265,52 +183,33 @@ static esp_err_t sendHeadResponse(httpd_req_t* req, const Representation& rep)
 
 CaptivePortal::StaticFileServer::StaticFileServer()
 {
-  // The portal assets: the www image where the partition table has one, else (1.x layout) littlefs static0.
-  if (const esp_partition_t* www = Www::FindPartition(); www != nullptr) {
-    if (!m_www.mount(www)) {
-      OS_LOGE(TAG, "The portal has no assets until a www image is flashed, serving the error page");  // mount() logged why
-      return;
-    }
-    if (!m_www.find("index.html")) {
-      OS_LOGE(TAG, "The www image has no index.html, serving the error page");
-      m_www.unmount();
-      return;
-    }
-    char hex[Www::kBodyHashSize * 2 + 1];
-    HexUtils::ToHex(m_www.image().BodyHash(), hex, false);
-    m_etag = std::string("\"") + hex + "\"";
-    OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag.c_str());
+  if (!m_www.mount(Www::FindPartition())) {
+    OS_LOGE(TAG, "The portal has no assets until a www image is flashed, serving the error page");  // mount() logged why
     return;
   }
-
-  // Mount the static filesystem (gzipped portal assets) read-only via raw littlefs.
-  const esp_partition_t* partition = FindStaticPartition();
-  if (partition == nullptr) {
-    OS_LOGE(TAG, "Failed to find a www or static filesystem partition");
-  } else if (!m_partition.mount(partition, false)) {
-    OS_LOGE(TAG, "Failed to mount static filesystem");
-  } else if (!m_partition.fileSize("/www/index.html.gz") && !m_partition.fileSize("/www/index.html")) {
-    OS_LOGE(TAG, "/www/index.html(.gz) not found, serving error page");
-    m_partition.unmount();
-  } else {
-    // Hash now, so the first request doesn't pay for it
-    const char* hash = getPartitionHash(partition);
-    OS_LOGI(TAG, "Serving files from littlefs (hash: %s)", hash != nullptr ? hash : "?");
+  if (!m_www.find("index.html")) {
+    OS_LOGE(TAG, "The www image has no index.html, serving the error page");
+    m_www.unmount();
+    return;
   }
+  char hex[Www::kBodyHashSize * 2 + 1];
+  HexUtils::ToHex(m_www.image().BodyHash(), hex, false);
+  m_etag = std::string("\"") + hex + "\"";
+  OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag.c_str());
 }
 
 void CaptivePortal::StaticFileServer::registerHandler(httpd_handle_t server)
 {
   // Decided once: the assets are mounted in the constructor and stay that way until destruction
-  if (m_www.isMounted() || m_partition.isMounted()) {
+  if (m_www.isMounted()) {
     CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::staticFileHandler, this);
     CaptivePortal::registerHandler(server, "/*", HTTP_HEAD, &StaticFileServer::staticFileHandler, this);
   } else {
-    CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::missingFsHandler, nullptr);
+    CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::missingAssetsHandler, nullptr);
   }
 }
 
-esp_err_t CaptivePortal::StaticFileServer::missingFsHandler(httpd_req_t* req)
+esp_err_t CaptivePortal::StaticFileServer::missingAssetsHandler(httpd_req_t* req)
 {
   // No usable assets on the device; serve the help page for any request.
   return sendResp(
@@ -334,7 +233,7 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
   std::string_view uri(req->uri);
   uri = uri.substr(0, uri.find('?'));
 
-  // A ".." segment is never a valid asset path (littlefs would resolve it). Browsers normalize these away before
+  // A ".." segment is never a valid asset path. Browsers normalize these away before
   // sending, so this only comes from hand-built requests: refuse it rather than answer like a captive probe.
   if (uri.find("..") != std::string_view::npos) {
     return sendResp(req, S400, HTTP::ContentType::TextPlain, "Bad Request\n");
@@ -344,28 +243,20 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
     uri = "/index.html";
   }
 
-  bool wantsGzip = clientAcceptsGzip(req);
-
-  return self->m_www.isMounted() ? self->serveFromImage(req, uri, wantsGzip) : self->serveFromLittlefs(req, uri, wantsGzip);
-}
-
-esp_err_t CaptivePortal::StaticFileServer::serveFromImage(httpd_req_t* req, std::string_view uri, bool wantsGzip)
-{
   // Stored without the leading slash. Every body in the image is gzipped.
-  auto asset = m_www.find(uri.substr(1));
+  auto asset = self->m_www.find(uri.substr(1));
   if (!asset) {
     // Unknown path -> captive redirect (the index fallback of a static server).
     return RFC8908::EmitRedirect(req);
   }
-  if (!wantsGzip) {
+  if (!clientAcceptsGzip(req)) {
     return sendNotAcceptable(req);
   }
 
   Representation rep {
     .contentType  = contentTypeForPath(uri),
-    .gzip         = true,
     .cacheControl = asset->immutable() ? kCacheControlImmutable : kCacheControl,
-    .etag         = m_etag.empty() ? nullptr : m_etag.c_str(),
+    .etag         = self->m_etag.c_str(),
     .size         = asset->body.size(),
   };
 
@@ -380,89 +271,4 @@ esp_err_t CaptivePortal::StaticFileServer::serveFromImage(httpd_req_t* req, std:
   httpd_resp_set_hdr(req, "Content-Encoding", "gzip");  // every body in the image is gzipped
   // Straight from the flash mapping: no copy, no filesystem
   return httpd_resp_send(req, reinterpret_cast<const char*>(asset->body.data()), static_cast<ssize_t>(asset->body.size()));
-}
-
-esp_err_t CaptivePortal::StaticFileServer::serveFromLittlefs(httpd_req_t* req, std::string_view uri, bool wantsGzip)
-{
-  // Assets live at /www/<path>, usually pre-compressed as /www/<path>.gz. A client that accepts gzip is offered the
-  // compressed file first; anyone else, or a path with no .gz, gets the plain file if the image has one.
-  std::string path;
-  path.reserve(4 + uri.size() + 3);
-  path += "/www";
-  path += uri;
-
-  // fileSize only answers for regular files: littlefs collapses "//" and "." segments, so a path can land on a
-  // directory, which must not be opened as a file.
-  std::optional<std::size_t> size;
-  bool gzip = false;
-  if (wantsGzip) {
-    path += ".gz";
-    size = m_partition.fileSize(path.c_str());
-    gzip = size.has_value();
-    if (!gzip) {
-      path.resize(path.size() - 3);
-    }
-  }
-  if (!gzip) {
-    size = m_partition.fileSize(path.c_str());
-    if (!size) {
-      if (!wantsGzip) {
-        path += ".gz";
-        if (m_partition.fileSize(path.c_str())) {
-          return sendNotAcceptable(req);
-        }
-      }
-      // Unknown path -> captive redirect (matches serveStatic default-file fallthrough).
-      return RFC8908::EmitRedirect(req);
-    }
-  }
-
-  // The two encodings are different representations, so they get different tags. Keep the quoted tag alive until
-  // after send.
-  std::string etag;
-  if (const char* fsHash = getPartitionHash(m_partition.partition())) {
-    etag = std::string("\"") + fsHash + (gzip ? "-gz\"" : "\"");
-  }
-
-  Representation rep {
-    .contentType  = contentTypeForPath(path),
-    .gzip         = gzip,
-    .cacheControl = kCacheControl,
-    .etag         = etag.empty() ? nullptr : etag.c_str(),
-    .size         = *size,
-  };
-
-  if (matchesIfNoneMatch(req, rep.etag)) {
-    return sendNotModified(req, rep);
-  }
-  if (req->method == HTTP_HEAD) {
-    return sendHeadResponse(req, rep);
-  }
-
-  // Headers are only committed with the first chunk, so a failure before anything is on the wire (open or buffer
-  // allocation) can still be answered with a clean 500 instead of a dropped connection.
-  bool started = false;
-  auto begin   = [&]() {
-    setHeaders(req, rep);
-    if (rep.gzip) {
-      httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    }
-    started = true;
-  };
-  bool ok = m_partition.readStream(path.c_str(), [&](std::span<const uint8_t> chunk) {
-    if (!started) {
-      begin();
-    }
-    return httpd_resp_send_chunk(req, reinterpret_cast<const char*>(chunk.data()), chunk.size()) == ESP_OK;
-  });
-  if (!ok) {
-    if (started) {
-      return ESP_FAIL;  // Mid-stream: the client sees a truncated chunked body
-    }
-    return sendResp(req, S500, HTTP::ContentType::TextPlain, "Internal Server Error\n");
-  }
-  if (!started) {
-    begin();  // Empty file
-  }
-  return httpd_resp_send_chunk(req, nullptr, 0);
 }

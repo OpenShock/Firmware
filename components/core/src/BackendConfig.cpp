@@ -11,19 +11,13 @@ const char* const TAG = "Config::BackendConfig";
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace = "backend";
 static constexpr const char* kKeyDomain = "domain";
 static constexpr const char* kKeyToken  = "token";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<BackendConfig> s_section({.name = "backend", .order = 3, .hubConfigField = Fbs::HubConfig::VT_BACKEND, .namespaces = kNamespaces});
-
-Section<BackendConfig>& OpenShock::Config::BackendSection()
-{
-  return s_section;
-}
+static Section<BackendConfig> s_section({.name = "backend", .order = 3, .namespaces = kNamespaces});
 
 BackendConfig::BackendConfig()
   : domain(CONFIG_OPENSHOCK_API_DOMAIN)
@@ -37,31 +31,10 @@ BackendConfig::BackendConfig(std::string_view domain, std::string_view authToken
 {
 }
 
-flatbuffers::Offset<OpenShock::Serialization::Configuration::BackendConfig> BackendConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  auto domainOffset = builder.CreateString(domain);
-
-  flatbuffers::Offset<flatbuffers::String> authTokenOffset;
-  if (withSensitiveData) {
-    authTokenOffset = builder.CreateString(authToken);
-  } else {
-    authTokenOffset = 0;
-  }
-
-  return Serialization::Configuration::CreateBackendConfig(builder, domainOffset, authTokenOffset);
-}
-
 bool BackendConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    OS_LOGW(TAG, "Config is null, setting to default");
-    *this = BackendConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   domain = json["domain"].tryGetStr().value_or(CONFIG_OPENSHOCK_API_DOMAIN);
@@ -84,24 +57,23 @@ void BackendConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensi
 
 bool BackendConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    *this = BackendConfig();
-    return true;
+    return false;
   }
   return Nvs::Load(*handle, kKeyDomain, domain, CONFIG_OPENSHOCK_API_DOMAIN) && Nvs::Load(*handle, kKeyToken, authToken, "");
 }
 
 bool BackendConfig::SaveNvs(const char* partition, const BackendConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }
-  return handle->SetStr(kKeyDomain, domain, previous != nullptr ? &previous->domain : nullptr) && handle->SetStr(kKeyToken, authToken, previous != nullptr ? &previous->authToken : nullptr) && handle->Commit();
+  return Nvs::Saver(*handle, *this, previous).Set(kKeyDomain, &BackendConfig::domain).Set(kKeyToken, &BackendConfig::authToken).Commit();
 }
 
-std::optional<BackendConfig> OpenShock::Config::GetBackendConfig()
+BackendConfig OpenShock::Config::GetBackendConfig()
 {
   return s_section.Get();
 }
@@ -111,7 +83,7 @@ bool OpenShock::Config::SetBackendConfig(const BackendConfig& config)
   return s_section.Set(config);
 }
 
-std::optional<std::string> OpenShock::Config::GetBackendDomain()
+std::string OpenShock::Config::GetBackendDomain()
 {
   return s_section.Read([](const BackendConfig& backend) { return backend.domain; });
 }
@@ -129,7 +101,7 @@ bool OpenShock::Config::HasBackendAuthToken()
   return s_section.Read([](const BackendConfig& backend) { return !backend.authToken.empty(); });
 }
 
-std::optional<std::string> OpenShock::Config::GetBackendAuthToken()
+std::string OpenShock::Config::GetBackendAuthToken()
 {
   return s_section.Read([](const BackendConfig& backend) { return backend.authToken; });
 }

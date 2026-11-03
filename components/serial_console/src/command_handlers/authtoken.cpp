@@ -11,14 +11,7 @@
 static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto authToken = OpenShock::Config::GetBackendAuthToken();
-    if (!authToken) {
-      SERPR_ERROR("Failed to get auth token from config");
-      return;
-    }
-
-    // Get auth token
-    SERPR_RESPONSE("AuthToken|%s", authToken->c_str());
+    SERPR_RESPONSE("AuthToken|%s", OpenShock::Config::GetBackendAuthToken().c_str());
     return;
   }
 
@@ -30,13 +23,7 @@ static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
 
   // If we have some other kind of request fault just set it anyway, we probably arent connected to a network
 
-  bool result = OpenShock::GatewayConnectionManager::SetAuthToken(std::string(arg));
-
-  if (result) {
-    SERPR_SUCCESS("Saved config");
-  } else {
-    SERPR_ERROR("Failed to save config");
-  }
+  OpenShock::SerialCmds::ReportSaved(OpenShock::GatewayConnectionManager::SetAuthToken(std::string(arg)));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::AuthTokenHandler()

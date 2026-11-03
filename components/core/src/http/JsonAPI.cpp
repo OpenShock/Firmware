@@ -9,36 +9,28 @@ const char* const TAG = "JsonAPI";
 #include "OpenShock.h"
 #include "StringHelpers.h"
 
-#include <optional>
 #include <string>
 
 using namespace OpenShock;
 
 // "https://<configured backend domain><path>"
-[[nodiscard]] static std::optional<std::string> tryGetBackendUri(std::string_view path)
+[[nodiscard]] static std::string backendUri(std::string_view path)
 {
-  auto domain = Config::GetBackendDomain();
-  if (!domain) {
-    return std::nullopt;
-  }
-
+  const std::string domain = Config::GetBackendDomain();
   std::string uri;
-  uri.reserve(8 + domain->size() + path.size());
+  uri.reserve(8 + domain.size() + path.size());
   uri = "https://";
-  uri += *domain;
+  uri += domain;
   uri += path;
   return uri;
 }
 
 HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkAccount(std::string_view accountLinkCode)
 {
-  auto uri = tryGetBackendUri(std::string("/1/device/pair/") + std::string(accountLinkCode));
-  if (!uri) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
+  const std::string uri = backendUri(std::string("/1/device/pair/") + std::string(accountLinkCode));
 
   return HTTP::GetJSON<Serialization::JsonAPI::AccountLinkResponse>(
-    *uri,
+    uri,
     {
       {"Accept", "application/json"}
   },
@@ -49,13 +41,10 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
 
 HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(std::string_view hubToken)
 {
-  auto uri = tryGetBackendUri("/1/device/self");
-  if (!uri) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
+  const std::string uri = backendUri("/1/device/self");
 
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
-    *uri,
+    uri,
     {
       {     "Accept",    "application/json"},
       {"DeviceToken", std::string(hubToken)}
@@ -67,13 +56,10 @@ HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInf
 
 HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(std::string_view hubToken)
 {
-  auto uri = tryGetBackendUri("/2/device/assignLCG?version=2");
-  if (!uri) {
-    return {HTTP::RequestResult::InternalError, 0, {}};
-  }
+  const std::string uri = backendUri("/2/device/assignLCG?version=2");
 
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
-    *uri,
+    uri,
     {
       {     "Accept",    "application/json"},
       {"DeviceToken", std::string(hubToken)}

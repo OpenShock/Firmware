@@ -13,7 +13,6 @@ const char* const TAG = "GatewayClient";
 #include "OtaUpdateConfig.h"
 #include "serialization/WSGateway.h"
 #include "Temporal.h"
-#include "visual/VisualStateManager.h"
 
 #include <esp_crt_bundle.h>
 
@@ -251,22 +250,13 @@ void GatewayClient::_sendBootStatus()
 
   OS_LOGV(TAG, "Sending Gateway boot status message");
 
-  auto updateId = Config::GetOtaUpdateId();
-  if (!updateId) {
-    OS_LOGE(TAG, "Failed to get OTA update ID");
-    return;
-  }
+  const int32_t updateId         = Config::GetOtaUpdateId();
+  const OtaUpdateStep updateStep = Config::GetOtaUpdateStep();
 
-  auto updateStep = Config::GetOtaUpdateStep();
-  if (!updateStep) {
-    OS_LOGE(TAG, "Failed to get OTA firmware boot type");
-    return;
-  }
+  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
 
-  s_bootStatusSent = Serialization::Gateway::SerializeBootStatusMessage(*updateId, AppHooks::OtaGetFirmwareBootType(), [this](std::span<const uint8_t> data) { return sendMessageBIN(data); });
-
-  if (s_bootStatusSent && *updateStep != OpenShock::OtaUpdateStep::None) {
-    s_reportedOtaStep     = *updateStep;
+  if (s_bootStatusSent && updateStep != OpenShock::OtaUpdateStep::None) {
+    s_reportedOtaStep     = updateStep;
     s_otaStepResetPending = true;
   }
 }

@@ -2,8 +2,6 @@
 
 #include "config/Store.h"
 
-#include <esp_system.h>
-
 static void handleJsonConfigCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
@@ -14,14 +12,7 @@ static void handleJsonConfigCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  if (!OpenShock::Config::SaveFromJSON(arg)) {
-    SERPR_ERROR("Failed to save config");
-    return;
-  }
-
-  SERPR_SUCCESS("Saved config, restarting...");
-
-  esp_restart();
+  OpenShock::SerialCmds::ReportSavedAndRestart(OpenShock::Config::SaveFromJSON(arg));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::JsonConfigHandler()

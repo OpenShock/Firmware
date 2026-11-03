@@ -16,6 +16,26 @@ namespace OpenShock {
     RollingBack
   };
 
+  // The name jsonconfig renders; TryParseOtaUpdateStep reads it back.
+  [[nodiscard]] constexpr const char* OtaUpdateStepName(OtaUpdateStep step)
+  {
+    switch (step) {
+      case OtaUpdateStep::None:
+        return "None";
+      case OtaUpdateStep::Updating:
+        return "Updating";
+      case OtaUpdateStep::Updated:
+        return "Updated";
+      case OtaUpdateStep::Validating:
+        return "Validating";
+      case OtaUpdateStep::Validated:
+        return "Validated";
+      case OtaUpdateStep::RollingBack:
+        return "RollingBack";
+    }
+    return "";
+  }
+
   [[nodiscard]] inline std::optional<OtaUpdateStep> TryParseOtaUpdateStep(std::string_view str)
   {
     if (StringIEquals(str, "none")) {

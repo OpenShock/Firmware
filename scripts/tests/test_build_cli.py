@@ -87,9 +87,9 @@ def test_the_build_hands_its_own_interpreter_to_cmake(idf):
 
 
 def test_missing_requirements_stop_the_build_before_idf_runs(idf, monkeypatch):
-    monkeypatch.setattr(build.pyreqs, 'check', lambda path=None: [build.pyreqs.Pin('littlefs-python', '0.19.0')])
+    monkeypatch.setattr(build.pyreqs, 'check', lambda path=None: [build.pyreqs.Pin('esptool', '0.19.0')])
 
-    with pytest.raises(SystemExit, match=r'lacks 1 of the pins in requirements.txt: littlefs-python==0.19.0'):
+    with pytest.raises(SystemExit, match=r'lacks 1 of the pins in requirements.txt: esptool==0.19.0'):
         build.main(['OpenShock-Core-V2'])
     assert idf == []
 

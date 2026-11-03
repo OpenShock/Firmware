@@ -20,10 +20,11 @@ menu "OpenShock defaults"
             Default backend API domain the hub connects to. Overridable at runtime.
 
     config OPENSHOCK_FW_CDN_DOMAIN
-        string "Firmware CDN domain"
-        default "firmware.openshock.org"
+        string "Firmware repository server domain"
+        default "repo.openshock.dev"
         help
-            Default CDN domain used for OTA firmware/version lookups. Overridable at runtime.
+            Default repository server domain used for OTA firmware/version lookups. Overridable at runtime.
+            Named CDN for its 1.x origin, when OTA read flat files off the CDN.
 
     config OPENSHOCK_FW_HOSTNAME
         string "Default hostname"

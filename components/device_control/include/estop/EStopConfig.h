@@ -5,11 +5,9 @@
 //
 // The same namespace holds the E-Stop latch, `latched` (u8): whether the E-Stop was active when it was last saved, so
 // a reboot or power cut does not release it. It is state, not config: not part of the section's value, never in
-// jsonconfig or the wire form. Keeping it in the section's namespace moves it with the store; a factory reset (which
-// erases the section's namespaces) clears it.
+// jsonconfig. A factory reset (which erases the section's namespaces) clears it.
 
 #include "config/Section.h"
-#include "serialization/_fbs/HubConfig_generated.h"
 
 #include <hal/gpio_types.h>
 
@@ -37,17 +35,13 @@ namespace OpenShock::Config {
 
     bool FromJSON(JSON::JsonView json);
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
-
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::EStopConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
   };
 
-  Section<EStopConfig>& EStopSection();
-
-  [[nodiscard]] std::optional<EStopConfig> GetEStopConfig();
+  [[nodiscard]] EStopConfig GetEStopConfig();
   bool SetEStopConfig(const EStopConfig& config);
-  [[nodiscard]] std::optional<bool> GetEStopEnabled();
+  [[nodiscard]] bool GetEStopEnabled();
   bool SetEStopEnabled(bool enabled);
-  [[nodiscard]] std::optional<gpio_num_t> GetEStopGpioPin();
+  [[nodiscard]] gpio_num_t GetEStopGpioPin();
   bool SetEStopGpioPin(gpio_num_t gpioPin);
 
   /// @brief Whether the stored E-Stop latch is set. A missing key, or a hub whose config only lives in RAM, reads as
@@ -60,7 +54,7 @@ namespace OpenShock::Config {
     Failed,  // the write failed
   };
 
-  /// @brief Stores the E-Stop latch. Never waits for another config writer (the layout migration holds the write lock
-  ///        across closing NVS), so the E-Stop task can call it between samples. Never call it from an ISR.
+  /// @brief Stores the E-Stop latch. Never waits for another config writer, so the E-Stop task can call it between
+  ///        samples. Never call it from an ISR.
   [[nodiscard]] LatchSave SaveEStopLatched(bool latched);
 }  // namespace OpenShock::Config

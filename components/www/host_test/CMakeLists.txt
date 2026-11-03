@@ -12,3 +12,4 @@ list(APPEND EXTRA_COMPONENT_DIRS
      "${CMAKE_CURRENT_LIST_DIR}/../../../test/host_support")
 
 project(www_host_test)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/cxx_standard.cmake)

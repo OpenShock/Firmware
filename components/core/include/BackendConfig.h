@@ -4,7 +4,6 @@
 // and kept in NVS through the config framework (config/Section.h); namespace "backend", keys domain and token (str).
 
 #include "config/Section.h"
-#include "serialization/_fbs/HubConfig_generated.h"
 
 #include <optional>
 #include <string>
@@ -25,8 +24,6 @@ namespace OpenShock::Config {
     /// @brief No rules to apply yet. The section runs it on every value it takes in.
     void Normalize() { }
 
-    [[nodiscard]] flatbuffers::Offset<Serialization::Configuration::BackendConfig> ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const;
-
     /// @brief Reads this section from `partition`; a missing key is its default, a read error fails.
     bool LoadNvs(const char* partition);
     /// @brief Writes the keys that differ from `previous` (every key when null) to `partition`.
@@ -36,14 +33,12 @@ namespace OpenShock::Config {
     void ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiveData) const;
   };
 
-  Section<BackendConfig>& BackendSection();
-
-  [[nodiscard]] std::optional<BackendConfig> GetBackendConfig();
+  [[nodiscard]] BackendConfig GetBackendConfig();
   bool SetBackendConfig(const BackendConfig& config);
-  [[nodiscard]] std::optional<std::string> GetBackendDomain();
+  [[nodiscard]] std::string GetBackendDomain();
   bool SetBackendDomain(std::string domain);
   bool HasBackendAuthToken();
-  [[nodiscard]] std::optional<std::string> GetBackendAuthToken();
+  [[nodiscard]] std::string GetBackendAuthToken();
   bool SetBackendAuthToken(std::string token);
   bool ClearBackendAuthToken();
 }  // namespace OpenShock::Config

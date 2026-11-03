@@ -8,12 +8,13 @@ const char* const TAG = "Config::EStopConfig";
 #include "Chipset.h"
 #include "config/Nvs.h"
 #include "config/Parse.h"
+#include "config/Store.h"
 #include "Logging.h"
+#include "SimpleMutex.h"
 
 #include "json/Json.h"
 
 using namespace OpenShock::Config;
-namespace Fbs = OpenShock::Serialization::Configuration;
 
 static constexpr const char* kNamespace  = "estop";
 static constexpr const char* kKeyEnabled = "enabled";
@@ -21,12 +22,7 @@ static constexpr const char* kKeyGpio    = "gpio";
 static constexpr const char* kKeyLatched = "latched";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
-static Section<EStopConfig> s_section({.name = "estop", .order = 6, .hubConfigField = Fbs::HubConfig::VT_ESTOP, .namespaces = kNamespaces});
-
-Section<EStopConfig>& OpenShock::Config::EStopSection()
-{
-  return s_section;
-}
+static Section<EStopConfig> s_section({.name = "estop", .order = 6, .namespaces = kNamespaces});
 
 EStopConfig::EStopConfig()
   : enabled(OpenShock::IsValidInputPin(Board::Get().estopGpio))
@@ -51,10 +47,9 @@ void EStopConfig::Normalize()
 
 bool EStopConfig::LoadNvs(const char* partition)
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    *this = EStopConfig();
-    return true;
+    return false;
   }
 
   const int8_t boardPin = static_cast<int8_t>(Board::Get().estopGpio);
@@ -75,38 +70,25 @@ bool EStopConfig::LoadNvs(const char* partition)
 
 bool EStopConfig::SaveNvs(const char* partition, const EStopConfig* previous) const
 {
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle) {
     return false;
   }
-  const int8_t pin     = static_cast<int8_t>(gpioPin);
-  const int8_t prevPin = previous != nullptr ? static_cast<int8_t>(previous->gpioPin) : 0;
-  return handle->SetBool(kKeyEnabled, enabled, previous != nullptr ? &previous->enabled : nullptr) && handle->SetI8(kKeyGpio, pin, previous != nullptr ? &prevPin : nullptr) && handle->Commit();
+  // The pin first: NVS commits key by key, so a power cut between the two leaves the old enable state on the new pin
+  // (disabled stays disabled; enabled moves to the pin that was asked for), never the E-Stop enabled on the old pin
+  return Nvs::Saver(*handle, *this, previous).Set<int8_t>(kKeyGpio, &EStopConfig::gpioPin).Set(kKeyEnabled, &EStopConfig::enabled).Commit();
 }
 
 bool EStopConfig::FromJSON(JSON::JsonView json)
 {
-  if (!json.valid()) {
-    *this = EStopConfig();
-    return true;
-  }
-
-  if (!json.isObject()) {
-    OS_LOGE(TAG, "json is not an object");
-    return false;
+  if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {
+    return *done;
   }
 
   gpioPin = Parse::JsonGpioNum(json, "gpioPin").value_or(static_cast<gpio_num_t>(Board::Get().estopGpio));
 
-  if (JSON::JsonView enabledJson = json["enabled"]; enabledJson.valid()) {
-    auto parsed = enabledJson.tryGetBool();
-    if (!parsed) {
-      OS_LOGE(TAG, "Failed to parse enabled");
-      return false;
-    }
-    enabled = *parsed;
-  } else {
-    enabled = OpenShock::IsValidInputPin(gpioPin);
+  if (!Parse::JsonBool(enabled, json, "enabled", OpenShock::IsValidInputPin(gpioPin), TAG)) {
+    return false;
   }
 
   return true;
@@ -121,26 +103,17 @@ void EStopConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensiti
   JSON::objEnd(gen, name);
 }
 
-flatbuffers::Offset<Fbs::EStopConfig> EStopConfig::ToFlatbuffers(flatbuffers::FlatBufferBuilder& builder, bool withSensitiveData) const
-{
-  (void)withSensitiveData;
-  return Fbs::CreateEStopConfig(builder, enabled, gpioPin);
-}
-
-std::optional<EStopConfig> OpenShock::Config::GetEStopConfig()
+EStopConfig OpenShock::Config::GetEStopConfig()
 {
   return s_section.Get();
 }
 
 bool OpenShock::Config::SetEStopConfig(const EStopConfig& config)
 {
-  return s_section.Update([&](EStopConfig& estop) {
-    estop = config;
-    return true;
-  });
+  return s_section.Set(config);
 }
 
-std::optional<bool> OpenShock::Config::GetEStopEnabled()
+bool OpenShock::Config::GetEStopEnabled()
 {
   return s_section.Read([](const EStopConfig& estop) { return estop.enabled; });
 }
@@ -153,7 +126,7 @@ bool OpenShock::Config::SetEStopEnabled(bool enabled)
   });
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetEStopGpioPin()
+gpio_num_t OpenShock::Config::GetEStopGpioPin()
 {
   return s_section.Read([](const EStopConfig& estop) { return estop.gpioPin; });
 }
@@ -173,16 +146,16 @@ bool OpenShock::Config::SetEStopGpioPin(gpio_num_t gpioPin)
 
 bool OpenShock::Config::LoadEStopLatched()
 {
-  ScopedLock lock__(&Internal::WriteLock());  // The partition can't change or close under the read
+  ScopedLock lock__(&Internal::WriteLock());  // No writer can touch the namespace under the read
 
-  const char* partition = Internal::Partition();
+  const char* partition = StorageLabel();
   if (partition == nullptr) {
     return false;
   }
 
-  auto handle = Nvs::Handle::Open(partition, kNamespace, false);
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
   if (!handle) {
-    return false;  // No estop namespace yet: never latched
+    return false;
   }
 
   uint8_t latched = 0;
@@ -190,7 +163,7 @@ bool OpenShock::Config::LoadEStopLatched()
     case Nvs::Result::Found:
       return latched != 0;
     case Nvs::Result::Missing:
-      return false;
+      return false;  // Also a namespace never written: never latched
     case Nvs::Result::Error:
     default:
       OS_LOGE(TAG, "Failed to read the E-Stop latch, treating it as latched");
@@ -205,12 +178,12 @@ LatchSave OpenShock::Config::SaveEStopLatched(bool latched)
     return LatchSave::Busy;
   }
 
-  const char* partition = Internal::Partition();
+  const char* partition = StorageLabel();
   if (partition == nullptr) {
     return LatchSave::Saved;
   }
 
-  auto handle = Nvs::Handle::Open(partition, kNamespace, true);
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
   if (!handle || !handle->SetU8(kKeyLatched, latched ? 1 : 0) || !handle->Commit()) {
     return LatchSave::Failed;
   }

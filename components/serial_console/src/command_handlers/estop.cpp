@@ -9,14 +9,7 @@
 static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto configEnabled = OpenShock::Config::GetEStopEnabled();
-    if (!configEnabled) {
-      SERPR_ERROR("Failed to get EStop enabled from config");
-      return;
-    }
-
-    // Get EStop enabled
-    SERPR_RESPONSE("EStopEnabled|%s", *configEnabled ? "true" : "false");
+    SERPR_RESPONSE("EStopEnabled|%s", OpenShock::Config::GetEStopEnabled() ? "true" : "false");
     return;
   }
 
@@ -37,14 +30,7 @@ static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto configPin = OpenShock::Config::GetEStopGpioPin();
-    if (!configPin) {
-      SERPR_ERROR("Failed to get EStop pin from config");
-      return;
-    }
-
-    // Get EStop pin
-    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(*configPin));
+    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(OpenShock::Config::GetEStopGpioPin()));
     return;
   }
 

@@ -204,13 +204,7 @@ static bool estopmgr_taskStart()
   }
 
   if (s_estopPin == GPIO_NUM_NC) {
-    auto configPin = OpenShock::Config::GetEStopGpioPin();
-    if (!configPin) {
-      OS_LOGE(TAG, "Failed to get EStop pin from config");
-      return false;
-    }
-
-    gpio_num_t pin = *configPin;
+    gpio_num_t pin = OpenShock::Config::GetEStopGpioPin();
     if (pin == GPIO_NUM_NC) {
       OS_LOGW(TAG, "No valid pin is defined, refusing to start task");
       return false;
@@ -258,17 +252,13 @@ bool EStopManager::Init()
   }
   s_estopInitialized = true;
 
-  auto cfg = OpenShock::Config::GetEStopConfig();
-  if (!cfg) {
-    OS_LOGE(TAG, "Failed to get EStop pin from config");
-    return false;
-  }
+  const Config::EStopConfig cfg = OpenShock::Config::GetEStopConfig();
 
   // Read before anything can transmit: CommandHandler and the RF transmitter start after this.
   bool latched  = OpenShock::Config::LoadEStopLatched();
   s_latchStored = latched;
 
-  if (!cfg->enabled) {
+  if (!cfg.enabled) {
     if (latched) {
       // Without an input there is no button to clear it, so it would stop the hub for good. Drop it.
       OS_LOGW(TAG, "E-Stop was latched, but the E-Stop is disabled; releasing the latch");
@@ -291,11 +281,11 @@ bool EStopManager::Init()
     estopmgr_publishState(EStopState::Active, lastState);
   }
 
-  if (!estopmgr_configurePin(cfg->gpioPin)) {
+  if (!estopmgr_configurePin(cfg.gpioPin)) {
     return false;
   }
 
-  s_estopPin = cfg->gpioPin;
+  s_estopPin = cfg.gpioPin;
 
   return estopmgr_taskStart();
 }

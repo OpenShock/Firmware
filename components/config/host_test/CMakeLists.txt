@@ -19,3 +19,10 @@ list(APPEND EXTRA_COMPONENT_DIRS
      "${CMAKE_CURRENT_LIST_DIR}/../../../test/host_support")
 
 project(config_host_test)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/cxx_standard.cmake)
+
+# glibc 2.42 (Ubuntu 26.04) pulls <linux/sockios.h> into <sys/ioctl.h>, so SIOCATMARK is already defined when lwip's
+# sockets.h defines it again under a guard that only checks SIOCSHIWAT. The netdb mock includes both, and -Werror
+# makes the redefinition a build failure. The mock is only here for esp_wifi_types.h's dependency chain.
+idf_component_get_property(_lwip_mock lwip COMPONENT_LIB)
+target_compile_options(${_lwip_mock} PRIVATE -Wno-error)

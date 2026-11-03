@@ -10,14 +10,7 @@
 static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    // Get keep alive status
-    auto configEnabled = OpenShock::Config::GetRFConfigKeepAliveEnabled();
-    if (!configEnabled) {
-      SERPR_ERROR("Failed to get keep-alive status from config");
-      return;
-    }
-
-    SERPR_RESPONSE("KeepAlive|%s", *configEnabled ? "true" : "false");
+    SERPR_RESPONSE("KeepAlive|%s", OpenShock::Config::GetRFConfigKeepAliveEnabled() ? "true" : "false");
     return;
   }
 
@@ -27,13 +20,7 @@ static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  bool result = OpenShock::CommandHandler::SetKeepAliveEnabled(*keepAliveEnabled);
-
-  if (result) {
-    SERPR_SUCCESS("Saved config");
-  } else {
-    SERPR_ERROR("Failed to save config");
-  }
+  OpenShock::SerialCmds::ReportSaved(OpenShock::CommandHandler::SetKeepAliveEnabled(*keepAliveEnabled));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::KeepAliveHandler()

@@ -20,8 +20,8 @@ namespace OpenShock::OtaUpdateManager {
   struct FirmwareRelease {
     std::string appBinaryUrl;
     uint8_t appBinaryHash[32];
-    std::string filesystemBinaryUrl;  // the `staticfs` artifact: the www image (www.bin)
-    uint8_t filesystemBinaryHash[32];
+    std::string wwwBinaryUrl;  // the `staticfs` artifact: the www image (www.bin)
+    uint8_t wwwBinaryHash[32];
   };
 
   /// @brief Asks the repository server for the head of a channel for this board.

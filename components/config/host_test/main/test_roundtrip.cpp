@@ -45,9 +45,7 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   AssertConfigEqual(before, Snapshot());
 
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
-  auto token = Config::GetBackendAuthToken();
-  TEST_ASSERT_TRUE(token.has_value());
-  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", token->c_str());
+  TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", Config::GetBackendAuthToken().c_str());
 
   auto creds = Config::TryGetWiFiCredentialsBySSID("Guest");
   TEST_ASSERT_TRUE(creds.has_value());
@@ -83,22 +81,22 @@ TEST_CASE("Removed credentials are gone after a reload and their ids can be reus
 
   Reload();
   auto creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(creds.has_value());
-  TEST_ASSERT_EQUAL_size_t(2, creds->size());
-  TEST_ASSERT_EQUAL_UINT8(1, (*creds)[0].id);
-  TEST_ASSERT_EQUAL_UINT8(3, (*creds)[1].id);
+  TEST_ASSERT_EQUAL_size_t(2, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
+  TEST_ASSERT_EQUAL_UINT8(3, creds[1].id);
   TEST_ASSERT_FALSE(Config::TryGetWiFiCredentialsByID(2).has_value());
 
   // The freed id is handed out again, and the list order is by id, not by insertion
   TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("D", "pd", WIFI_AUTH_WPA2_PSK));
   Reload();
   creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_EQUAL_size_t(3, creds->size());
-  TEST_ASSERT_EQUAL_STRING("D", (*creds)[1].ssid.c_str());
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_STRING("D", creds[1].ssid.c_str());
 
   TEST_ASSERT_TRUE(Config::ClearWiFiCredentials());
   Reload();
-  TEST_ASSERT_TRUE(Config::GetWiFiCredentials()->empty());
+  TEST_ASSERT_TRUE(Config::GetWiFiCredentials().empty());
+  TEST_ASSERT_FALSE(Config::HasWiFiCredentials());
 }
 
 TEST_CASE("Credentials are enumerated from their keys, never counted", "[config][roundtrip]")
@@ -109,29 +107,40 @@ TEST_CASE("Credentials are enumerated from their keys, never counted", "[config]
   InitWith(config);
 
   auto creds = Config::GetWiFiCredentials();
-  TEST_ASSERT_TRUE(creds.has_value());
-  TEST_ASSERT_EQUAL_size_t(3, creds->size());
-  TEST_ASSERT_EQUAL_UINT8(3, (*creds)[0].id);
-  TEST_ASSERT_EQUAL_UINT8(200, (*creds)[1].id);
-  TEST_ASSERT_EQUAL_UINT8(255, (*creds)[2].id);
-  TEST_ASSERT_EQUAL_STRING("Max", (*creds)[2].ssid.c_str());
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(3, creds[0].id);
+  TEST_ASSERT_EQUAL_UINT8(200, creds[1].id);
+  TEST_ASSERT_EQUAL_UINT8(255, creds[2].id);
+  TEST_ASSERT_EQUAL_STRING("Max", creds[2].ssid.c_str());
 }
 
-TEST_CASE("GetRaw writes fields that equal their schema default", "[config][roundtrip]")
+TEST_CASE("One credential that does not read is dropped; the others load and survive the next save", "[config][roundtrip]")
 {
-  // 1.5.x reads a missing is_enabled/keepalive_enabled as false, so omitting them breaks loading the dump there.
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRFConfigKeepAliveEnabled(true));
+  // A credential blob NVS hands back unreadable must not fail the wifi load: a failed load runs the section on an
+  // empty list, and the next save sweeps every stored credential that is not in it, so every network would be lost.
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
+  {
+    auto wifi = Config::Nvs::Handle::OpenForWrite(Keys::kPartitionCfg, Keys::Ns::kWifi);
+    TEST_ASSERT_TRUE(wifi.has_value());
+    const uint8_t garbage[] = {0xFF, 0x02, 0x00};  // unknown blob version, id 2
+    TEST_ASSERT_TRUE(wifi->SetBlob("2", garbage));
+    TEST_ASSERT_TRUE(wifi->Commit());
+  }
+  Reload();
 
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  const auto* root = Serialization::Configuration::GetHubConfig(raw.data());
-  // The generated tables derive from flatbuffers::Table privately; every table is one at the same address
-  auto hasField = [](const void* table, flatbuffers::voffset_t field) {
-    return static_cast<const flatbuffers::Table*>(table)->CheckField(field);
-  };
-  TEST_ASSERT_TRUE(hasField(root->rf(), Serialization::Configuration::RFConfig::VT_KEEPALIVE_ENABLED));
-  TEST_ASSERT_TRUE(hasField(root->ota_update(), Serialization::Configuration::OtaUpdateConfig::VT_IS_ENABLED));
+  Full expected = sample;
+  expected.wifi.credentialsList.erase(expected.wifi.credentialsList.begin() + 1);  // Guest, id 2
+  AssertConfigEqual(expected, Snapshot());
+
+  // The section is in sync with flash: a changed-only save adds one key and leaves the readable credentials alone
+  TEST_ASSERT_EQUAL_UINT8(2, Config::AddWiFiCredentials("Cafe", "latte123", WIFI_AUTH_WPA2_PSK));
+  Reload();
+  auto creds = Config::GetWiFiCredentials();
+  TEST_ASSERT_EQUAL_size_t(3, creds.size());
+  TEST_ASSERT_EQUAL_UINT8(1, creds[0].id);
+  TEST_ASSERT_EQUAL_STRING("Cafe", creds[1].ssid.c_str());
+  TEST_ASSERT_EQUAL_UINT8(7, creds[2].id);
 }
 
 TEST_CASE("A save writes only what changed", "[config][roundtrip]")
@@ -151,7 +160,7 @@ TEST_CASE("A save writes only what changed", "[config][roundtrip]")
   TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(true));
   TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
   Reload();
-  TEST_ASSERT_TRUE(*Config::GetSerialInputConfigEchoEnabled());
+  TEST_ASSERT_TRUE(Config::GetSerialInputConfigEchoEnabled());
 }
 
 TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtrip]")
@@ -168,11 +177,10 @@ TEST_CASE("Many max-length WiFi credentials survive a reload", "[config][roundtr
   AssertConfigEqual(before, Snapshot());
 }
 
-TEST_CASE("The store holds more than the 1.x config file could", "[config][roundtrip]")
+TEST_CASE("The store holds 32 long WiFi credentials", "[config][roundtrip]")
 {
-  // The 1.x firmware capped its config file at 4 KiB, some 30 credentials like these. cfg is that file's 12 KiB
-  // partition retyped as NVS (three pages, one of them always kept free for compaction): 32 credentials with long
-  // names and passphrases fit with room for the rest of the config. The store fills up at about 36.
+  // cfg is 12 KiB of NVS (three pages, one of them always kept free for compaction): 32 credentials with long names and
+  // passphrases fit with room for the rest of the config. The store fills up at about 36.
   InitDefault();
   for (int i = 0; i < 32; ++i) {
     std::string ssid = "Network-" + std::to_string(i) + std::string(20, 'x');
@@ -214,7 +222,7 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(json));
 
-  // Escaped exactly once on the way out (as the cJSON firmware did), decoded on the way in.
+  // Escaped exactly once on the way out (not double-escaped), decoded on the way in.
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("Office \"5G\"")"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, json.find(R"("p@ss w0rd/\\")"));
 
@@ -231,15 +239,15 @@ TEST_CASE("jsonconfig round trip keeps strings that need escaping", "[config][ro
 TEST_CASE("jsonconfig set decodes \\u escapes", "[config][roundtrip][json]")
 {
   InitDefault();
-  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub-1","credentials":[{"id":1,"ssid":"Café 😀","password":"a\tb"}]}})"));
+  // Escaped on purpose (a BMP code point, a surrogate pair, an escaped ASCII hyphen): the decoder is what is under test
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"hostname":"hub\u002d1","credentials":[{"id":1,"ssid":"Caf\u00e9 \ud83d\ude00","password":"a\tb"}]}})"));
 
   Reload();  // UTF-8 and control characters survive the store too
   auto wifi = Config::GetWiFiConfig();
-  TEST_ASSERT_TRUE(wifi.has_value());
-  TEST_ASSERT_EQUAL_STRING("hub-1", wifi->hostname.c_str());
-  TEST_ASSERT_EQUAL_size_t(1, wifi->credentialsList.size());
-  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi->credentialsList[0].ssid.c_str());
-  TEST_ASSERT_EQUAL_STRING("a\tb", wifi->credentialsList[0].password.c_str());
+  TEST_ASSERT_EQUAL_STRING("hub-1", wifi.hostname.c_str());
+  TEST_ASSERT_EQUAL_size_t(1, wifi.credentialsList.size());
+  TEST_ASSERT_EQUAL_STRING("Caf\xc3\xa9 \xf0\x9f\x98\x80", wifi.credentialsList[0].ssid.c_str());
+  TEST_ASSERT_EQUAL_STRING("a\tb", wifi.credentialsList[0].password.c_str());
 }
 
 TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip][json]")
@@ -256,20 +264,6 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("authToken"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"HomeNet\""));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
-}
-
-TEST_CASE("The wire form for the portal omits secrets and carries every section", "[config][roundtrip]")
-{
-  const Full sample = MakeSampleConfig();
-  InitWith(sample);
-
-  flatbuffers::FlatBufferBuilder builder;
-  Serialization::Configuration::FinishHubConfigBuffer(builder, Config::GetAsFlatBuffer(builder, false));
-  std::vector<uint8_t> exported(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
-
-  Full decoded;
-  TEST_ASSERT_TRUE(Deserialize(exported.data(), exported.size(), decoded));
-  AssertConfigEqual(sample, decoded, false);
 }
 
 TEST_CASE("UpdateOtaUpdateConfig edits only what the update touches and saves only on change", "[config][roundtrip]")
@@ -317,25 +311,4 @@ TEST_CASE("Factory reset wipes every setting and survives a reload", "[config][r
   AssertConfigEqual(Full(), Snapshot());
   Reload();
   AssertConfigEqual(Full(), Snapshot());
-}
-
-TEST_CASE("rawconfig get and set round trip the whole config", "[config][roundtrip]")
-{
-  InitWith(MakeSampleConfig());
-  TinyVec<uint8_t> raw;
-  TEST_ASSERT_TRUE(Config::GetRaw(raw));
-  const std::vector<uint8_t> exported(raw.data(), raw.data() + raw.size());
-
-  InitDefault();
-  TEST_ASSERT_TRUE(Config::SetRaw(exported.data(), exported.size()));
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-  Reload();
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
-
-  // A buffer that does not verify changes nothing
-  const std::size_t before = UsedEntries();
-  TEST_ASSERT_FALSE(Config::SetRaw(exported.data(), exported.size() / 2));
-  TEST_ASSERT_FALSE(Config::SetRaw(nullptr, 0));
-  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
-  AssertConfigEqual(MakeSampleConfig(), Snapshot());
 }
