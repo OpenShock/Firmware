@@ -14,6 +14,12 @@ const char* const TAG = "CaptivePortalWs";
 
 #include <utility>
 
+// Without it httpd_uri_t has no ws_pre_handshake_cb. sdkconfig.defaults enables it, but an existing sdkconfig wins over
+// the defaults, so a build directory configured before the option was added still has it off.
+#if !CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT
+#error "CONFIG_HTTPD_WS_PRE_HANDSHAKE_CB_SUPPORT is off: this build directory's sdkconfig predates it. Delete build/<board>/sdkconfig and rebuild."
+#endif
+
 using namespace OpenShock;
 
 void CaptivePortal::WebSocketEndpoint::registerHandler(httpd_handle_t server)
@@ -144,7 +150,7 @@ void CaptivePortal::WebSocketEndpoint::wsSessCtxFree(void* ctx)
 // httpd answers the handshake. Failing closes the connection after the redirect is sent.
 esp_err_t CaptivePortal::WebSocketEndpoint::wsPreHandshake(httpd_req_t* req)
 {
-  if (RFC8908::IsForeignHost(req)) {
+  if (RFC8908::IsCaptured(req)) {
     OS_LOGW(TAG, "Rejecting WebSocket for another host on fd %d", httpd_req_to_sockfd(req));
     RFC8908::EmitRedirect(req);
     return ESP_FAIL;

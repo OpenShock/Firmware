@@ -31,13 +31,13 @@ namespace OpenShock::CaptivePortal {
   namespace detail {
     void registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*), void* userCtx);
 
-    // httpd has no hook that runs before every request, so each route is wrapped in this. A request addressed to
-    // another host (a connectivity probe, a page on a hijacked or rebound name) never reaches a portal handler; it
-    // gets the captive redirect instead.
+    // httpd has no hook that runs before every request, so each route is wrapped in this. A request that came in over
+    // the AP addressed to another host (a connectivity probe, a page on a hijacked or rebound name) never reaches a
+    // portal handler; it gets the captive redirect instead. LAN requests always pass.
     template<esp_err_t (*Handler)(httpd_req_t*)>
     esp_err_t ownHostOnly(httpd_req_t* req)
     {
-      if (RFC8908::IsForeignHost(req)) {
+      if (RFC8908::IsCaptured(req)) {
         return RFC8908::EmitRedirect(req);
       }
       return Handler(req);
