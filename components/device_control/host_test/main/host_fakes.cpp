@@ -80,6 +80,7 @@ namespace HostFake {
   OpenShock::Config::EStopConfig EStopCfg = {.enabled = false, .gpioPin = GPIO_NUM_NC};
   esp_event_handler_t EStopHandler        = nullptr;
   int ActivityPosts                       = 0;
+  bool FailEventPost                      = false;
 
   static std::vector<FakeQueue*> s_liveQueues;  // Queues only; mutexes are not counted
   static std::vector<std::unique_ptr<FakeTask>> s_tasks;
@@ -95,6 +96,7 @@ namespace HostFake {
     FailRmtTransmit = false;
     TaskDelays      = 0;
     ActivityPosts   = 0;
+    FailEventPost   = false;
     Transmissions.clear();
     OnIdle     = nullptr;
     OnTransmit = nullptr;
@@ -365,9 +367,12 @@ static esp_err_t fakeEventHandlerRegister(esp_event_base_t, int32_t event_id, es
   return ESP_OK;
 }
 
-static esp_err_t fakeEventPost(esp_event_base_t, int32_t event_id, const void*, size_t, TickType_t, int)
+static esp_err_t fakeEventPost(esp_event_base_t event_base, int32_t event_id, const void*, size_t, TickType_t, int)
 {
-  if (event_id == OPENSHOCK_EVENT_DEVICE_ACTIVITY) {
+  if (FailEventPost) {
+    return ESP_FAIL;
+  }
+  if (event_base == OPENSHOCK_EVENTS && event_id == OPENSHOCK_EVENT_DEVICE_ACTIVITY) {
     ++ActivityPosts;
   }
   return ESP_OK;

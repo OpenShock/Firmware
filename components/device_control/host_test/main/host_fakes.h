@@ -47,6 +47,7 @@ namespace HostFake {
   extern OpenShock::Config::EStopConfig EStopCfg;
   extern esp_event_handler_t EStopHandler;  // Handler registered for OPENSHOCK_EVENT_ESTOP_STATE_CHANGED
   extern int ActivityPosts;                 // OPENSHOCK_EVENT_DEVICE_ACTIVITY posts since Reset()
+  extern bool FailEventPost;                // esp_event_post fails (and counts nothing) while set
 
   /// @brief Clears recorded frames and hooks and releases the e-stop. Queues and tasks are owned by the code under test.
   void Reset();
