@@ -22,6 +22,8 @@ TEST_CASE("ShockerModelType: all accepted spellings", "[common][enums]")
   TEST_ASSERT_TRUE(TryParseShockerModelType("wellturnt330") == ShockerModelType::WellturnT330);
   TEST_ASSERT_TRUE(TryParseShockerModelType("t330") == ShockerModelType::WellturnT330);
   TEST_ASSERT_TRUE(TryParseShockerModelType("d80") == ShockerModelType::D80);
+  TEST_ASSERT_TRUE(TryParseShockerModelType("wellturnt330alt1") == ShockerModelType::WellturnT330Alt1);
+  TEST_ASSERT_TRUE(TryParseShockerModelType("t330alt1") == ShockerModelType::WellturnT330Alt1);
 }
 
 TEST_CASE("ShockerModelType: case-insensitive", "[common][enums]")

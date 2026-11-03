@@ -7,6 +7,7 @@
 #   radio/rmt/Petrainer998DREncoder.h
 #   radio/rmt/D80Encoder.h
 #   radio/rmt/T330Encoder.h
+#   radio/rmt/T330Alt1Encoder.h
 
 idf_component_register(
   SRCS          "src/CaiXianlinEncoder.cpp"
@@ -14,6 +15,7 @@ idf_component_register(
                 "src/Petrainer998DREncoder.cpp"
                 "src/PetrainerEncoder.cpp"
                 "src/Sequence.cpp"
+                "src/T330Alt1Encoder.cpp"
                 "src/T330Encoder.cpp"
   INCLUDE_DIRS  "include"
   PRIV_INCLUDE_DIRS "src"                    # radio/rmt/internal/Shared.h (private)
