@@ -54,9 +54,11 @@ static std::string_view getHostFromURL(std::string_view url)
     url = url.substr(0, seperator);
   }
 
-  // Remove the port eg. "api.example.com:443" -> "api.example.com"
-  seperator = url.rfind(':');
-  if (seperator != std::string_view::npos) {
+  // Remove the port eg. "api.example.com:443" -> "api.example.com". In a bracketed IPv6 host ("[2001:db8::1]:443")
+  // only a colon after the closing bracket starts the port.
+  seperator                      = url.rfind(':');
+  const std::size_t closeBracket = url.rfind(']');
+  if (seperator != std::string_view::npos && (closeBracket == std::string_view::npos || seperator > closeBracket)) {
     url = url.substr(0, seperator);
   }
 
@@ -157,8 +159,6 @@ HTTP::Response<std::size_t>
   }
 
   std::string urlStr(url);
-  m_retryAfter.clear();
-  m_connectionClose = false;
 
   int64_t begin = OpenShock::millis();
 
@@ -184,6 +184,10 @@ HTTP::Response<std::size_t>
   int64_t contentLength = -1;
   for (int attempt = 0; attempt < 2; ++attempt) {
     bool reused = m_handle != nullptr;
+
+    // Headers seen on a failed attempt must not carry over to the retry
+    m_retryAfter.clear();
+    m_connectionClose = false;
 
     if (m_handle == nullptr) {
       esp_http_client_config_t config = {};
