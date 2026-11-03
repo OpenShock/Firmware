@@ -26,8 +26,8 @@ const char* const TAG = "CommandHandler";
 #include <memory>
 #include <unordered_map>
 
-// WiFiManager keeps the radio out of power save for an hour after the last activity event, so a session only needs
-// refreshing now and then, not a broadcast per command.
+// WiFiManager keeps the radio out of power save for CONFIG_OPENSHOCK_WIFI_POWERSAVE_IDLE_MS (at least 5 minutes) after
+// the last activity event, so a session only needs refreshing now and then, not a broadcast per command.
 const int64_t ACTIVITY_POST_INTERVAL = 60'000;
 
 static uint32_t calculateEepyTime(int64_t timeToKeepAlive)

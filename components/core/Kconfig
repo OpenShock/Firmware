@@ -27,6 +27,16 @@ menu "OpenShock WiFi"
         help
             A network that failed to connect is retried after 2 s, 4 s, 8 s, ... up to this.
 
+    config OPENSHOCK_WIFI_POWERSAVE_IDLE_MS
+        int "Radio stays awake after the last command (ms)"
+        range 300000 86400000
+        default 3600000
+        help
+            Modem sleep has the AP hold frames until the next DTIM beacon, delaying each one
+            by up to a beacon interval (typically 100-300 ms). Power save is switched off on
+            the first shocker command and back on after this long without one. The command
+            handler reports activity at most once a minute, so this stays well above that.
+
 endmenu
 
 menu "OpenShock gateway"

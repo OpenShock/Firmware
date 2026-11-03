@@ -552,9 +552,10 @@ static void wakeUpdateTask()
 
 // Modem sleep (IDF's default WIFI_PS_MIN_MODEM) has the AP hold frames for us until the next DTIM beacon, delaying each
 // one by up to a beacon interval (typically 100-300 ms). The radio stays awake from the first command until there has
-// been no activity for an hour, so a session's commands arrive at once while an idle hub still saves power. The first
-// command of a session still waits for the beacon. CommandHandler refreshes the activity at most once a minute.
-static constexpr TickType_t kPowerSaveIdleTicks = pdMS_TO_TICKS(60 * 60 * 1000);
+// been no activity for CONFIG_OPENSHOCK_WIFI_POWERSAVE_IDLE_MS, so a session's commands arrive at once while an idle hub
+// still saves power. The first command of a session still waits for the beacon. CommandHandler refreshes the activity
+// at most once a minute.
+static constexpr TickType_t kPowerSaveIdleTicks = pdMS_TO_TICKS(CONFIG_OPENSHOCK_WIFI_POWERSAVE_IDLE_MS);
 
 // Set by the event loop on each activity event, consumed by the update task, which alone switches power save so the
 // switches can't reorder.
