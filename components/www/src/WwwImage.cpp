@@ -82,6 +82,8 @@ const char* Www::ParseErrorName(ParseError error)
   switch (error) {
     case ParseError::TooShort:
       return "too short";
+    case ParseError::BadLength:
+      return "image length out of range";
     case ParseError::BadMagic:
       return "bad magic";
     case ParseError::BadVersion:
@@ -132,15 +134,33 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
   if (readU16(bytes.data() + 4) != kVersion) {
     return std::unexpected(ParseError::BadVersion);
   }
-  const uint16_t count  = readU16(bytes.data() + 6);
-  const uint32_t dirLen = readU32(bytes.data() + 8);
-  if (dirLen % kAlign != 0 || dirLen < kNodeSize * count || dirLen > bytes.size() - kHeaderSize) {
-    return std::unexpected(ParseError::BadDirectory);
+  const uint32_t imageLen = readU32(bytes.data() + kImageLenOffset);
+  if (imageLen % kAlign != 0 || imageLen < kHeaderSize || imageLen > bytes.size()) {
+    return std::unexpected(ParseError::BadLength);
   }
-  for (std::size_t i = kHashOffset + kBodyHashSize; i < kHeaderSize; ++i) {
+  bytes = bytes.first(imageLen);
+
+  // Authenticate before reading anything else: every check below runs on bytes the hash covers.
+  static constexpr uint8_t kZeroHash[kImageHashSize] = {};
+  SHA256 sha;
+  SHA256::Digest digest {};
+  const bool hashed = sha.begin() && sha.update(bytes.data(), kHashOffset) && sha.update(kZeroHash, kImageHashSize) && sha.update(bytes.data() + kHashOffset + kImageHashSize, imageLen - kHashOffset - kImageHashSize) && sha.finish(digest);
+  if (!hashed) {
+    return std::unexpected(ParseError::HashFailed);
+  }
+  if (memcmp(digest.data(), bytes.data() + kHashOffset, kImageHashSize) != 0) {
+    return std::unexpected(ParseError::HashMismatch);
+  }
+
+  for (std::size_t i = kReservedOffset; i < kHeaderSize; ++i) {
     if (bytes[i] != 0) {
       return std::unexpected(ParseError::BadReserved);
     }
+  }
+  const uint16_t count  = readU16(bytes.data() + 6);
+  const uint32_t dirLen = readU32(bytes.data() + 8);
+  if (dirLen % kAlign != 0 || dirLen < kNodeSize * count || dirLen > imageLen - kHeaderSize) {
+    return std::unexpected(ParseError::BadDirectory);
   }
   if (count == 0) {
     return std::unexpected(ParseError::BadTree);  // no root
@@ -186,8 +206,8 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
       }
       nextRun += node.size;
     } else {
-      // Checked against the span (not the image size we have not finished computing) with overflow-safe arithmetic.
-      if (node.offset < bodyStart || node.offset % kAlign != 0 || node.size > bytes.size() || node.offset > bytes.size() - node.size) {
+      // Overflow-safe: offset + padded(size) never computed before both are known to fit in the image
+      if (node.offset < bodyStart || node.offset % kAlign != 0 || node.size > imageLen || node.offset > imageLen - node.size) {
         return std::unexpected(ParseError::BadBody);
       }
       end = std::max(end, static_cast<std::size_t>(node.offset) + padded(node.size));
@@ -196,8 +216,8 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
   if (nextRun != count) {
     return std::unexpected(ParseError::BadTree);  // nodes no directory reaches
   }
-  if (end > bytes.size()) {
-    return std::unexpected(ParseError::BadBody);  // a body's padding runs past the end
+  if (end != imageLen) {
+    return std::unexpected(ParseError::BadLength);  // image_len is not where the bodies end
   }
 
   // Pass 2: each directory's children strictly increasing by name (every name is valid now)
@@ -213,19 +233,7 @@ std::expected<Www::Image, Www::ParseError> Www::Image::Parse(std::span<const uin
     }
   }
 
-  // The image as it was hashed: body_hash zeroed
-  static constexpr uint8_t kZeroHash[kBodyHashSize] = {};
-  SHA256 sha;
-  SHA256::Digest digest {};
-  const bool hashed = sha.begin() && sha.update(bytes.data(), kHashOffset) && sha.update(kZeroHash, kBodyHashSize) && sha.update(bytes.data() + kHashOffset + kBodyHashSize, end - kHashOffset - kBodyHashSize) && sha.finish(digest);
-  if (!hashed) {
-    return std::unexpected(ParseError::HashFailed);
-  }
-  if (memcmp(digest.data(), bytes.data() + kHashOffset, kBodyHashSize) != 0) {
-    return std::unexpected(ParseError::HashMismatch);
-  }
-
-  return Image(bytes, count, dirLen, end);
+  return Image(bytes, count, dirLen, imageLen);
 }
 
 Www::Node Www::Image::At(std::size_t index) const

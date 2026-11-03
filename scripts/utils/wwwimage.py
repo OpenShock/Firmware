@@ -1,14 +1,18 @@
 """The `www` image: the captive-portal assets as one read-only directory tree the firmware maps and serves.
 
-Mirrors components/www/include/www/WwwImage.h; change both together and bump VERSION.
+Mirrors components/www/include/www/WwwImage.h and docs/STORAGE.md (which has an ImHex pattern for it); change all
+three together and bump VERSION on a change once images are in the field.
+
+All fields are little-endian.
 
     header (64 B)
-      magic      u32   'OSWW' as little-endian bytes
-      version    u16   1
-      node_count u16   number of nodes, the root and directories included
-      dir_len    u32   bytes of nodes + string table (+ padding to 4)
-      body_hash  u8[32]  sha256 of the whole image with this field zeroed
-      reserved   u8[20]  zero
+      magic      u32     'OSWW' as little-endian bytes
+      version    u16     1
+      node_count u16     number of nodes, the root and directories included
+      dir_len    u32     bytes of nodes + string table (+ padding to 4)
+      image_len  u32     bytes of the whole image, header to the end of the last body's padding
+      image_hash u8[32]  sha256 of the first image_len bytes, this field zeroed
+      reserved   u8[16]  zero
     node (16 B) x node_count
       name_off   u16   offset into the string table
       flags      u16   bit0 directory, bit1 immutable (files only; long cache)
@@ -23,6 +27,11 @@ sorted by name (byte order), and the runs are laid out breadth-first: walking th
 run starts where the previous one ended, the first right after the root. Every body is gzipped; there is no flag
 for it. Names are lowercase: the packer folds ASCII letters, and the firmware folds the request path the same way,
 so URL case never matters.
+
+The reader checks image_len against what it was given, verifies image_hash over exactly those bytes, and only then
+reads the rest of the header and the node table, so nothing it parses is unauthenticated. image_len must equal the
+end of the last body's padding (the header and directory alone for an image without files). Anything after
+image_len (the rest of the partition) is ignored.
 
 Everything is 4-byte aligned. The output is a pure function of the entries: no timestamps, sorted order, so an
 unchanged frontend gives a byte-identical image and the device can skip re-flashing it.
@@ -40,10 +49,12 @@ MAGIC = 0x5757534F  # 'OSWW'
 VERSION = 1
 HEADER_LEN = 64
 NODE_LEN = 16
-HEADER_FORMAT = '<IHHI32s20s'
+HEADER_FORMAT = '<IHHII32s16s'
 NODE_FORMAT = '<HHIII'
-BODY_HASH_LEN = 32
-HEADER_RESERVED_LEN = 20
+IMAGE_LEN_OFFSET = 12
+IMAGE_HASH_OFFSET = 16
+IMAGE_HASH_LEN = 32
+HEADER_RESERVED_LEN = 16
 ALIGN = 4
 
 FLAG_DIRECTORY = 1 << 0
@@ -181,19 +192,28 @@ def pack(entries: list[Entry]) -> bytes:
     dir_bytes = bytes(table) + bytes(strings)
     dir_bytes += b'\0' * (dir_len - len(dir_bytes))
     after_header = dir_bytes + bytes(bodies)
+    image_len = HEADER_LEN + len(after_header)
     reserved = b'\0' * HEADER_RESERVED_LEN
-    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, b'\0' * BODY_HASH_LEN, reserved)
-    body_hash = hashlib.sha256(header + after_header).digest()
-    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, body_hash, reserved)
+    header = struct.pack(
+        HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, image_len, b'\0' * IMAGE_HASH_LEN, reserved
+    )
+    image_hash = hashlib.sha256(header + after_header).digest()
+    header = struct.pack(HEADER_FORMAT, MAGIC, VERSION, len(nodes), dir_len, image_len, image_hash, reserved)
     return header + after_header
+
+
+def compute_hash(image: bytes) -> bytes:
+    """image_hash for these image bytes (exactly image_len of them): sha256 with the hash field zeroed."""
+    zeroed = image[:IMAGE_HASH_OFFSET] + b'\0' * IMAGE_HASH_LEN + image[IMAGE_HASH_OFFSET + IMAGE_HASH_LEN :]
+    return hashlib.sha256(zeroed).digest()
 
 
 @dataclass(frozen=True)
 class Image:
     entries: tuple[Entry, ...]  # every file, with its full path, depth-first
-    body_hash: bytes
+    image_hash: bytes
     node_count: int
-    size: int  # bytes of the image, header to the end of the last body's padding
+    size: int  # image_len: bytes of the image, header to the end of the last body's padding
 
     def find(self, path: str) -> Entry | None:
         """Case-insensitive for ASCII, as on the device."""
@@ -205,12 +225,18 @@ def parse(data: bytes) -> Image:
     """Decode and fully validate an image (what the firmware checks at mount). Raises WwwImageError."""
     if len(data) < HEADER_LEN:
         raise WwwImageError('too short for a header')
-    magic, version, count, dir_len, body_hash, reserved = struct.unpack_from(HEADER_FORMAT, data, 0)
+    magic, version, count, dir_len, image_len, image_hash, reserved = struct.unpack_from(HEADER_FORMAT, data, 0)
     if magic != MAGIC:
         raise WwwImageError(f'bad magic 0x{magic:08X}')
     if version != VERSION:
         raise WwwImageError(f'unsupported version {version}')
-    if dir_len % ALIGN or dir_len < NODE_LEN * count or HEADER_LEN + dir_len > len(data):
+    if image_len % ALIGN or image_len < HEADER_LEN or image_len > len(data):
+        raise WwwImageError('image length out of range')
+    data = data[:image_len]
+    # Authenticate first: everything below parses bytes the hash already covers
+    if compute_hash(data) != image_hash:
+        raise WwwImageError('image hash mismatch')
+    if dir_len % ALIGN or dir_len < NODE_LEN * count or HEADER_LEN + dir_len > image_len:
         raise WwwImageError('directory length out of range')
     if reserved != b'\0' * HEADER_RESERVED_LEN:
         raise WwwImageError('reserved header field not zero')
@@ -251,8 +277,8 @@ def parse(data: bytes) -> Image:
                 raise WwwImageError(f'node {index}: body out of range')
             end = max(end, offset + size + _pad(size))
         names.append(name)
-    if end > len(data):
-        raise WwwImageError('body padding out of range')
+    if end != image_len:
+        raise WwwImageError('image length does not match the bodies')
     if next_run != count:
         raise WwwImageError('unreachable nodes')
     for index, (_, flags, offset, size, _) in enumerate(nodes):
@@ -260,10 +286,6 @@ def parse(data: bytes) -> Image:
             run = names[offset : offset + size]
             if any(a >= b for a, b in zip(run, run[1:], strict=False)):
                 raise WwwImageError(f'node {index}: children not strictly increasing')
-
-    hashed = data[:12] + b'\0' * BODY_HASH_LEN + data[12 + BODY_HASH_LEN : end]
-    if hashlib.sha256(hashed).digest() != body_hash:
-        raise WwwImageError('image hash mismatch')
 
     entries: list[Entry] = []
 
@@ -278,7 +300,7 @@ def parse(data: bytes) -> Image:
                 entries.append(Entry(path.decode('utf-8'), data[offset : offset + size], bool(flags & FLAG_IMMUTABLE)))
 
     walk(0, b'')
-    return Image(tuple(entries), body_hash, count, end)
+    return Image(tuple(entries), image_hash, count, image_len)
 
 
 def main(argv: list[str] | None = None) -> int:

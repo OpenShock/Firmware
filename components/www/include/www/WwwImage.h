@@ -2,10 +2,11 @@
 
 // The `www` image: the captive-portal assets as one read-only directory tree, every body gzipped.
 //
-// Written by scripts/utils/wwwimage.py (the one place the format is documented in full; keep both in
-// step and bump kVersion together). Little-endian, everything 4-byte aligned:
+// Written by scripts/utils/wwwimage.py. docs/STORAGE.md documents the format in full, with an ImHex pattern; keep all
+// three in step and bump kVersion on a change once images are in the field. Little-endian, everything 4-byte aligned:
 //
-//   header (64 B): magic u32 'OSWW', version u16, node_count u16, dir_len u32, body_hash u8[32], reserved u8[20]
+//   header (64 B): magic u32 'OSWW', version u16, node_count u16, dir_len u32, image_len u32, image_hash u8[32],
+//                  reserved u8[16]
 //   node (16 B) x node_count: name_off u16, flags u16, offset u32, size u32, reserved u32
 //     flags: bit0 directory, bit1 immutable (files only)
 //     directory: offset = index of its first child, size = number of children
@@ -19,10 +20,12 @@
 // Names are lowercase: the packer folds ASCII letters and Find() folds the request path the same way, so URL case
 // never matters.
 //
-// body_hash is the SHA-256 of the whole image (header included, with body_hash itself zeroed), so no byte the
-// parser reads goes unchecked; reserved fields must be zero. Parse() checks every field before the image
-// is used: a failure means "no portal assets", never a partially trusted image. The image is smaller
-// than the partition it sits in; the bytes after it are ignored.
+// image_hash is the SHA-256 of the first image_len bytes (header included, with image_hash itself zeroed). Parse()
+// checks image_len against the span, verifies the hash over exactly those bytes, and only then reads the rest of the
+// header and the node table, so it never parses an unauthenticated byte. It still checks every field afterwards (a
+// packer bug must not become an out-of-bounds read); reserved fields must be zero, and image_len must equal the end
+// of the last body's padding. A failure means "no portal assets", never a partially trusted image. The image is
+// smaller than the partition it sits in; the bytes after image_len are ignored.
 //
 // C++ over a byte span plus OpenShock::SHA256 (Hashing.h; the host tests stub it), so the host tests cover it; the
 // device side (WwwPartition.h) maps the partition and hands the span in.
@@ -35,13 +38,15 @@
 #include <string_view>
 
 namespace OpenShock::Www {
-  inline constexpr uint32_t kMagic           = 0x5757534Fu;  // 'OSWW' as little-endian bytes
-  inline constexpr uint16_t kVersion         = 1;
-  inline constexpr std::size_t kHeaderSize   = 64;
-  inline constexpr std::size_t kNodeSize     = 16;
-  inline constexpr std::size_t kBodyHashSize = 32;
-  inline constexpr std::size_t kHashOffset   = 12;  // body_hash in the header
-  inline constexpr std::size_t kAlign        = 4;
+  inline constexpr uint32_t kMagic             = 0x5757534Fu;  // 'OSWW' as little-endian bytes
+  inline constexpr uint16_t kVersion           = 1;
+  inline constexpr std::size_t kHeaderSize     = 64;
+  inline constexpr std::size_t kNodeSize       = 16;
+  inline constexpr std::size_t kImageHashSize  = 32;
+  inline constexpr std::size_t kImageLenOffset = 12;  // image_len in the header
+  inline constexpr std::size_t kHashOffset     = 16;  // image_hash in the header
+  inline constexpr std::size_t kReservedOffset = 48;  // the header's reserved bytes, to its end
+  inline constexpr std::size_t kAlign          = 4;
 
   inline constexpr uint16_t kFlagDirectory = 1u << 0;
   inline constexpr uint16_t kFlagImmutable = 1u << 1;  // content-addressed name: may be cached for a long time
@@ -69,6 +74,7 @@ namespace OpenShock::Www {
 
   enum class ParseError : uint8_t {
     TooShort,
+    BadLength,  // image_len unaligned, smaller than the header, past the end of the span, or not where the bodies end
     BadMagic,
     BadVersion,
     BadDirectory,  // dir_len unaligned, too small for the nodes, or past the end
@@ -99,10 +105,10 @@ namespace OpenShock::Www {
     [[nodiscard]] std::size_t Count() const { return m_count; }
     [[nodiscard]] Node At(std::size_t index) const;
 
-    /// @brief Bytes from the header to the end of the last body's padding: what an OTA hash of the image covers.
+    /// @brief image_len: bytes from the header to the end of the last body's padding; what an OTA hash covers.
     [[nodiscard]] std::size_t ImageSize() const { return m_size; }
     /// @brief The image's own hash; it changes whenever any byte of the image does.
-    [[nodiscard]] std::span<const uint8_t, kBodyHashSize> BodyHash() const { return m_bytes.subspan<kHashOffset, kBodyHashSize>(); }
+    [[nodiscard]] std::span<const uint8_t, kImageHashSize> ImageHash() const { return m_bytes.subspan<kHashOffset, kImageHashSize>(); }
     [[nodiscard]] std::span<const uint8_t> Bytes() const { return m_bytes.first(m_size); }
 
   private:
