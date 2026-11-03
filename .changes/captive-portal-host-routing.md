@@ -11,3 +11,4 @@ Phones and computers joining the hub's setup network now reliably open the sign-
 - Any request to another website over the setup network is sent to the portal, not just a fixed list of check addresses
 - Unknown pages on the hub show "Not Found" instead of jumping back to the start page
 - The captive portal API also answers at /captiveportal/api, and only on the setup network
+- The setup network's DNS server no longer answers queries from your home network
