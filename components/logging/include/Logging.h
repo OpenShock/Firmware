@@ -10,6 +10,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include <cstdint>
+
 // Without it every OS_LOG* (and the OS_PANIC message) in the including file would silently compile to nothing.
 #ifndef OPENSHOCK_LOG_LEVEL
 #error "OPENSHOCK_LOG_LEVEL is not defined (openshock_board.h)"
@@ -50,7 +52,21 @@ consteval const char* openshockPathToFileName(const char (&path)[N])
 #define OPENSHOCK_LOG_LEVEL_DEBUG   (4)
 #define OPENSHOCK_LOG_LEVEL_VERBOSE (5)
 
-#define OPENSHOCK_LOG_FORMAT(letter, format) "[%lli][" #letter "][%s:%d] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
+// Every OS_LOG* format starts with this prefix and then the level letter, which openshock_log_printf reads to apply
+// the runtime level (OpenShock::Log::SetRuntimeLevel) without an extra argument at each call site.
+#define OPENSHOCK_LOG_FORMAT_PREFIX          "[%lli]["
+#define OPENSHOCK_LOG_FORMAT(letter, format) OPENSHOCK_LOG_FORMAT_PREFIX #letter "][%s:%d] %s(): " format "\r\n", OpenShock::millis(), openshockPathToFileName(__FILE__), __LINE__, __FUNCTION__
+
+namespace OpenShock::Log {
+  /// @brief The level the OS_LOG* macros were compiled with: nothing above it is in the image.
+  inline constexpr uint8_t kCompiledLevel = OPENSHOCK_LOG_LEVEL;
+
+  /// @brief The level OS_LOG* output is filtered to at runtime, at most kCompiledLevel. Starts at kCompiledLevel and
+  ///        is not saved, so a restart brings back the full output. OS_LOGN is always printed.
+  [[nodiscard]] uint8_t GetRuntimeLevel();
+  /// @brief Sets the runtime level, clamped to kCompiledLevel. Returns the level now in effect.
+  uint8_t SetRuntimeLevel(uint8_t level);
+}  // namespace OpenShock::Log
 
 #if OPENSHOCK_LOG_LEVEL >= OPENSHOCK_LOG_LEVEL_VERBOSE
 #define OS_LOGV(TAG, format, ...) openshock_log_printf(OPENSHOCK_LOG_FORMAT(V, "[%s] " format), TAG, ##__VA_ARGS__)
