@@ -684,8 +684,8 @@ std::optional<OpenShock::SemVer> OtaUpdateManager::TryGetFirmwareVersion(HTTP::C
     return OpenShock::Constants::FirmwareVersion();
   }
 
-  char versionScratch[64];
-  auto versionStr = doc.root()["version"].tryGetStrView(versionScratch);
+  // Owned, not a view into scratch: a valid SemVer has no length limit, and this runs once per update check
+  auto versionStr = doc.root()["version"].tryGetStr();
   if (!versionStr) {
     OS_LOGE(TAG, "Response is missing a 'version' string");
     return std::nullopt;
