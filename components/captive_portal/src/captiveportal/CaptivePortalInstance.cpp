@@ -23,8 +23,8 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   // API endpoints (registered before the static wildcard so they take priority).
   RegisterApiHandlers(m_server, this);
 
-  // OS captive-detection probes + RFC 8908 endpoint + 404 redirect (rfc8908 component).
-  // Registered before the static wildcard so the specific probe paths take priority.
+  // RFC 8908 endpoint (rfc8908 component); probes fall through to the static handler's redirect.
+  // Registered before the static wildcard so the API paths take priority.
   RFC8908::RegisterProbeHandlers(m_server, CaptivePortal::ApIPv4String());
 
   m_webSocket.registerHandler(m_server);

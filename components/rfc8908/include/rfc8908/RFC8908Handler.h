@@ -4,17 +4,23 @@
 
 namespace OpenShock::RFC8908 {
   // Registers the OS captive-detection surface on an esp_http_server instance:
-  //   - well-known probe URLs (/gen_204, /hotspot-detect*, /ncsi.txt, ...) -> 302 to the portal
-  //   - the RFC 8908 endpoint /captive-portal/api -> application/captive+json
-  //   - a 404 fallback that redirects any other unknown request to the portal
+  //   - the RFC 8908 endpoint /captive-portal/api (or /captiveportal/api) -> application/captive+json
+  // Connectivity probes (/generate_204, /hotspot-detect.html, ...) get no routes: the portal's routes redirect any
+  // request for another host (IsForeignHost), and the static file handler's HandleMiss catches the same probes sent to
+  // our address. The full list is in the .cpp.
   //
   // `apIpv4` is the portal AP address (e.g. "4.3.2.1"); the portal URL is built from it once, here.
-  //
-  // The server must be configured with httpd_uri_match_wildcard for the prefix probe
-  // paths to match.
   esp_err_t RegisterProbeHandlers(httpd_handle_t server, const char* apIpv4);
 
-  // Emit the standard captive redirect (302 -> http://<apIpv4>/). Exposed so a static
-  // file handler can share the exact same fallthrough behaviour on unknown paths.
+  // True when the request's Host header is a name rather than an IP literal. Our own pages are always requested by
+  // IP (the AP address, or the hub's LAN address), so a name is one the wildcard DNS server sent here: a connectivity
+  // probe or a user browsing elsewhere, which should get the captive redirect whatever the path.
+  bool IsForeignHost(httpd_req_t* req);
+
+  // Emit the standard captive redirect (302 -> http://<apIpv4>/).
   esp_err_t EmitRedirect(httpd_req_t* req);
+
+  // Answer a request the server has nothing for: the captive redirect if it is addressed to another host or is a
+  // known connectivity probe path, otherwise a plain 404. For a catch-all handler's not-found branch.
+  esp_err_t HandleMiss(httpd_req_t* req);
 }  // namespace OpenShock::RFC8908

@@ -158,7 +158,7 @@ static esp_err_t sendNotModified(httpd_req_t* req, const Representation& rep)
 static esp_err_t sendNotAcceptable(httpd_req_t* req)
 {
   httpd_resp_set_hdr(req, "Vary", "Accept-Encoding");
-  return CaptivePortal::sendResp(req, CaptivePortal::S406, HTTP::ContentType::TextPlain, "Only available with Content-Encoding: gzip\n");
+  return CaptivePortal::sendResp(req, CaptivePortal::S406, HTTP::ContentType::TextPlain, "Only available with Content-Encoding: gzip");
 }
 
 // httpd derives Content-Length from the buffer it is handed and has no bodiless send, so the HEAD response (the GET's
@@ -211,10 +211,10 @@ void CaptivePortal::StaticFileServer::registerHandler(httpd_handle_t server)
 {
   // Decided once: the assets are mounted in the constructor and stay that way until destruction
   if (m_www.isMounted()) {
-    CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::staticFileHandler, this);
-    CaptivePortal::registerHandler(server, "/*", HTTP_HEAD, &StaticFileServer::staticFileHandler, this);
+    CaptivePortal::registerHandler<&StaticFileServer::staticFileHandler>(server, "/*", HTTP_GET, this);
+    CaptivePortal::registerHandler<&StaticFileServer::staticFileHandler>(server, "/*", HTTP_HEAD, this);
   } else {
-    CaptivePortal::registerHandler(server, "/*", HTTP_GET, &StaticFileServer::missingAssetsHandler, nullptr);
+    CaptivePortal::registerHandler<&StaticFileServer::missingAssetsHandler>(server, "/*", HTTP_GET, nullptr);
   }
 }
 
@@ -245,7 +245,7 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
   // A ".." segment is never a valid asset path. Browsers normalize these away before
   // sending, so this only comes from hand-built requests: refuse it rather than answer like a captive probe.
   if (uri.find("..") != std::string_view::npos) {
-    return sendResp(req, S400, HTTP::ContentType::TextPlain, "Bad Request\n");
+    return sendResp(req, S400, HTTP::ContentType::TextPlain, "Bad Request");
   }
 
   if (uri == "/") {
@@ -255,8 +255,7 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
   // Stored without the leading slash. Every body in the image is gzipped.
   auto asset = self->m_www.find(uri.substr(1));
   if (!asset) {
-    // Unknown path -> captive redirect (the index fallback of a static server).
-    return RFC8908::EmitRedirect(req);
+    return RFC8908::HandleMiss(req);
   }
   if (!clientAcceptsGzip(req)) {
     return sendNotAcceptable(req);

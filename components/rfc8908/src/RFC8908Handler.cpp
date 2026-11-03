@@ -3,11 +3,14 @@
 const char* const TAG = "RFC8908Handler";
 
 #include "Logging.h"
+#include "StringHelpers.h"
+#include "util/IPv4Utils.h"
 
 #include "json/Json.h"
 
 #include <cstdio>
 #include <string>
+#include <string_view>
 
 using namespace OpenShock;
 
@@ -17,7 +20,26 @@ using namespace OpenShock;
 static char s_portalUrl[sizeof("http://255.255.255.255/")] = "http://4.3.2.1/";
 static std::size_t s_portalUrlLen                          = sizeof("http://4.3.2.1/") - 1;
 
-static const char* const captivePortalApiPath = "/captive-portal/api";
+bool RFC8908::IsForeignHost(httpd_req_t* req)
+{
+  // Long enough for any IPv4 literal with a port. A longer Host comes back truncated, so it is a name (or an IPv6
+  // literal, which the '[' check below catches either way).
+  char host[sizeof("255.255.255.255:65535")];
+  esp_err_t err = httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host));
+  if (err != ESP_OK && err != ESP_ERR_HTTPD_RESULT_TRUNC) {
+    return false;  // No Host header (HTTP/1.0): assume it's for us
+  }
+
+  std::string_view hostView(host);
+  if (StringHasPrefix(hostView, '[')) {
+    return false;  // IPv6 literal
+  }
+  if (err != ESP_OK) {
+    return true;
+  }
+
+  return !IPv4Utils::IsDottedDecimal(StringBeforeFirst(hostView, ':'));
+}
 
 esp_err_t RFC8908::EmitRedirect(httpd_req_t* req)
 {
@@ -29,12 +51,48 @@ esp_err_t RFC8908::EmitRedirect(httpd_req_t* req)
   return httpd_resp_send(req, nullptr, 0);
 }
 
-// Catch-all handler for OS connectivity probes. Operating systems attempt to detect
-// internet access by requesting well-known URLs; redirecting these to the portal root
-// intentionally fails the connectivity check and activates captive-portal mode.
-static esp_err_t probeHandler(httpd_req_t* req)
+// Paths of the OS connectivity probes. These normally arrive addressed to the probe's own host (wildcard DNS sends
+// every host to us) and get redirected on that alone; the table catches the same probes sent to our address.
+// clang-format off
+static constexpr std::string_view kProbePaths[] = {
+  "/generate_204",                // Android, ChromeOS, Chrome: connectivitycheck.gstatic.com, connectivitycheck.android.com, www.gstatic.com, clients3.google.com, www.googleapis.cn (China), connect.rom.miui.com (Xiaomi)
+  "/generate204",                 // Unknown Android OEM, seen in the field
+  "/gen_204",                     // Google
+  "/gen204",                      // Variant of the above
+  "/captiveportal/generate_204",  // Edge: edge-http.microsoft.com
+  "/hotspot-detect.html",         // Apple iOS/macOS: captive.apple.com
+  "/connecttest.txt",             // Windows: www.msftconnecttest.com
+  "/ncsi.txt",                    // Windows (legacy NCSI): www.msftncsi.com
+  "/success.txt",                 // Firefox: detectportal.firefox.com
+  "/canonical.html",              // Firefox: detectportal.firefox.com
+  "/check_network_status.txt",    // GNOME NetworkManager: nmcheck.gnome.org
+};
+// clang-format on
+
+static bool IsProbePath(std::string_view path)
 {
-  return RFC8908::EmitRedirect(req);
+  for (std::string_view probePath : kProbePaths) {
+    if (StringIEquals(path, probePath)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+esp_err_t RFC8908::HandleMiss(httpd_req_t* req)
+{
+  // Path only: httpd leaves the query string in req->uri
+  std::string_view path(req->uri);
+  path = path.substr(0, path.find('?'));
+
+  if (IsForeignHost(req) || IsProbePath(path)) {
+    return EmitRedirect(req);
+  }
+
+  // Addressed to us, so a real miss (a stale asset name, a typo): say so instead of answering with the portal
+  httpd_resp_set_status(req, "404 Not Found");
+  httpd_resp_set_type(req, "text/plain");
+  return httpd_resp_sendstr(req, "Not Found");
 }
 
 // RFC 8908 Captive Portal API endpoint: machine-readable captive state. Complements
@@ -60,11 +118,6 @@ static esp_err_t captiveApiHandler(httpd_req_t* req)
   return httpd_resp_send(req, jsonStr.data(), jsonStr.size());
 }
 
-static esp_err_t err404Handler(httpd_req_t* req, httpd_err_code_t)
-{
-  return RFC8908::EmitRedirect(req);
-}
-
 esp_err_t RFC8908::RegisterProbeHandlers(httpd_handle_t server, const char* apIpv4)
 {
   if (apIpv4 != nullptr) {
@@ -76,37 +129,26 @@ esp_err_t RFC8908::RegisterProbeHandlers(httpd_handle_t server, const char* apIp
     s_portalUrlLen = static_cast<std::size_t>(len);
   }
 
-  // Well-known OS probe paths. Prefix forms (e.g. "/hotspot-detect*") require the
-  // server to be configured with httpd_uri_match_wildcard.
-  static const char* const probePaths[] = {
-    captivePortalApiPath,  // handled specially below
-    "/gen_204",
-    "/generate_204",
-    "/ncsi.txt",
-    "/hotspot-detect*",
-    "/success*",
-    "/connecttest*",
-    "/check_network_status*",
-    "/canonical*",
+  // RFC 8908 API. The DHCP option 114 URI (Manager.cpp) points at the first path.
+  static const char* const apiPaths[] = {
+    "/captive-portal/api",
+    "/captiveportal/api",
   };
 
   esp_err_t result = ESP_OK;
-  for (const char* path : probePaths) {
+  for (const char* path : apiPaths) {
     httpd_uri_t def = {};
     def.uri         = path;
     def.method      = HTTP_GET;
-    def.handler     = (path == captivePortalApiPath) ? captiveApiHandler : probeHandler;
+    def.handler     = captiveApiHandler;
     def.user_ctx    = nullptr;
 
     esp_err_t err = httpd_register_uri_handler(server, &def);
     if (err != ESP_OK) {
-      OS_LOGE(TAG, "Failed to register probe handler %s: %s", path, esp_err_to_name(err));
+      OS_LOGE(TAG, "Failed to register captive API handler %s: %s", path, esp_err_to_name(err));
       result = err;
     }
   }
-
-  // Any other unknown request also redirects to the portal.
-  httpd_register_err_handler(server, HTTPD_404_NOT_FOUND, err404Handler);
 
   return result;
 }

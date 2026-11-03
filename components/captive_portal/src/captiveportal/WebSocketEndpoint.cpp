@@ -7,6 +7,7 @@ const char* const TAG = "CaptivePortalWs";
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "message_handlers/WebSocket.h"
+#include "rfc8908/RFC8908Handler.h"
 #include "serialization/WSLocal.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
@@ -27,6 +28,7 @@ void CaptivePortal::WebSocketEndpoint::registerHandler(httpd_handle_t server)
   ws.is_websocket             = true;
   ws.handle_ws_control_frames = false;
   ws.supported_subprotocol    = "flatbuffers";
+  ws.ws_pre_handshake_cb      = &WebSocketEndpoint::wsPreHandshake;
   ws.ws_post_handshake_cb     = &WebSocketEndpoint::wsPostHandshake;
   if (httpd_register_uri_handler(m_server, &ws) != ESP_OK) {
     OS_LOGE(TAG, "Failed to register WebSocket handler");
@@ -138,6 +140,18 @@ void CaptivePortal::WebSocketEndpoint::wsSessCtxFree(void* ctx)
 
 // httpd does not call the URI handler for the handshake (esp_http_server's httpd_uri.c), only this callback, right
 // after it has switched the socket to WebSocket: allocate an id, arm the disconnect hook and greet the client.
+// The /ws route is registered directly (it needs the websocket fields), so it does its own Host check, here before
+// httpd answers the handshake. Failing closes the connection after the redirect is sent.
+esp_err_t CaptivePortal::WebSocketEndpoint::wsPreHandshake(httpd_req_t* req)
+{
+  if (RFC8908::IsForeignHost(req)) {
+    OS_LOGW(TAG, "Rejecting WebSocket for another host on fd %d", httpd_req_to_sockfd(req));
+    RFC8908::EmitRedirect(req);
+    return ESP_FAIL;
+  }
+  return ESP_OK;
+}
+
 esp_err_t CaptivePortal::WebSocketEndpoint::wsPostHandshake(httpd_req_t* req)
 {
   auto* self = static_cast<WebSocketEndpoint*>(req->user_ctx);
@@ -161,6 +175,11 @@ esp_err_t CaptivePortal::WebSocketEndpoint::wsHandler(httpd_req_t* req)
 {
   auto* self = static_cast<WebSocketEndpoint*>(req->user_ctx);
   int fd     = httpd_req_to_sockfd(req);
+
+  // A plain GET /ws without the upgrade headers reaches here as an ordinary request: treat it like any other miss
+  if (httpd_ws_get_fd_info(req->handle, fd) != HTTPD_WS_CLIENT_WEBSOCKET) {
+    return RFC8908::HandleMiss(req);
+  }
 
   // Data frame: two-call recv (length first, then payload).
   httpd_ws_frame_t frame = {};
