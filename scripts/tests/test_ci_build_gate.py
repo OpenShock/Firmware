@@ -91,22 +91,26 @@ def test_pr_labelled_with_another_label_while_carrying_full_build_still_does_not
 # --- release tags ---
 
 
-@pytest.mark.parametrize('tag', ['1.5.0', '1.5.0-rc.1', '1.5.0-develop.3'])
-def test_tag_push_builds_and_publishes_to_prod(tag):
+@pytest.mark.parametrize('tag', ['1.5.0', '1.5.0-rc.1'])
+@pytest.mark.parametrize('release_input', ['true', True])
+def test_release_dispatch_builds_and_publishes_to_prod(tag, release_input):
     api = FakeApi()
-    d = decide('push', f'refs/tags/{tag}', SHA, {}, api)
+    # release.yml leaves server at its dev default; a release goes to prod regardless.
+    d = decide('workflow_dispatch', f'refs/tags/{tag}', SHA, {'inputs': {'release': release_input}}, api)
     assert outcome(d) == (True, True, 'prod', '')
     assert api.run_queries == [] and api.compares == []
 
 
-def test_branch_push_builds_without_publishing():
-    d = decide('push', 'refs/heads/develop', SHA, {}, FakeApi())
-    assert outcome(d) == (True, False, 'dev', '')
+def test_release_dispatch_on_a_branch_is_refused(capsys):
+    with fails_with(capsys, 'A release was dispatched on refs/heads/master'):
+        decide('workflow_dispatch', 'refs/heads/master', SHA, {'inputs': {'release': 'true'}}, FakeApi())
 
 
-def test_an_unsupported_event_is_refused(capsys):
-    with fails_with(capsys, "Unsupported event 'release'"):
-        decide('release', 'refs/tags/1.5.0', SHA, {}, FakeApi())
+@pytest.mark.parametrize('event', ['push', 'release'])
+def test_an_unsupported_event_is_refused(event, capsys):
+    # Tag pushes no longer trigger ci-build: release.yml dispatches it once the draft is staged.
+    with fails_with(capsys, f'Unsupported event {event!r}'):
+        decide(event, 'refs/tags/1.5.0', SHA, {}, FakeApi())
 
 
 # --- nightlies ---

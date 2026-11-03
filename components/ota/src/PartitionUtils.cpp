@@ -36,7 +36,13 @@ bool OpenShock::FlashPartitionFromUrl(
   std::size_t erasedTo       = 0;
   int64_t lastProgress       = 0;
 
-  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress](std::size_t size) -> bool {
+  // Where the time goes (us), logged once at the end: whatever isn't flash, hashing or progress reporting is the
+  // network (TLS reads and waiting for data), which can't overlap the flash work in this single-task loop.
+  struct {
+    int64_t erase, write, hash, progress;
+  } spent = {};
+
+  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress, &spent](std::size_t size) -> bool {
     if (size > partition->size) {
       OS_LOGE(TAG, "Remote partition binary is too large");
       return false;
@@ -46,17 +52,20 @@ bool OpenShock::FlashPartitionFromUrl(
     contentLength = size;
 
     lastProgress = OpenShock::millis();
+    int64_t t0   = OpenShock::micros();
     progressCallback(0, contentLength, 0.0f);
+    spent.progress += OpenShock::micros() - t0;
 
     return true;
   };
-  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, &erasedTo, progressCallback, &lastProgress, &firstChunkCheck](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
+  auto dataWriter = [partition, &sha256, &contentLength, &contentWritten, &erasedTo, progressCallback, &lastProgress, &firstChunkCheck, &spent](std::size_t offset, const uint8_t* data, std::size_t length) -> bool {
     // Before the first erase: a refused first chunk leaves the partition as it was
     if (offset == 0 && firstChunkCheck && !(*firstChunkCheck)(std::span<const uint8_t>(data, length))) {
       OS_LOGE(TAG, "The download is not what the partition takes; nothing was erased");
       return false;
     }
 
+    int64_t t0 = OpenShock::micros();
     while (erasedTo < offset + length) {
       // The step is a multiple of the erase size, and partitions end on an erase-size boundary
       std::size_t eraseLength = std::min<std::size_t>(kEraseStep, partition->size - erasedTo);
@@ -66,16 +75,19 @@ bool OpenShock::FlashPartitionFromUrl(
       }
       erasedTo += eraseLength;
     }
+    int64_t t1 = OpenShock::micros();
 
     if (esp_partition_write(partition, offset, data, length) != ESP_OK) {
       OS_LOGE(TAG, "Failed to write to partition");
       return false;
     }
+    int64_t t2 = OpenShock::micros();
 
     if (!sha256.update(data, length)) {
       OS_LOGE(TAG, "Failed to update SHA256 hash");
       return false;
     }
+    int64_t t3 = OpenShock::micros();
 
     contentWritten += length;
 
@@ -85,8 +97,15 @@ bool OpenShock::FlashPartitionFromUrl(
       progressCallback(contentWritten, contentLength, static_cast<float>(contentWritten) / static_cast<float>(contentLength));
     }
 
+    spent.erase += t1 - t0;
+    spent.write += t2 - t1;
+    spent.hash += t3 - t2;
+    spent.progress += OpenShock::micros() - t3;
+
     return true;
   };
+
+  int64_t downloadStart = OpenShock::micros();
 
   // Start streaming binary to app partition.
   auto appBinaryResponse = client.Download(
@@ -103,6 +122,21 @@ bool OpenShock::FlashPartitionFromUrl(
     OS_LOGE(TAG, "Failed to download remote partition binary: [%d]", appBinaryResponse.code);
     return false;
   }
+
+  int64_t total = OpenShock::micros() - downloadStart;
+  int64_t other = total - spent.erase - spent.write - spent.hash - spent.progress;
+  OS_LOGI(
+    TAG,
+    "Flashed %zu bytes in %lld ms (%lld KB/s): erase %lld ms, write %lld ms, hash %lld ms, progress %lld ms, network+other %lld ms",
+    contentWritten,
+    total / 1000,
+    total > 0 ? static_cast<int64_t>(contentWritten) * 1000 / total : 0,  // bytes/us * 1000 = KB/s (1 KB = 1000 B)
+    spent.erase / 1000,
+    spent.write / 1000,
+    spent.hash / 1000,
+    spent.progress / 1000,
+    other / 1000
+  );
 
   progressCallback(contentLength, contentLength, 1.0f);
   OS_LOGD(TAG, "Wrote %zu bytes to partition", appBinaryResponse.data);

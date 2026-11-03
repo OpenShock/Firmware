@@ -6,7 +6,7 @@
 // Pure (socket-free) half of the captive-portal DNS responder, split out of the
 // DNSServer task so the parse/build logic can be host-tested with crafted packets.
 namespace OpenShock::DNSPacket {
-  constexpr size_t MAX_PACKET = 512;
+  inline constexpr size_t MAX_PACKET = 512;
 
   /// Turns the query in packet[0..len) into a reply, in place, answering an A/IN
   /// question with `ip` (network order, i.e. a.b.c.d) and any other type/class with

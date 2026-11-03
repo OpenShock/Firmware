@@ -22,6 +22,6 @@ namespace OpenShock::CaptivePortal {
     static esp_err_t staticFileHandler(httpd_req_t* req);
 
     Www::Partition m_www;
-    char m_etag[1 + (Www::kBodyHashSize * 2) + 1 + 1] = {};  // the www image's hash, quoted; httpd keeps the pointer
+    char m_etag[1 + (Www::kImageHashSize * 2) + 1 + 1] = {};  // the www image's hash, quoted; httpd keeps the pointer
   };
 }  // namespace OpenShock::CaptivePortal

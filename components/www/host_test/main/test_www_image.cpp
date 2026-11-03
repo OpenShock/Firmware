@@ -79,6 +79,29 @@ namespace {
   {
     return static_cast<uint16_t>(bytes[at] | (bytes[at + 1] << 8));
   }
+  uint32_t Get32(const std::vector<uint8_t>& bytes, std::size_t at)
+  {
+    return static_cast<uint32_t>(Get16(bytes, at)) | (static_cast<uint32_t>(Get16(bytes, at + 2)) << 16);
+  }
+
+  // Re-signs a hand-corrupted image, so the parser has to catch the bad field itself rather than as a hash mismatch.
+  void Rehash(std::vector<uint8_t>& bytes)
+  {
+    const uint32_t imageLen = Get32(bytes, Www::kImageLenOffset);
+    TEST_ASSERT_TRUE(imageLen >= Www::kHeaderSize && imageLen <= bytes.size());
+    std::vector<uint8_t> zeroed(bytes.begin(), bytes.begin() + imageLen);
+    std::fill_n(zeroed.begin() + Www::kHashOffset, Www::kImageHashSize, 0);
+    SHA256::Digest digest {};
+    TEST_ASSERT_TRUE(SHA256::compute(zeroed.data(), zeroed.size(), digest));
+    std::copy(digest.begin(), digest.end(), bytes.begin() + Www::kHashOffset);
+  }
+
+  // Like ExpectError, for a corrupted field past the hash check: re-signs first.
+  void ExpectSignedError(std::vector<uint8_t> bytes, Www::ParseError expected)
+  {
+    Rehash(bytes);
+    ExpectError(bytes, expected);
+  }
 
   std::string Body(const Www::Asset& asset)
   {
@@ -92,6 +115,7 @@ TEST_CASE("An image packed by the Python packer parses and serves every asset", 
   Www::Image image = ParseOk(bytes);
 
   TEST_ASSERT_EQUAL_size_t(bytes.size(), image.ImageSize());
+  TEST_ASSERT_EQUAL_UINT32(bytes.size(), Get32(bytes, Www::kImageLenOffset));
   TEST_ASSERT_EQUAL_size_t(kNodeCount, image.Count());
 
   auto index = image.Find("index.html");
@@ -207,6 +231,7 @@ TEST_CASE("Every truncation is rejected", "[www]")
 
 TEST_CASE("Each corrupted header field is rejected with its own reason", "[www]")
 {
+  // Checked before the hash
   auto bytes = Fixture();
   bytes[0] ^= 0xFF;
   ExpectError(bytes, Www::ParseError::BadMagic);
@@ -216,40 +241,69 @@ TEST_CASE("Each corrupted header field is rejected with its own reason", "[www]"
   ExpectError(bytes, Www::ParseError::BadVersion);
 
   bytes = Fixture();
+  Put32(bytes, Www::kImageLenOffset, Get32(bytes, Www::kImageLenOffset) + 2);  // unaligned
+  ExpectError(bytes, Www::ParseError::BadLength);
+
+  bytes = Fixture();
+  Put32(bytes, Www::kImageLenOffset, Www::kHeaderSize - 4);  // shorter than the header
+  ExpectError(bytes, Www::ParseError::BadLength);
+
+  bytes = Fixture();
+  Put32(bytes, Www::kImageLenOffset, bytes.size() + 4);  // past the end of the span
+  ExpectError(bytes, Www::ParseError::BadLength);
+
+  bytes = Fixture();
+  bytes[Www::kHashOffset] ^= 0x01;  // the hash itself
+  ExpectError(bytes, Www::ParseError::HashMismatch);
+
+  bytes = Fixture();
+  bytes[bytes.size() - 1] ^= 0x01;  // a body byte
+  ExpectError(bytes, Www::ParseError::HashMismatch);
+
+  bytes = Fixture();
+  Put16(bytes, 6, 60000);  // any other field changed without re-signing
+  ExpectError(bytes, Www::ParseError::HashMismatch);
+
+  // Checked after the hash: the corrupted image is re-signed
+  bytes = Fixture();
   Put16(bytes, 6, 60000);  // more nodes than the directory holds
-  ExpectError(bytes, Www::ParseError::BadDirectory);
+  ExpectSignedError(bytes, Www::ParseError::BadDirectory);
 
   bytes = Fixture();
   Put16(bytes, 6, 0);  // no root
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 
   bytes = Fixture();
   Put32(bytes, 8, 2);  // smaller than the nodes
-  ExpectError(bytes, Www::ParseError::BadDirectory);
+  ExpectSignedError(bytes, Www::ParseError::BadDirectory);
 
   bytes = Fixture();
   Put32(bytes, 8, 0x100000);  // past the end
-  ExpectError(bytes, Www::ParseError::BadDirectory);
+  ExpectSignedError(bytes, Www::ParseError::BadDirectory);
 
   bytes = Fixture();
   Put32(bytes, 8, Get16(bytes, 6) * Www::kNodeSize + 2);  // unaligned
-  ExpectError(bytes, Www::ParseError::BadDirectory);
+  ExpectSignedError(bytes, Www::ParseError::BadDirectory);
 
-  bytes = Fixture();
-  bytes[12] ^= 0x01;  // the hash itself
-  ExpectError(bytes, Www::ParseError::HashMismatch);
-
-  bytes     = Fixture();
-  bytes[44] = 0x01;  // first reserved byte, right after the hash
-  ExpectError(bytes, Www::ParseError::BadReserved);
+  bytes                       = Fixture();
+  bytes[Www::kReservedOffset] = 0x01;  // first reserved byte, right after the hash
+  ExpectSignedError(bytes, Www::ParseError::BadReserved);
 
   bytes     = Fixture();
   bytes[63] = 0x01;  // last reserved byte
-  ExpectError(bytes, Www::ParseError::BadReserved);
+  ExpectSignedError(bytes, Www::ParseError::BadReserved);
+
+  // image_len short of where the last body ends: the body (17 bytes, padded to 20) now runs past the image
+  bytes = Fixture();
+  Put32(bytes, Www::kImageLenOffset, bytes.size() - 4);
+  ExpectSignedError(bytes, Www::ParseError::BadBody);
+
+  // image_len past the last body, into trailing bytes the signature covers but no node accounts for
 
   bytes = Fixture();
-  bytes[bytes.size() - 1] ^= 0x01;  // a body byte: the hash no longer matches
-  ExpectError(bytes, Www::ParseError::HashMismatch);
+  bytes.insert(bytes.end(), 4, 0);
+  Put32(bytes, Www::kImageLenOffset, bytes.size());
+  ExpectSignedError(bytes, Www::ParseError::BadLength);
 }
 
 TEST_CASE("Each corrupted node field is rejected", "[www]")
@@ -259,31 +313,31 @@ TEST_CASE("Each corrupted node field is rejected", "[www]")
 
   auto bytes = Fixture();
   Put16(bytes, file, 0xFFFF);  // name offset past the string table
-  ExpectError(bytes, Www::ParseError::BadName);
+  ExpectSignedError(bytes, Www::ParseError::BadName);
 
   bytes = Fixture();
   Put16(bytes, file + 2, 0x8000);  // unknown flag
-  ExpectError(bytes, Www::ParseError::BadFlags);
+  ExpectSignedError(bytes, Www::ParseError::BadFlags);
 
   bytes = Fixture();
   Put32(bytes, file + 12, 1);  // reserved
-  ExpectError(bytes, Www::ParseError::BadReserved);
+  ExpectSignedError(bytes, Www::ParseError::BadReserved);
 
   bytes = Fixture();
   Put32(bytes, file + 4, 0x10);  // body inside the header
-  ExpectError(bytes, Www::ParseError::BadBody);
+  ExpectSignedError(bytes, Www::ParseError::BadBody);
 
   bytes = Fixture();
   Put32(bytes, file + 4, Www::kHeaderSize + 2);  // unaligned
-  ExpectError(bytes, Www::ParseError::BadBody);
+  ExpectSignedError(bytes, Www::ParseError::BadBody);
 
   bytes = Fixture();
   Put32(bytes, file + 8, 0x7FFFFFFF);  // size past the end
-  ExpectError(bytes, Www::ParseError::BadBody);
+  ExpectSignedError(bytes, Www::ParseError::BadBody);
 
   bytes = Fixture();
   Put32(bytes, file + 8, 0xFFFFFFF0);  // offset + size overflows
-  ExpectError(bytes, Www::ParseError::BadBody);
+  ExpectSignedError(bytes, Www::ParseError::BadBody);
 
   // An uppercase letter in a stored name
   bytes = Fixture();
@@ -292,7 +346,7 @@ TEST_CASE("Each corrupted node field is rejected", "[www]")
     auto it                       = std::search(bytes.begin(), bytes.end(), kName, kName + sizeof(kName));  // includes the NUL
     TEST_ASSERT_TRUE(it != bytes.end());
     *it = 'I';
-    ExpectError(bytes, Www::ParseError::BadName);
+    ExpectSignedError(bytes, Www::ParseError::BadName);
   }
 
   // The last path loses its terminator (it is the last byte of the string table, before the padding)
@@ -300,17 +354,17 @@ TEST_CASE("Each corrupted node field is rejected", "[www]")
   {
     const uint16_t count      = Get16(bytes, 6);
     const std::size_t strings = Www::kHeaderSize + count * Www::kNodeSize;
-    const std::size_t dirEnd  = Www::kHeaderSize + (bytes[8] | (bytes[9] << 8) | (bytes[10] << 16) | (static_cast<uint32_t>(bytes[11]) << 24));
+    const std::size_t dirEnd  = Www::kHeaderSize + Get32(bytes, 8);
     for (std::size_t i = strings; i < dirEnd; ++i) {
       bytes[i] = 'x';  // every NUL gone
     }
-    ExpectError(bytes, Www::ParseError::BadName);
+    ExpectSignedError(bytes, Www::ParseError::BadName);
   }
 
   // The root gets a non-empty name (index.html's)
   bytes = Fixture();
   Put16(bytes, root, Get16(bytes, file));
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 }
 
 TEST_CASE("Each corrupted directory is rejected", "[www]")
@@ -323,27 +377,27 @@ TEST_CASE("Each corrupted directory is rejected", "[www]")
 
   auto bytes = Fixture();
   Put16(bytes, root + 2, 0);  // the root is not a directory
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 
   bytes = Fixture();
   Put32(bytes, root + 4, 2);  // the root's children must start at 1
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 
   bytes = Fixture();
   Put32(bytes, root + 8, 100);  // more children than nodes
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 
   bytes = Fixture();
   Put16(bytes, app + 2, Www::kFlagDirectory | Www::kFlagImmutable);  // immutable directory
-  ExpectError(bytes, Www::ParseError::BadFlags);
+  ExpectSignedError(bytes, Www::ParseError::BadFlags);
 
   bytes = Fixture();
   Put32(bytes, app + 4, 7);  // _app's run must follow the root's
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 
   bytes = Fixture();
   Put32(bytes, imm + 8, 0);  // chunk.abc123.js then belongs to no directory
-  ExpectError(bytes, Www::ParseError::BadTree);
+  ExpectSignedError(bytes, Www::ParseError::BadTree);
 
   // Swap the names of index.html and licenses.txt: the root's children are no longer increasing
   bytes         = Fixture();
@@ -351,7 +405,7 @@ TEST_CASE("Each corrupted directory is rejected", "[www]")
   uint16_t off3 = Get16(bytes, licenses);
   Put16(bytes, index, off3);
   Put16(bytes, licenses, off2);
-  ExpectError(bytes, Www::ParseError::NotSorted);
+  ExpectSignedError(bytes, Www::ParseError::NotSorted);
 }
 
 TEST_CASE("A failing hasher is reported, not treated as a match", "[www]")

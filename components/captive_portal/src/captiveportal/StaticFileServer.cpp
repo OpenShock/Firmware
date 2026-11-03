@@ -196,8 +196,8 @@ CaptivePortal::StaticFileServer::StaticFileServer()
     m_www.unmount();
     return;
   }
-  char hex[Www::kBodyHashSize * 2 + 1];
-  HexUtils::ToHex(m_www.image().BodyHash(), hex, false);
+  char hex[Www::kImageHashSize * 2 + 1];
+  HexUtils::ToHex(m_www.image().ImageHash(), hex, false);
   snprintf(m_etag, sizeof(m_etag), "\"%s\"", hex);
   OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag);
 }

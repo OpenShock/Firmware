@@ -19,6 +19,8 @@ const char* const TAG = "GatewayConnectionManager";
 #include "util/RetiredList.h"
 #include "wifi/WiFiManager.h"
 
+#include <esp_system.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cstring>
@@ -37,11 +39,15 @@ static std::atomic<uint8_t> s_flags = 0;
 // Retry timing, owned by the main task (Update()). Other tasks ask for a reset through s_retryResetRequested.
 // After the backend rejects the token
 static OpenShock::Backoff s_authBackoff(CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS);
-// Between LCG connection attempts
-static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
+// Between LCG connection attempts: doubling from the first value up to the cap, so a brief drop reconnects in seconds
+static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
+// When the current connection came up (0 while not connected). Only a connection that stayed up for the whole cap
+// resets s_connectBackoff, so a gateway that drops every connection right away still gets the capped delay.
+static int64_t s_connectedSinceMs = 0;
 // After a failed hub info fetch: doubling from the first value up to the cap
 static OpenShock::Backoff s_hubInfoBackoff(CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS);
 static std::atomic<bool> s_retryResetRequested = false;
+static std::atomic<bool> s_restartRequested    = false;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
 // Clients taken out of service but not yet destroyed. Destruction blocks (websocket close + task stop), so it is
@@ -96,6 +102,29 @@ static void handleWiFiStateChanged(void* arg, esp_event_base_t base, int32_t id,
       break;
     default:
       break;
+  }
+}
+
+// Runs inside esp_restart(), on the task that called it (main, serial console, OTA; never the websocket task, see
+// RequestRestart). Shutdown handlers run newest first, so this one is registered when a client is created (see
+// registerShutdownHandler), after WiFiManager::Init() registered esp_wifi_stop(): the gateway websocket closes before
+// WiFi stops underneath it.
+static void handleShutdown()
+{
+  auto client = GetClient();
+  if (client != nullptr) {
+    client->retire();  // Outside s_clientMutex: it posts an event
+    client->close();
+  }
+}
+
+// Not in Init(): that runs before WiFiManager::Init(), and a handler registered before esp_wifi_stop()'s would run
+// after it. Re-registering is harmless (ESP_ERR_INVALID_STATE), so this runs for every client.
+static void registerShutdownHandler()
+{
+  esp_err_t err = esp_register_shutdown_handler(handleShutdown);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    OS_LOGE(TAG, "Failed to register shutdown handler: %s", esp_err_to_name(err));
   }
 }
 
@@ -355,6 +384,8 @@ static void InitializeClient()
   }
   s_hubInfoBackoff.reset();
 
+  registerShutdownHandler();
+
   {
     // The token may have been cleared or replaced (UnLink / Link / SetAuthToken) while the request was in flight.
     // Those tear the client down, bumping the generation, so checking it under the same lock as creating the client
@@ -391,8 +422,19 @@ static void reconcileConnectivity()
   }
 }
 
+void GatewayConnectionManager::RequestRestart()
+{
+  OS_LOGI(TAG, "Restart requested by gateway");
+  s_restartRequested.store(true);
+}
+
 void GatewayConnectionManager::Update()
 {
+  if (s_restartRequested.load()) {
+    OS_LOGI(TAG, "Restarting");
+    esp_restart();
+  }
+
   s_retiredClients.reap();
   reconcileConnectivity();
 
@@ -405,8 +447,21 @@ void GatewayConnectionManager::Update()
   if (client != nullptr) {
     // Client exists; run its loop and optionally reconnect
     if (client->loop()) {
+      // loop() is also true while connecting: only time spent connected may reset the backoff, or a handshake that
+      // runs long and then fails would reset it too
+      if (client->state() != GatewayClientState::Connected) {
+        s_connectedSinceMs = 0;
+        return;
+      }
+      int64_t now = OpenShock::millis();
+      if (s_connectedSinceMs == 0) {
+        s_connectedSinceMs = now;
+      } else if (now - s_connectedSinceMs >= CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS) {
+        s_connectBackoff.reset();
+      }
       return;
     }
+    s_connectedSinceMs = 0;
 
     StartConnectingToLCG();
     return;

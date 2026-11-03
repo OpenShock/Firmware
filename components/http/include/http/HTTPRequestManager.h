@@ -132,6 +132,7 @@ namespace OpenShock::HTTP {
     void drop();
 
     esp_http_client_handle_t m_handle;
+    std::string m_host;                     // host m_handle was created for; its saved TLS session belongs to it
     std::optional<uint32_t> m_retryAfterS;  // "Retry-After" delay-seconds, captured by eventHandler
     bool m_connectionClose;                 // server sent "Connection: close"
   };

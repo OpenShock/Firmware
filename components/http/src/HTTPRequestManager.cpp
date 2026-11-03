@@ -60,9 +60,11 @@ static std::string_view getHostFromURL(std::string_view url)
     url = url.substr(0, seperator);
   }
 
-  // Remove the port eg. "api.example.com:443" -> "api.example.com"
-  seperator = url.rfind(':');
-  if (seperator != std::string_view::npos) {
+  // Remove the port eg. "api.example.com:443" -> "api.example.com". In a bracketed IPv6 host ("[2001:db8::1]:443")
+  // only a colon after the closing bracket starts the port.
+  seperator                      = url.rfind(':');
+  const std::size_t closeBracket = url.rfind(']');
+  if (seperator != std::string_view::npos && (closeBracket == std::string_view::npos || seperator > closeBracket)) {
     url = url.substr(0, seperator);
   }
 
@@ -105,6 +107,7 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::stri
 
 HTTP::Client::Client() noexcept
   : m_handle(nullptr)
+  , m_host()
   , m_retryAfterS()
   , m_connectionClose(false)
 {
@@ -144,6 +147,7 @@ void HTTP::Client::drop()
     esp_http_client_cleanup(m_handle);
     m_handle = nullptr;
   }
+  m_host.clear();
 }
 
 HTTP::Response<std::size_t>
@@ -157,9 +161,6 @@ HTTP::Response<std::size_t>
   if (!rateLimiter->tryRequest()) {
     return {RequestResult::RateLimited, 0, 0};
   }
-
-  m_retryAfterS.reset();
-  m_connectionClose = false;
 
   // Headers are per request: take them off the (possibly reused) handle on every way out of this call.
   struct HeaderCleanup {
@@ -184,14 +185,26 @@ HTTP::Response<std::size_t>
     return begin + timeoutMs - OpenShock::millis();
   };
 
+  // The handle keeps the TLS session of its last connection and offers it on every reconnect, so a server that closed
+  // the kept-alive socket costs a resumed handshake instead of a full one. esp_http_client offers it to whatever host
+  // the URL names, so a handle is only reused for the host it was created for.
+  std::string_view host = getHostFromURL(url);
+  if (m_handle != nullptr && !OpenShock::StringIEquals(m_host, host)) {
+    drop();
+  }
+
   // Open the connection, reusing the kept-alive handle when possible. If a
-  // reused (kept-alive) socket has been closed by the server, drop it and
-  // reconnect fresh once. HTTPS servers are verified against the compiled-in
+  // reused (kept-alive) socket has been closed by the server, close it and
+  // reconnect once on the same handle. HTTPS servers are verified against the compiled-in
   // CA bundle via config.crt_bundle_attach below.
   esp_err_t err         = ESP_FAIL;
   int64_t contentLength = -1;
   for (int attempt = 0; attempt < 2; ++attempt) {
     bool reused = m_handle != nullptr;
+
+    // Headers seen on a failed attempt must not carry over to the retry
+    m_retryAfterS.reset();
+    m_connectionClose = false;
 
     if (m_handle == nullptr) {
       esp_http_client_config_t config = {};
@@ -203,12 +216,16 @@ HTTP::Response<std::size_t>
       config.event_handler            = &Client::eventHandler;
       config.user_data                = this;
       config.crt_bundle_attach        = esp_crt_bundle_attach;  // verify HTTPS servers against the compiled-in CA bundle
+      config.save_client_session      = true;                   // resume the TLS session when reconnecting, see above
+      // Each transport read is capped at this; the 512-byte default turns a 4 KB body read into eight TLS reads
+      config.buffer_size = CONFIG_OPENSHOCK_HTTP_RX_BUFFER_SIZE;
 
       m_handle = esp_http_client_init(&config);
       if (m_handle == nullptr) {
         OS_LOGE(TAG, "Failed to initialize HTTP client");
         return {RequestResult::RequestFailed, 0, 0};
       }
+      m_host.assign(host);
     } else {
       esp_http_client_set_url(m_handle, url);
       esp_http_client_set_method(m_handle, HTTP_METHOD_GET);
@@ -235,11 +252,13 @@ HTTP::Response<std::size_t>
       err = ESP_FAIL;
     }
 
-    drop();
-    if (!reused) {
+    if (!reused || attempt > 0) {
+      drop();
       OS_LOGE(TAG, "Failed to send HTTP request: %s", esp_err_to_name(err));
       return {RequestResult::RequestFailed, 0, 0};
     }
+    // Closed, not dropped: the next open reconnects on the same handle and resumes its TLS session
+    esp_http_client_close(m_handle);
     OS_LOGD(TAG, "Reused connection failed, reconnecting");
   }
   if (err != ESP_OK) {
@@ -294,7 +313,7 @@ HTTP::Response<std::size_t>
   } else if (!chunked) {
     // No Content-Length and not chunked => empty body. Nothing to drain.
     if (m_connectionClose) {
-      drop();
+      esp_http_client_close(m_handle);  // The next request reconnects on this handle, resuming its TLS session
     }
     return {RequestResult::Success, responseCode, 0};
   }
@@ -356,9 +375,10 @@ HTTP::Response<std::size_t>
     return fail(result, responseCode, totalWritten);  // connection state uncertain
   }
 
-  // Success: keep the connection alive for the next request unless the server closed it.
+  // Success: keep the connection alive for the next request unless the server closed it. Even then the handle stays,
+  // so the next request reconnects on it and resumes its TLS session.
   if (m_connectionClose) {
-    drop();
+    esp_http_client_close(m_handle);
   }
 
   return {result, responseCode, totalWritten};

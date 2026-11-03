@@ -179,7 +179,11 @@ esp_err_t CaptivePortal::WebSocketEndpoint::wsHandler(httpd_req_t* req)
     return ESP_FAIL;
   }
 
-  std::vector<uint8_t> buf(frame.len);
+  // onWsFrame copies what it keeps (reassembly), so the buffer is free again once it returns
+  std::vector<uint8_t>& buf = self->m_rxBuf;
+  if (buf.size() < frame.len) {
+    buf.resize(frame.len);
+  }
   frame.payload = buf.data();
   ret           = httpd_ws_recv_frame(req, &frame, frame.len);
   if (ret != ESP_OK) {

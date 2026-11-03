@@ -1,14 +1,14 @@
 #pragma once
 
 namespace OpenShock::HTTP::ContentType {
-  constexpr const char* JSON        = "application/json";
-  constexpr const char* TextPlain   = "text/plain";
-  constexpr const char* TextHTML    = "text/html";
-  constexpr const char* JavaScript  = "text/javascript";
-  constexpr const char* CSS         = "text/css";
-  constexpr const char* SVG         = "image/svg+xml";
-  constexpr const char* PNG         = "image/png";
-  constexpr const char* Icon        = "image/x-icon";
-  constexpr const char* WOFF2       = "font/woff2";
-  constexpr const char* OctetStream = "application/octet-stream";
+  inline constexpr const char* JSON        = "application/json";
+  inline constexpr const char* TextPlain   = "text/plain";
+  inline constexpr const char* TextHTML    = "text/html";
+  inline constexpr const char* JavaScript  = "text/javascript";
+  inline constexpr const char* CSS         = "text/css";
+  inline constexpr const char* SVG         = "image/svg+xml";
+  inline constexpr const char* PNG         = "image/png";
+  inline constexpr const char* Icon        = "image/x-icon";
+  inline constexpr const char* WOFF2       = "font/woff2";
+  inline constexpr const char* OctetStream = "application/octet-stream";
 }  // namespace OpenShock::HTTP::ContentType
