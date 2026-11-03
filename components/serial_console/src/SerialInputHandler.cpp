@@ -29,230 +29,148 @@ const char* const TAG = "SerialInputHandler";
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <string_view>
-#include <unordered_map>
-
-namespace {
-  // Case-insensitive hash/equality for the command lookup table.
-  struct hash_ci {
-    std::size_t operator()(std::string_view str) const noexcept
-    {
-      std::size_t hash = 7;
-
-      for (char c : str) {
-        hash = hash * 31 + tolower(static_cast<unsigned char>(c));
-      }
-
-      return hash;
-    }
-  };
-
-  struct equals_ci {
-    bool operator()(std::string_view a, std::string_view b) const { return OpenShock::StringIEquals(a, b); }
-  };
-}  // namespace
-
-using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
 const int64_t PASTE_INTERVAL_THRESHOLD_MS = 20;
 
 static std::vector<OpenShock::SerialCmds::CommandGroup> s_commandGroups;
-static std::unordered_map<std::string_view, OpenShock::SerialCmds::CommandGroup, hash_ci, equals_ci> s_commandHandlers;
+
+// A handful of groups: a linear, case-insensitive scan beats keeping a second, hashed copy of the table.
+static SerialCmds::CommandGroup* findCommandGroup(std::string_view name)
+{
+  for (auto& group : s_commandGroups) {
+    if (StringIEquals(group.name(), name)) {
+      return &group;
+    }
+  }
+  return nullptr;
+}
+
+namespace {
+  // Collects help output and prints it in one Print call when it goes out of scope. One write holds the serial lock for
+  // the whole text, so a concurrent log line can't land in the middle of it (or split one of its lines).
+  class HelpWriter {
+  public:
+    HelpWriter() { m_text.reserve(1024); }
+    HelpWriter(const HelpWriter&)            = delete;
+    HelpWriter& operator=(const HelpWriter&) = delete;
+    ~HelpWriter() { SerialInputHandler::Print(m_text); }
+
+    void append(std::string_view str) { m_text.append(str); }
+    void append(std::size_t count, char c) { m_text.append(count, c); }
+
+  private:
+    std::string m_text;
+  };
+}  // namespace
 
 static void printCompleteHelp()
 {
-  std::size_t commandCount    = 0;
   std::size_t longestCommand  = 0;
   std::size_t longestArgument = 0;
-  std::size_t descriptionSize = 0;
   for (const auto& group : s_commandGroups) {
     longestCommand = std::max(longestCommand, group.name().size());
     for (const auto& command : group.commands()) {
-      commandCount++;
-
       std::size_t argumentSize = 0;
-      if (command.name().size() > 0) {
+      if (!command.name().empty()) {
         argumentSize += command.name().size() + 1;  // +1 for space
       }
       for (const auto& arg : command.arguments()) {
         argumentSize += arg.name.size() + 3;  // +1 for space, +2 for <>
       }
       longestArgument = std::max(longestArgument, argumentSize);
-      descriptionSize += command.description().size();
-    }
-  }
-
-  std::size_t paddedLength = longestCommand + 1 + longestArgument + 2;  // +1 for space, +2 for newline
-
-  std::string buffer;
-  buffer.reserve((paddedLength * commandCount) + descriptionSize);  // Approximate size
-
-  for (const auto& group : s_commandGroups) {
-    for (const auto& command : group.commands()) {
-      buffer.append(group.name());
-      buffer.append((longestCommand - group.name().size()) + 1, ' ');
-
-      std::size_t startSize = buffer.size();
-
-      if (command.name().size() > 0) {
-        buffer.append(command.name());
-        buffer.push_back(' ');
-      }
-
-      for (const auto& arg : command.arguments()) {
-        buffer.push_back('<');
-        buffer.append(arg.name);
-        buffer.push_back('>');
-        buffer.push_back(' ');
-      }
-
-      buffer.append(longestArgument - (buffer.size() - startSize), ' ');
-
-      buffer.append(command.description());
-
-      buffer.push_back('\r');
-      buffer.push_back('\n');
     }
   }
 
   SerialInputHandler::PrintWelcomeHeader();
 
-  OS_SERIAL_PRINT(buffer);
+  HelpWriter out;
+  for (const auto& group : s_commandGroups) {
+    for (const auto& command : group.commands()) {
+      out.append(group.name());
+      out.append(longestCommand - group.name().size() + 1, ' ');
+
+      std::size_t argumentSize = 0;
+      if (!command.name().empty()) {
+        out.append(command.name());
+        out.append(" ");
+        argumentSize += command.name().size() + 1;
+      }
+      for (const auto& arg : command.arguments()) {
+        out.append("<");
+        out.append(arg.name);
+        out.append("> ");
+        argumentSize += arg.name.size() + 3;
+      }
+      out.append(longestArgument - argumentSize, ' ');
+
+      out.append(command.description());
+      out.append("\r\n");
+    }
+  }
 }
 
-static void printCommandHelp(SerialCmds::CommandGroup& group)
+static void printCommandHelp(const SerialCmds::CommandGroup& group)
 {
-  std::size_t size = 0;
+  HelpWriter out;
   for (const auto& command : group.commands()) {
-    size += 2;  // +2 for newline
-    size += group.name().size();
-    size++;     // +1 for space
+    out.append("\r\n");
+    out.append(group.name());
+    out.append(" ");
 
-    if (command.name().size() > 0) {
-      size += command.name().size() + 1;  // +1 for space
+    if (!command.name().empty()) {
+      out.append(command.name());
+      out.append(" ");
     }
 
     for (const auto& arg : command.arguments()) {
-      size += arg.name.size() + 3;  // +1 for space, +2 for <>
+      out.append("<");
+      out.append(arg.name);
+      out.append("> ");
+    }
+    out.append("\r\n");
+
+    if (!command.description().empty()) {
+      out.append("  ");
+      out.append(command.description());
+      out.append("\r\n");
     }
 
-    size += 2;  // +2 for newline
-
-    if (command.description().size() > 0) {
-      size += command.description().size() + 4;  // +2 for indent, +2 for newline
-    }
-
-    if (command.arguments().size() > 0) {
-      size += 14;                     // +14 for "  Arguments:\r\n"
+    if (!command.arguments().empty()) {
+      out.append("  Arguments:\r\n");
       for (const auto& arg : command.arguments()) {
-        size += arg.name.size() + 7;  // +4 for indent, +2 for <>, +1 for space
-        size += arg.constraint.size();
-        if (arg.constraintExtensions.size() > 0) {
-          size += 3;                 // +1 for ':', +2 for newline
-          for (const auto& ext : arg.constraintExtensions) {
-            size += ext.size() + 8;  // +2 for newline, +6 for indent
-          }
-        } else {
-          size += 2;  // +2 for newline
+        out.append("    <");
+        out.append(arg.name);
+        out.append("> ");
+        out.append(arg.constraint);
+        out.append("\r\n");
+        for (std::string_view ext : arg.constraintExtensions) {
+          out.append("      ");
+          out.append(ext);
+          out.append("\r\n");
         }
       }
     }
 
-    size += 16;                       // +16 for "  Example:    \r\n"
-    size += group.name().size() + 1;  // +1 for space
+    out.append("  Example:\r\n    ");
+    out.append(group.name());
+    out.append(" ");
 
-    if (command.name().size() > 0) {
-      size += command.name().size() + 1;  // +1 for space
+    if (!command.name().empty()) {
+      out.append(command.name());
+      out.append(" ");
     }
 
     for (const auto& arg : command.arguments()) {
-      size += arg.exampleValue.size() + 1;  // +1 for space
+      out.append(arg.exampleValue);
+      out.append(" ");
     }
-
-    size += 2;  // +2 for newline
+    out.append("\r\n");
   }
-
-  size += 2;  // +2 for newline
-
-  std::string buffer;
-  buffer.reserve(size);  // TODO: Should be exact size, is 20 bytes off, figure out why
-
-  for (const auto& command : group.commands()) {
-    buffer.push_back('\r');
-    buffer.push_back('\n');
-    buffer.append(group.name());
-    buffer.push_back(' ');
-
-    if (command.name().size() > 0) {
-      buffer.append(command.name());
-      buffer.push_back(' ');
-    }
-
-    for (const auto& arg : command.arguments()) {
-      buffer.push_back('<');
-      buffer.append(arg.name);
-      buffer.push_back('>');
-      buffer.push_back(' ');
-    }
-
-    buffer.push_back('\r');
-    buffer.push_back('\n');
-
-    if (command.description().size() > 0) {
-      buffer.append(2, ' ');
-      buffer.append(command.description());
-      buffer.push_back('\r');
-      buffer.push_back('\n');
-    }
-
-    if (command.arguments().size() > 0) {
-      buffer.append("  Arguments:\r\n"sv);
-      for (const auto& arg : command.arguments()) {
-        buffer.append(4, ' ');
-        buffer.push_back('<');
-        buffer.append(arg.name);
-        buffer.push_back('>');
-        buffer.push_back(' ');
-        buffer.append(arg.constraint);
-        if (arg.constraintExtensions.size() > 0) {
-          buffer.push_back('\r');
-          buffer.push_back('\n');
-          for (const auto& ext : arg.constraintExtensions) {
-            buffer.append(6, ' ');
-            buffer.append(ext);
-            buffer.push_back('\r');
-            buffer.push_back('\n');
-          }
-        } else {
-          buffer.push_back('\r');
-          buffer.push_back('\n');
-        }
-      }
-    }
-
-    buffer.append("  Example:\r\n    "sv);
-    buffer.append(group.name());
-    buffer.push_back(' ');
-
-    if (command.name().size() > 0) {
-      buffer.append(command.name());
-      buffer.push_back(' ');
-    }
-
-    for (const auto& arg : command.arguments()) {
-      buffer.append(arg.exampleValue);
-      buffer.push_back(' ');
-    }
-
-    buffer.push_back('\r');
-    buffer.push_back('\n');
-  }
-  buffer.push_back('\r');
-  buffer.push_back('\n');
-
-  OS_SERIAL_PRINT(buffer);
+  out.append("\r\n");
 }
 
 static void handleHelpCommand(std::string_view arg, bool isAutomated)
@@ -264,18 +182,12 @@ static void handleHelpCommand(std::string_view arg, bool isAutomated)
   }
 
   // Get help for a specific command
-  auto it = s_commandHandlers.find(arg);
-  if (it != s_commandHandlers.end()) {
-    printCommandHelp(it->second);
+  if (const auto* group = findCommandGroup(arg)) {
+    printCommandHelp(*group);
     return;
   }
 
   SERPR_ERROR("Command \"%.*s\" not found", static_cast<int>(arg.length()), arg.data());
-}
-
-void RegisterCommandHandler(const OpenShock::SerialCmds::CommandGroup& handler)
-{
-  s_commandHandlers[handler.name()] = handler;
 }
 
 #define CLEAR_LINE "\r\x1B[K"
@@ -334,9 +246,8 @@ public:
       delete[] m_data;
     }
 
-    m_data                 = newData;
-    m_capacity             = size;
-    m_data[m_capacity - 1] = 0;
+    m_data     = newData;
+    m_capacity = size;
   }
 
   inline void append(const char* data, std::size_t len)
@@ -559,36 +470,30 @@ static void processSerialLine(std::string_view line)
     return;
   }
 
-  auto parts                 = OpenShock::StringSplit(line, ' ', 1);
-  std::string_view command   = OpenShock::StringTrim(parts[0]);
-  std::string_view arguments = parts.size() > 1 ? OpenShock::StringTrim(parts[1]) : std::string_view();
+  auto [command, arguments] = OpenShock::StringSplitByFirst(line, ' ');
+  arguments                 = OpenShock::StringTrim(arguments);
 
-  if (command == "help"sv) {
+  if (StringIEquals(command, "help")) {
     handleHelpCommand(arguments, isAutomated);
     return;
   }
 
-  auto it = s_commandHandlers.find(command);
-  if (it == s_commandHandlers.end()) {
+  SerialCmds::CommandGroup* group = findCommandGroup(command);
+  if (group == nullptr) {
     SERPR_ERROR("Command \"%.*s\" not found", static_cast<int>(command.size()), command.data());
     return;
   }
 
   // Get potential subcommand (arguments are trimmed, so the first token is never empty)
-  std::string_view firstArg;
-  std::string_view subArguments;
-  if (!arguments.empty()) {
-    parts        = OpenShock::StringSplit(arguments, ' ', 1);
-    firstArg     = parts[0];
-    subArguments = parts.size() > 1 ? OpenShock::StringTrim(parts[1]) : std::string_view();
-  }
+  auto [firstArg, subArguments] = OpenShock::StringSplitByFirst(arguments, ' ');
+  subArguments                  = OpenShock::StringTrim(subArguments);
 
   // If the first argument is not empty, try to find a subcommand that matches
   if (!firstArg.empty()) {
     bool nameMatched = false;
-    for (SerialCmds::CommandEntry& cmd : it->second.commands()) {
+    for (SerialCmds::CommandEntry& cmd : group->commands()) {
       // Check subcommand name
-      if (cmd.name() != firstArg) {
+      if (!StringIEquals(cmd.name(), firstArg)) {
         continue;
       }
       nameMatched = true;
@@ -604,13 +509,13 @@ static void processSerialLine(std::string_view line)
     }
 
     if (nameMatched) {
-      printCommandHelp(it->second);
+      printCommandHelp(*group);
       return;
     }
   }
 
   // If no subcommand was found, try to find a default command
-  for (SerialCmds::CommandEntry& cmd : it->second.commands()) {
+  for (SerialCmds::CommandEntry& cmd : group->commands()) {
     // Skip subcommands
     if (!cmd.name().empty()) {
       continue;
@@ -618,7 +523,7 @@ static void processSerialLine(std::string_view line)
 
     // Check if the command requires arguments
     if (cmd.arguments().size() > 0 && arguments.empty()) {
-      printCommandHelp(it->second);
+      printCommandHelp(*group);
       return;
     }
 
@@ -680,10 +585,6 @@ bool SerialInputHandler::Init()
 
   // Register command handlers
   s_commandGroups = OpenShock::SerialCmds::CommandHandlers::AllCommandHandlers();
-  for (const auto& handler : s_commandGroups) {
-    OS_LOGV(TAG, "Registering command handler: %.*s", static_cast<int>(handler.name().size()), handler.name().data());
-    RegisterCommandHandler(handler);
-  }
 
   SerialInputHandler::PrintWelcomeHeader();
   SerialInputHandler::PrintVersionInfo();

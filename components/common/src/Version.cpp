@@ -35,12 +35,11 @@ namespace OpenShock::Constants {
     return OPENSHOCK_FW_USERAGENT;
 #else
     static const std::string userAgent = [] {
-      using namespace std::string_view_literals;
-      constexpr auto prefix    = CONFIG_OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (ESP-IDF; "sv;
-      constexpr auto separator = "; "sv;
-      constexpr auto suffix    = "; Espressif)"sv;
-      const auto board         = Board::Name();
-      const auto chip          = Board::Chip();
+      constexpr std::string_view prefix    = CONFIG_OPENSHOCK_FW_HOSTNAME "/" OPENSHOCK_FW_VERSION " (ESP-IDF; ";
+      constexpr std::string_view separator = "; ";
+      constexpr std::string_view suffix    = "; Espressif)";
+      const auto board                     = Board::Name();
+      const auto chip                      = Board::Chip();
 
       std::string ua;
       ua.reserve(prefix.size() + board.size() + separator.size() + chip.size() + suffix.size());

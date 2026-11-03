@@ -24,7 +24,7 @@ namespace OpenShock {
   bool FlashPartitionFromUrl(
     HTTP::Client& client,
     const esp_partition_t* partition,
-    std::string_view remoteUrl,
+    const char* remoteUrl,
     const uint8_t (&remoteHash)[32],
     Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback,
     std::optional<Util::FunctionRef<bool(std::span<const uint8_t>)>> firstChunkCheck = std::nullopt

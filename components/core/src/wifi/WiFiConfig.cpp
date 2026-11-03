@@ -94,19 +94,15 @@ namespace {
   template<typename List>
   auto findById(List& list, uint8_t id) -> decltype(list.data())
   {
-    for (auto& creds : list) {
-      if (creds.id == id) return &creds;
-    }
-    return nullptr;
+    auto it = std::ranges::find(list, id, &WiFiCredentials::id);
+    return it != list.end() ? &*it : nullptr;
   }
 
   template<typename List>
   auto findBySsid(List& list, std::string_view ssid) -> decltype(list.data())
   {
-    for (auto& creds : list) {
-      if (creds.ssid == ssid) return &creds;
-    }
-    return nullptr;
+    auto it = std::ranges::find(list, ssid, &WiFiCredentials::ssid);
+    return it != list.end() ? &*it : nullptr;
   }
 
   // The lowest id in 1..255 no credential in `list` holds; 0 when every id is taken
@@ -187,7 +183,7 @@ bool WiFiConfig::LoadNvs(const char* partition)
     }
     credentialsList.push_back(std::move(creds));
   }
-  std::sort(credentialsList.begin(), credentialsList.end(), [](const WiFiCredentials& a, const WiFiCredentials& b) { return a.id < b.id; });
+  std::ranges::sort(credentialsList, {}, &WiFiCredentials::id);
   return true;
 }
 
@@ -276,6 +272,15 @@ std::vector<WiFiCredentials> OpenShock::Config::GetWiFiCredentials()
   return s_section.Read([](const WiFiConfig& wifi) { return wifi.credentialsList; });
 }
 
+void OpenShock::Config::ForEachWiFiSsid(Util::FunctionRef<void(std::string_view ssid)> visit)
+{
+  s_section.Read([&](const WiFiConfig& wifi) {
+    for (const WiFiCredentials& creds : wifi.credentialsList) {
+      visit(creds.ssid);
+    }
+  });
+}
+
 void OpenShock::Config::GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData)
 {
   s_section.Read([&](const WiFiConfig& wifi) {
@@ -310,13 +315,6 @@ bool OpenShock::Config::SetWiFiCredentials(const std::vector<WiFiCredentials>& c
     wifi.credentialsList = credentials;
     return true;
   });
-}
-
-bool OpenShock::Config::AnyWiFiCredentials(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate)
-{
-  // The predicate is caller code, so run it on a copy outside the lock
-  auto creds = GetWiFiCredentials();
-  return std::any_of(creds.begin(), creds.end(), predicate);
 }
 
 uint8_t OpenShock::Config::AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode)
@@ -365,15 +363,7 @@ std::optional<WiFiCredentials> OpenShock::Config::TryGetWiFiCredentialsByID(uint
   });
 }
 
-std::optional<WiFiCredentials> OpenShock::Config::TryGetWiFiCredentialsBySSID(const char* ssid)
-{
-  return s_section.Read([&](const WiFiConfig& wifi) -> std::optional<WiFiCredentials> {
-    const WiFiCredentials* creds = findBySsid(wifi.credentialsList, ssid);
-    return creds != nullptr ? std::optional(*creds) : std::nullopt;
-  });
-}
-
-uint8_t OpenShock::Config::GetWiFiCredentialsIDbySSID(const char* ssid)
+uint8_t OpenShock::Config::GetWiFiCredentialsIDbySSID(std::string_view ssid)
 {
   return s_section.Read([&](const WiFiConfig& wifi) -> uint8_t {
     const WiFiCredentials* creds = findBySsid(wifi.credentialsList, ssid);

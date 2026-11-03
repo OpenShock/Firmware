@@ -26,10 +26,16 @@ const char* const TAG = "HTTPRequestManager";
 #include <string_view>
 #include <unordered_map>
 
-using namespace std::string_view_literals;
+namespace {
+  // Transparent, so a host can be looked up by view: only the first request to a host stores a string.
+  struct HostHash {
+    using is_transparent = void;
+    std::size_t operator()(std::string_view host) const noexcept { return std::hash<std::string_view> {}(host); }
+  };
+}  // namespace
 
-static OpenShock::SimpleMutex s_rateLimitsMutex                                              = {};
-static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>> s_rateLimits = {};
+static OpenShock::SimpleMutex s_rateLimitsMutex                                                                         = {};
+static std::unordered_map<std::string, std::shared_ptr<OpenShock::RateLimiter>, HostHash, std::equal_to<>> s_rateLimits = {};
 
 using namespace OpenShock;
 
@@ -84,7 +90,7 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForDomain(std::s
 
 static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::string_view url)
 {
-  auto domain = std::string(getHostFromURL(url));
+  std::string_view domain = getHostFromURL(url);
   if (domain.empty()) {
     return nullptr;
   }
@@ -102,8 +108,7 @@ static std::shared_ptr<OpenShock::RateLimiter> createRateLimiterForURL(std::stri
 HTTP::Client::Client() noexcept
   : m_handle(nullptr)
   , m_host()
-  , m_headerKeys()
-  , m_retryAfter()
+  , m_retryAfterS()
   , m_connectionClose(false)
 {
 }
@@ -127,7 +132,7 @@ esp_err_t HTTP::Client::eventHandler(esp_http_client_event_t* evt)
   }
 
   if (OpenShock::StringIEquals(evt->header_key, "Retry-After")) {
-    self->m_retryAfter.assign(evt->header_value);
+    self->m_retryAfterS = OpenShock::Convert::ToUint32(evt->header_value);
   } else if (OpenShock::StringIEquals(evt->header_key, "Connection")) {
     self->m_connectionClose = OpenShock::StringIEquals(evt->header_value, "close");
   }
@@ -143,11 +148,10 @@ void HTTP::Client::drop()
     m_handle = nullptr;
   }
   m_host.clear();
-  m_headerKeys.clear();
 }
 
 HTTP::Response<std::size_t>
-  HTTP::Client::Download(std::string_view url, const std::map<std::string, std::string>& headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+  HTTP::Client::Download(const char* url, std::initializer_list<Header> headers, HTTP::GotContentLengthCallback contentLengthCallback, HTTP::DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::shared_ptr<OpenShock::RateLimiter> rateLimiter = createRateLimiterForURL(url);
   if (rateLimiter == nullptr) {
@@ -158,7 +162,20 @@ HTTP::Response<std::size_t>
     return {RequestResult::RateLimited, 0, 0};
   }
 
-  std::string urlStr(url);
+  // Headers are per request: take them off the (possibly reused) handle on every way out of this call.
+  struct HeaderCleanup {
+    esp_http_client_handle_t& handle;
+    std::initializer_list<Header> headers;
+    ~HeaderCleanup()
+    {
+      if (handle == nullptr) {
+        return;
+      }
+      for (const Header& header : headers) {
+        esp_http_client_delete_header(handle, header.key);
+      }
+    }
+  } headerCleanup {m_handle, headers};
 
   int64_t begin = OpenShock::millis();
 
@@ -186,12 +203,12 @@ HTTP::Response<std::size_t>
     bool reused = m_handle != nullptr;
 
     // Headers seen on a failed attempt must not carry over to the retry
-    m_retryAfter.clear();
+    m_retryAfterS.reset();
     m_connectionClose = false;
 
     if (m_handle == nullptr) {
       esp_http_client_config_t config = {};
-      config.url                      = urlStr.c_str();
+      config.url                      = url;
       config.user_agent               = OpenShock::Constants::UserAgent();
       config.method                   = HTTP_METHOD_GET;
       config.timeout_ms               = static_cast<int>(std::max<int64_t>(remainingMs(), 1));
@@ -210,20 +227,13 @@ HTTP::Response<std::size_t>
       }
       m_host.assign(host);
     } else {
-      esp_http_client_set_url(m_handle, urlStr.c_str());
+      esp_http_client_set_url(m_handle, url);
       esp_http_client_set_method(m_handle, HTTP_METHOD_GET);
       esp_http_client_set_timeout_ms(m_handle, static_cast<int>(std::max<int64_t>(remainingMs(), 1)));
     }
 
-    // Clear headers left over from a previous request on this reused handle.
-    for (const auto& key : m_headerKeys) {
-      esp_http_client_delete_header(m_handle, key.c_str());
-    }
-    m_headerKeys.clear();
-
-    for (const auto& header : headers) {
-      esp_http_client_set_header(m_handle, header.first.c_str(), header.second.c_str());
-      m_headerKeys.push_back(header.first);
+    for (const Header& header : headers) {
+      esp_http_client_set_header(m_handle, header.key, header.value);
     }
 
     err = esp_http_client_open(m_handle, 0);
@@ -272,7 +282,7 @@ HTTP::Response<std::size_t>
     // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Retry-After
     // Only delay-seconds (whole seconds, RFC 9110) is parsed; a missing header, an HTTP-date or anything else
     // unparseable gets the minimum.
-    uint32_t retryAfter = OpenShock::Convert::ToUint32(m_retryAfter).value_or(CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S);
+    uint32_t retryAfter = m_retryAfterS.value_or(CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S);
 
     rateLimiter->blockFor(static_cast<int64_t>(std::clamp<uint32_t>(retryAfter, CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MIN_S, CONFIG_OPENSHOCK_HTTP_RETRY_AFTER_MAX_S)) * 1000);
 
@@ -283,7 +293,7 @@ HTTP::Response<std::size_t>
     OS_LOGW(TAG, "The server refused to brew coffee because it is, permanently, a teapot.");
   }
 
-  if (std::find(acceptedCodes.begin(), acceptedCodes.end(), responseCode) == acceptedCodes.end()) {
+  if (!std::ranges::contains(acceptedCodes, responseCode)) {
     OS_LOGD(TAG, "Received unexpected response code %d", responseCode);
     return fail(RequestResult::CodeRejected, responseCode, 0);  // body not drained
   }
@@ -374,7 +384,7 @@ HTTP::Response<std::size_t>
   return {result, responseCode, totalWritten};
 }
 
-HTTP::Response<std::string> HTTP::Client::GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
+HTTP::Response<std::string> HTTP::Client::GetString(const char* url, std::initializer_list<Header> headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs)
 {
   std::string result;
 

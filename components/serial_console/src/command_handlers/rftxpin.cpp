@@ -45,12 +45,12 @@ static void handleRfTxPinCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RfTxPinHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("rftxpin"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("rftxpin");
 
-  group.addCommand("Get the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
+  group.addCommand("Get the GPIO pin used for the radio transmitter", handleRfTxPinCommand);
 
-  auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter"sv, handleRfTxPinCommand);
-  setCommand.addArgument("pin"sv, "must be a number"sv, "15"sv);
+  auto& setCommand = group.addCommand("Set the GPIO pin used for the radio transmitter", handleRfTxPinCommand);
+  setCommand.addArgument("pin", "must be a number", "15");
 
   return group;
 }

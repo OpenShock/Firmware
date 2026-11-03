@@ -14,6 +14,7 @@ const char* const TAG = "GatewayConnectionManager";
 #include "Temporal.h"
 
 #include "SimpleMutex.h"
+#include "StringHelpers.h"
 #include "util/Backoff.h"
 #include "util/RetiredList.h"
 #include "wifi/WiFiManager.h"
@@ -169,6 +170,12 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::InvalidCodeLength;
   }
 
+  // The code becomes a URL path segment: anything but [0-9A-Za-z] could rewrite the request path or query
+  if (!std::ranges::all_of(linkCode, CharIsAlnum)) {
+    OS_LOGE(TAG, "Invalid link code: not alphanumeric");
+    return AccountLinkResultCode::InvalidCode;
+  }
+
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.code == 404) {
@@ -262,7 +269,7 @@ bool GatewayConnectionManager::SendMessageBIN(std::span<const uint8_t> data)
   return client->sendMessageBIN(data);
 }
 
-static bool FetchHubInfo(std::string authToken)
+static bool FetchHubInfo(const char* authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
@@ -273,7 +280,7 @@ static bool FetchHubInfo(std::string authToken)
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetHubInfo(std::move(authToken));
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");
@@ -327,7 +334,7 @@ static bool StartConnectingToLCG()
     return false;
   }
 
-  auto response = HTTP::JsonAPI::AssignLcg(Config::GetBackendAuthToken());
+  auto response = HTTP::JsonAPI::AssignLcg(Config::GetBackendAuthToken().c_str());
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -349,7 +356,7 @@ static bool StartConnectingToLCG()
   }
 
   OS_LOGI(TAG, "Connecting to LCG endpoint { host: '%s', port: %hu, path: '%s' } in country %s", response.data.host.c_str(), response.data.port, response.data.path.c_str(), response.data.country.c_str());
-  client->connect(response.data.host, response.data.port, response.data.path);
+  client->connect(response.data.host.c_str(), response.data.port, response.data.path.c_str());
 
   return true;
 }
@@ -370,7 +377,7 @@ static void InitializeClient()
   }
 
   const std::string authToken = Config::GetBackendAuthToken();
-  if (!FetchHubInfo(authToken)) {
+  if (!FetchHubInfo(authToken.c_str())) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;

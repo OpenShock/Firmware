@@ -21,7 +21,8 @@ std::optional<JsonSerial::ShockerCommand> JsonSerial::ParseShockerCommand(JSON::
     OS_LOGE(TAG, "missing 'model' field");
     return std::nullopt;
   }
-  auto modelStr = model.tryGetStr();
+  char modelScratch[32];
+  auto modelStr = model.tryGetStrView(modelScratch);
   if (!modelStr) {
     OS_LOGE(TAG, "value at 'model' is not a string");
     return std::nullopt;
@@ -53,7 +54,8 @@ std::optional<JsonSerial::ShockerCommand> JsonSerial::ParseShockerCommand(JSON::
     OS_LOGE(TAG, "missing 'type' field");
     return std::nullopt;
   }
-  auto commandStr = command.tryGetStr();
+  char commandScratch[32];
+  auto commandStr = command.tryGetStrView(commandScratch);
   if (!commandStr) {
     OS_LOGE(TAG, "value at 'type' is not a string");
     return std::nullopt;

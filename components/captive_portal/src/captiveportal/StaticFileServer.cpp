@@ -12,6 +12,7 @@ const char* const TAG = "CaptivePortalStatic";
 #include "util/HexUtils.h"
 
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -98,17 +99,25 @@ static bool acceptsGzip(std::string_view acceptEncoding)
 // The length lookup can't tell the two apart, but the value lookup can.
 static bool clientAcceptsGzip(httpd_req_t* req)
 {
-  std::size_t len = httpd_req_get_hdr_value_len(req, "Accept-Encoding");
-  std::string value;
-  value.resize(len + 1);
-  esp_err_t err = httpd_req_get_hdr_value_str(req, "Accept-Encoding", value.data(), value.size());
+  // Browsers send at most "gzip, deflate, br, zstd" (23 bytes), which fits; a longer value goes to the heap
+  char value[32];
+  esp_err_t err = httpd_req_get_hdr_value_str(req, "Accept-Encoding", value, sizeof(value));
   if (err == ESP_ERR_NOT_FOUND) {
     return true;
   }
-  if (err != ESP_OK) {
+  if (err == ESP_OK) {
+    return acceptsGzip(value);
+  }
+  if (err != ESP_ERR_HTTPD_RESULT_TRUNC) {
     return false;
   }
-  return acceptsGzip(std::string_view(value.data(), len));
+
+  std::size_t len = httpd_req_get_hdr_value_len(req, "Accept-Encoding");
+  std::string longValue(len + 1, '\0');
+  if (httpd_req_get_hdr_value_str(req, "Accept-Encoding", longValue.data(), longValue.size()) != ESP_OK) {
+    return false;
+  }
+  return acceptsGzip(std::string_view(longValue.data(), len));
 }
 
 static constexpr const char* kCacheControl          = "max-age=3600";
@@ -194,8 +203,8 @@ CaptivePortal::StaticFileServer::StaticFileServer()
   }
   char hex[Www::kImageHashSize * 2 + 1];
   HexUtils::ToHex(m_www.image().ImageHash(), hex, false);
-  m_etag = std::string("\"") + hex + "\"";
-  OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag.c_str());
+  snprintf(m_etag, sizeof(m_etag), "\"%s\"", hex);
+  OS_LOGI(TAG, "Serving files from the www image (%s)", m_etag);
 }
 
 void CaptivePortal::StaticFileServer::registerHandler(httpd_handle_t server)
@@ -256,7 +265,7 @@ esp_err_t CaptivePortal::StaticFileServer::staticFileHandler(httpd_req_t* req)
   Representation rep {
     .contentType  = contentTypeForPath(uri),
     .cacheControl = asset->immutable() ? kCacheControlImmutable : kCacheControl,
-    .etag         = self->m_etag.c_str(),
+    .etag         = self->m_etag,
     .size         = asset->body.size(),
   };
 

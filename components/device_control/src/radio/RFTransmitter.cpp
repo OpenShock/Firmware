@@ -94,8 +94,9 @@ RFTransmitter::RFTransmitter(gpio_num_t gpioPin)
     return;
   }
 
-  char name[32];
-  snprintf(name, sizeof(name), "RFTransmitter-%u", m_txPin);
+  // FreeRTOS keeps 15 characters of a task name: short enough that a two-digit pin isn't cut off
+  char name[configMAX_TASK_NAME_LEN];
+  snprintf(name, sizeof(name), "RFTx-%d", static_cast<int>(m_txPin));
 
   if (!m_task.startExpensive(name, CONFIG_OPENSHOCK_RF_TASK_STACK_SIZE, CONFIG_OPENSHOCK_RF_TASK_PRIORITY, [this] { TransmitTask(); })) {
     OS_LOGE(TAG, "[pin-%hhi] Failed to create task", m_txPin);
@@ -342,7 +343,7 @@ void RFTransmitter::TransmitTask()
       }
 
       uint32_t key = shockerKey(cmd.modelType, cmd.shockerId);
-      auto stop    = std::find_if(stops.begin(), stops.end(), [key](const auto& entry) { return entry.first == key; });
+      auto stop    = std::ranges::find(stops, key, [](const auto& entry) { return entry.first; });
       if ((cmd.flags & kFlagStop) != 0) {
         if (stop == stops.end()) {
           stops.emplace_back(key, cmd.seq);

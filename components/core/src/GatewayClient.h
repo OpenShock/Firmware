@@ -21,12 +21,12 @@ namespace OpenShock {
     DISABLE_MOVE(GatewayClient);
 
   public:
-    GatewayClient(const std::string& authToken);
+    explicit GatewayClient(std::string_view authToken);
     ~GatewayClient();
 
     inline GatewayClientState state() const { return m_state; }
 
-    void connect(const std::string& host, uint16_t port, const std::string& path);
+    void connect(const char* host, uint16_t port, const char* path);
 
     bool sendMessageTXT(std::string_view data);
     bool sendMessageBIN(std::span<const uint8_t> data);
@@ -54,7 +54,7 @@ namespace OpenShock {
 
     esp_websocket_client_handle_t _takeHandle();
     void _destroyHandle();
-    esp_transport_handle_t _prepareTransport(const std::string& host, const std::string& path);
+    esp_transport_handle_t _prepareTransport(const char* host, const char* path);
     void _destroyTransport();
 
     std::string m_headers;

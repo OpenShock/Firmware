@@ -6,6 +6,7 @@ const char* const TAG = "SemVer";
 #include "Logging.h"
 #include "StringHelpers.h"
 
+#include <algorithm>
 #include <charconv>
 
 using namespace OpenShock;
@@ -27,17 +28,7 @@ static constexpr bool semverIsDigit(char c)
 }
 static constexpr bool semverIsDigits(std::string_view str)
 {
-  if (str.empty()) {
-    return false;
-  }
-
-  for (auto c : str) {
-    if (!semverIsDigit(c)) {
-      return false;
-    }
-  }
-
-  return true;
+  return !str.empty() && std::ranges::all_of(str, semverIsDigit);
 }
 static constexpr bool semverIsNonDigit(char c)
 {
@@ -49,17 +40,7 @@ static constexpr bool semverIsIdentifierChararacter(char c)
 }
 static constexpr bool semverIsIdentifierChararacters(std::string_view str)
 {
-  if (str.empty()) {
-    return false;
-  }
-
-  for (auto c : str) {
-    if (!semverIsIdentifierChararacter(c)) {
-      return false;
-    }
-  }
-
-  return true;
+  return !str.empty() && std::ranges::all_of(str, semverIsIdentifierChararacter);
 }
 static constexpr bool semverIsNumericIdentifier(std::string_view str)
 {

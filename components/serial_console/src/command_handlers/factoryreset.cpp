@@ -17,9 +17,9 @@ static void handleFactoryResetCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::FactoryResetHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("factoryreset"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("factoryreset");
 
-  group.addCommand("Reset the hub to factory defaults and restart"sv, handleFactoryResetCommand);
+  group.addCommand("Reset the hub to factory defaults and restart", handleFactoryResetCommand);
 
   return group;
 }

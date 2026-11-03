@@ -3,6 +3,7 @@
 #include "serial_console/command_handlers/common.h"
 
 #include "BackendConfig.h"
+#include "http/ContentTypes.h"
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
 
@@ -24,12 +25,17 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  std::string uri = "https://" + std::string(arg) + "/1";
+  constexpr std::string_view kScheme = "https://";
+  constexpr std::string_view kPath   = "/1";
+
+  std::string uri;
+  uri.reserve(kScheme.size() + arg.size() + kPath.size());
+  uri.append(kScheme).append(arg).append(kPath);
 
   auto resp = OpenShock::HTTP::GetJSON<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(
-    uri,
+    uri.c_str(),
     {
-      {"Accept", "application/json"}
+      {"Accept", OpenShock::HTTP::ContentType::JSON}
   },
     OpenShock::Serialization::JsonAPI::ParseBackendVersionJsonResponse,
     std::array<uint16_t, 2> {200}
@@ -48,12 +54,12 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::DomainHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("domain"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("domain");
 
-  group.addCommand("Get the backend domain."sv, handleDomainCommand);
+  group.addCommand("Get the backend domain.", handleDomainCommand);
 
-  auto& setCommand = group.addCommand("Set the backend domain."sv, handleDomainCommand);
-  setCommand.addArgument("domain"sv, "must be a string"sv, std::string_view(CONFIG_OPENSHOCK_API_DOMAIN));
+  auto& setCommand = group.addCommand("Set the backend domain.", handleDomainCommand);
+  setCommand.addArgument("domain", "must be a string", std::string_view(CONFIG_OPENSHOCK_API_DOMAIN));
 
   return group;
 }

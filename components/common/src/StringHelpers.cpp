@@ -26,74 +26,6 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...)
   return written == length;
 }
 
-std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, char delimiter, std::size_t maxSplits)
-{
-  if (view.empty()) {
-    return {};
-  }
-
-  std::vector<std::string_view> result = {};
-
-  std::size_t pos    = 0;
-  std::size_t splits = 0;
-  while (pos < view.size() && splits < maxSplits) {
-    std::size_t nextPos = view.find(delimiter, pos);
-    if (nextPos == std::string_view::npos) {
-      nextPos = view.size();
-    }
-
-    result.push_back(view.substr(pos, nextPos - pos));
-    pos = nextPos + 1;
-    ++splits;
-  }
-
-  if (pos < view.size()) {
-    result.push_back(view.substr(pos));
-  }
-
-  return result;
-}
-
-std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits)
-{
-  if (view.empty()) {
-    return {};
-  }
-
-  std::vector<std::string_view> result = {};
-
-  const char* start = nullptr;
-  for (const char* ptr = view.begin(); ptr < view.end(); ++ptr) {
-    if (predicate(*ptr)) {
-      if (start != nullptr) {
-        result.emplace_back(start, ptr - start);
-        start = nullptr;
-      }
-    } else if (start == nullptr) {
-      start = ptr;
-      if (result.size() >= maxSplits) {
-        break;  // Remainder becomes the final part below
-      }
-    }
-  }
-
-  if (start != nullptr) {
-    result.emplace_back(start, view.end() - start);
-  }
-
-  return result;
-}
-
-std::vector<std::string_view> OpenShock::StringSplitNewLines(std::string_view view, std::size_t maxSplits)
-{
-  return StringSplit(view, [](char c) { return c == '\r' || c == '\n'; }, maxSplits);
-}
-
-std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits)
-{
-  return StringSplit(view, [](char c) { return CharIsSpace(c); }, maxSplits);
-}
-
 static bool lowercaseEqual(char a, char b)
 {
   return OpenShock::CharToLower(a) == OpenShock::CharToLower(b);
@@ -108,7 +40,7 @@ bool OpenShock::StringIContains(std::string_view haystack, std::string_view need
   if (haystack.size() < needle.size()) return false;
   if (haystack.size() == needle.size()) return std::ranges::equal(haystack, needle, lowercaseEqual);
 
-  return std::search(haystack.begin(), haystack.end(), needle.begin(), needle.end(), lowercaseEqual) != haystack.end();
+  return std::ranges::search(haystack, needle, lowercaseEqual).begin() != haystack.end();
 }
 bool OpenShock::StringHasPrefixIC(std::string_view view, std::string_view prefix) noexcept
 {

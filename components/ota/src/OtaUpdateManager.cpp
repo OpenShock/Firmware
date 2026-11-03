@@ -9,6 +9,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "captiveportal/Manager.h"
 #include "GatewayConnectionManager.h"
 #include "Hashing.h"
+#include "http/ContentTypes.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
 #include "OpenShock.h"
@@ -45,8 +46,6 @@ const char* const TAG = "OtaUpdateManager";
 // Firmware version / commit. Regenerated every build, so this file is one of the
 // few that recompile on a new commit.
 
-using namespace std::string_view_literals;
-
 /// Repository server firmware API root. Paths per firmware-api-spec.md §4.
 #define OPENSHOCK_FW_REPO_API_PREFIX "/2/firmware"
 
@@ -60,7 +59,7 @@ using namespace std::string_view_literals;
 
 /// @brief Artifacts for one specific version of this board: the directed-update path. See spec §4.4.
 /// Arguments: domain, version, board (as %.*s: length, data).
-#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/%s/%.*s"
+#define OPENSHOCK_FW_REPO_VERSION_URL_FORMAT "https://%s" OPENSHOCK_FW_REPO_API_PREFIX "/versions/" SEMVER_FMT "/%.*s"
 
 enum OtaTaskEventFlag : uint32_t {
   OTA_TASK_EVENT_UPDATE_REQUESTED  = 1 << 0,
@@ -216,7 +215,7 @@ static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const cha
   return true;
 }
 
-static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing app partition");
 
@@ -234,14 +233,14 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
 
   if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress)) {
     OS_LOGE(TAG, "Failed to flash app partition");
-    _sendFailureMessage("Failed to flash app partition"sv);
+    _sendFailureMessage("Failed to flash app partition");
     return false;
   }
 
   // The hash proved the download is what the server published; this proves the server published it for this
   // board. Checked before the slot is made bootable, so a mislabelled release never gets a chance to boot.
   if (!otaum_slot_matches_this_board(partition, "Downloaded firmware", true)) {
-    _sendFailureMessage("Downloaded firmware is for a different board"sv);
+    _sendFailureMessage("Downloaded firmware is for a different board");
     return false;
   }
 
@@ -252,14 +251,14 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
   // Set app partition bootable.
   if (esp_ota_set_boot_partition(partition) != ESP_OK) {
     OS_LOGE(TAG, "Failed to set app partition bootable");
-    _sendFailureMessage("Failed to set app partition bootable"sv);
+    _sendFailureMessage("Failed to set app partition bootable");
     return false;
   }
 
   return true;
 }
 
-static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, std::string_view remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
 {
   OS_LOGD(TAG, "Flashing www partition");
 
@@ -289,7 +288,11 @@ static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp
 
   if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
     OS_LOGE(TAG, "Failed to flash www partition");
-    _sendFailureMessage(formatMismatch ? "The downloaded image is not a www image"sv : "Failed to flash www partition"sv);
+    if (formatMismatch) {
+      _sendFailureMessage("The downloaded image is not a www image");
+    } else {
+      _sendFailureMessage("Failed to flash www partition");
+    }
     return false;
   }
 
@@ -300,7 +303,7 @@ static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp
   // Verify the freshly flashed image
   if (!Www::VerifyPartition(partition)) {
     OS_LOGE(TAG, "The flashed www image is not valid");
-    _sendFailureMessage("The flashed www image is not valid"sv);
+    _sendFailureMessage("The flashed www image is not valid");
     return false;
   }
 
@@ -414,14 +417,12 @@ static void otaum_updatetask(void* arg)
       version = std::move(*latestVersion);
     }
 
-    std::string versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-
-    if (versionStr == OpenShock::Constants::FW_VERSION) {
+    if (version == OpenShock::Constants::FirmwareVersion()) {
       OS_LOGI(TAG, "Requested version is already installed");
       continue;
     }
 
-    OS_LOGD(TAG, "Updating to version: %.*s", static_cast<int>(versionStr.length()), versionStr.data());
+    OS_LOGD(TAG, "Updating to version: " SEMVER_FMT, SEMVER_ARG(version));
 
     // Generate random int32_t for this update.
     int32_t updateId = static_cast<int32_t>(esp_random());
@@ -457,14 +458,14 @@ static void otaum_updatetask(void* arg)
     auto maybeRelease = OtaUpdateManager::TryGetFirmwareRelease(client, version);
     if (!maybeRelease) {
       OS_LOGE(TAG, "Failed to fetch firmware release");  // TODO: Send error message to server
-      _sendFailureMessage("Failed to fetch firmware release"sv);
+      _sendFailureMessage("Failed to fetch firmware release");
       continue;
     }
     const OtaUpdateManager::FirmwareRelease& release = *maybeRelease;
 
     // Print release.
     OS_LOGD(TAG, "Firmware release:");
-    OS_LOGD(TAG, "  Version:                %.*s", static_cast<int>(versionStr.length()), versionStr.data());
+    OS_LOGD(TAG, "  Version:                " SEMVER_FMT, SEMVER_ARG(version));
     OS_LOGD(TAG, "  App binary URL:         %.*s", static_cast<int>(release.appBinaryUrl.length()), release.appBinaryUrl.data());
     OS_LOGD(TAG, "  App binary hash:        %s", HexUtils::ToHex<32>(release.appBinaryHash).data());
     OS_LOGD(TAG, "  www image URL:  %.*s", static_cast<int>(release.wwwBinaryUrl.length()), release.wwwBinaryUrl.data());
@@ -474,7 +475,7 @@ static void otaum_updatetask(void* arg)
     const esp_partition_t* appPartition = esp_ota_get_next_update_partition(nullptr);
     if (appPartition == nullptr) {
       OS_LOGE(TAG, "Failed to get app update partition");
-      _sendFailureMessage("Failed to get app update partition"sv);
+      _sendFailureMessage("Failed to get app update partition");
       continue;
     }
 
@@ -482,7 +483,7 @@ static void otaum_updatetask(void* arg)
     const esp_partition_t* wwwPartition = Www::FindPartition();
     if (wwwPartition == nullptr) {
       OS_LOGE(TAG, "Failed to find the www partition");
-      _sendFailureMessage("Failed to find www partition"sv);
+      _sendFailureMessage("Failed to find www partition");
       continue;
     }
 
@@ -504,7 +505,7 @@ static void otaum_updatetask(void* arg)
     // Make sure captive portal is stopped, timeout after 5 seconds.
     if (!CaptivePortal::ForceClose(5000U)) {
       OS_LOGE(TAG, "Failed to force close captive portal (timed out)");
-      _sendFailureMessage("Failed to force close captive portal (timed out)"sv);
+      _sendFailureMessage("Failed to force close captive portal (timed out)");
       continue;
     }
 
@@ -513,17 +514,17 @@ static void otaum_updatetask(void* arg)
     const bool wwwCurrent = Www::ImageSha256(wwwPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.wwwBinaryHash, 32) == 0;
     if (wwwCurrent) {
       OS_LOGI(TAG, "The www image is already current, not flashing it");
-    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl, release.wwwBinaryHash)) {
+    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl.c_str(), release.wwwBinaryHash)) {
       continue;
     }
-    if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash)) {
+    if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl.c_str(), release.appBinaryHash)) {
       continue;
     }
 
     // Set OTA boot type in config.
     if (!Config::SetOtaUpdateStep(OpenShock::OtaUpdateStep::Updated)) {
       OS_LOGE(TAG, "Failed to set OTA update step");
-      _sendFailureMessage("Failed to set OTA update step"sv);
+      _sendFailureMessage("Failed to set OTA update step");
       continue;
     }
     resetStepOnFailure.succeeded = true;
@@ -562,17 +563,17 @@ static void otaum_updatetask(void* arg)
 /// @param acceptedCodes Response codes to treat as success. 204 is handled by the caller and must not
 ///                      reach the parser; an empty body is not valid JSON.
 /// @return The response code, or std::nullopt if the request or the JSON parse failed.
-[[nodiscard]] static std::optional<int> otaum_try_get_json(HTTP::Client& client, std::string_view url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc)
+[[nodiscard]] static std::optional<int> otaum_try_get_json(HTTP::Client& client, const char* url, std::span<const uint16_t> acceptedCodes, std::string& body, JSON::JsonDocument& doc)
 {
   auto response = client.GetString(
     url,
     {
-      {"Accept", "application/json"}
+      {"Accept", HTTP::ContentType::JSON}
   },
     acceptedCodes
   );
   if (response.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Request failed: %s [%u] %s", response.ResultToString(), response.code, response.data.c_str());
+    OS_LOGE(TAG, "Request failed: %s [%d]", response.ResultToString(), response.code);
     return std::nullopt;
   }
 
@@ -671,7 +672,7 @@ std::optional<OpenShock::SemVer> OtaUpdateManager::TryGetFirmwareVersion(HTTP::C
 
   std::string body;
   JSON::JsonDocument doc;
-  auto code = otaum_try_get_json(client, uri, std::array<uint16_t, 2> {200, 204}, body, doc);
+  auto code = otaum_try_get_json(client, uri.c_str(), std::array<uint16_t, 2> {200, 204}, body, doc);
   if (!code) {
     return std::nullopt;
   }
@@ -683,6 +684,7 @@ std::optional<OpenShock::SemVer> OtaUpdateManager::TryGetFirmwareVersion(HTTP::C
     return OpenShock::Constants::FirmwareVersion();
   }
 
+  // Owned, not a view into scratch: a valid SemVer has no length limit, and this runs once per update check
   auto versionStr = doc.root()["version"].tryGetStr();
   if (!versionStr) {
     OS_LOGE(TAG, "Response is missing a 'version' string");
@@ -735,7 +737,8 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
   for (int i = 0; i < count; i++) {
     auto artifact = artifacts.at(i);
 
-    auto typeStr = artifact["type"].tryGetStr();
+    char typeScratch[16];
+    auto typeStr = artifact["type"].tryGetStrView(typeScratch);
     if (!typeStr) {
       continue;
     }
@@ -743,12 +746,13 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
     if (!urlStr) {
       continue;
     }
-    auto hashStr = artifact["sha256Hash"].tryGetStr();
+    char hashScratch[64];
+    auto hashStr = artifact["sha256Hash"].tryGetStrView(hashScratch);
     if (!hashStr) {
       continue;
     }
 
-    if (*typeStr == "app"sv) {
+    if (*typeStr == "app") {
       if (foundApp) {
         OS_LOGE(TAG, "Duplicate 'app' artifact");
         return std::nullopt;
@@ -758,7 +762,7 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
       }
       release.appBinaryUrl = std::move(*urlStr);
       foundApp             = true;
-    } else if (*typeStr == "staticfs"sv) {
+    } else if (*typeStr == "staticfs") {
       if (foundWww) {
         OS_LOGE(TAG, "Duplicate 'staticfs' artifact");
         return std::nullopt;
@@ -786,8 +790,6 @@ static bool _tryParseIntoHash(std::string_view hash, uint8_t (&hashBytes)[32])
 
 std::optional<OtaUpdateManager::FirmwareRelease> OtaUpdateManager::TryGetFirmwareRelease(HTTP::Client& client, const OpenShock::SemVer& version)
 {
-  auto versionStr = version.toString();  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
-
   auto domain = otaum_try_get_repo_domain();
   if (!domain) {
     return std::nullopt;
@@ -795,7 +797,7 @@ std::optional<OtaUpdateManager::FirmwareRelease> OtaUpdateManager::TryGetFirmwar
 
   std::string uri;
   const auto board = Board::Name();
-  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain->c_str(), versionStr.c_str(), static_cast<int>(board.size()), board.data())) {
+  if (!FormatToString(uri, OPENSHOCK_FW_REPO_VERSION_URL_FORMAT, domain->c_str(), SEMVER_ARG(version), static_cast<int>(board.size()), board.data())) {
     OS_LOGE(TAG, "Failed to format URL");
     return std::nullopt;
   }
@@ -804,7 +806,7 @@ std::optional<OtaUpdateManager::FirmwareRelease> OtaUpdateManager::TryGetFirmwar
 
   std::string body;
   JSON::JsonDocument doc;
-  if (!otaum_try_get_json(client, uri, std::array<uint16_t, 1> {200}, body, doc)) {
+  if (!otaum_try_get_json(client, uri.c_str(), std::array<uint16_t, 1> {200}, body, doc)) {
     return std::nullopt;
   }
 
@@ -813,7 +815,7 @@ std::optional<OtaUpdateManager::FirmwareRelease> OtaUpdateManager::TryGetFirmwar
 
 bool OtaUpdateManager::TryStartFirmwareUpdate(const OpenShock::SemVer& version)
 {
-  OS_LOGD(TAG, "Requesting firmware version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  OS_LOGD(TAG, "Requesting firmware version " SEMVER_FMT, SEMVER_ARG(version));
 
   return otaum_try_queue_update_request(version);
 }

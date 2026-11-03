@@ -79,3 +79,18 @@ TEST_CASE("Base64 failed decode leaves the output empty", "[util][base64]")
   TEST_ASSERT_FALSE(Base64::Decode("TW!u", out));
   TEST_ASSERT_EQUAL_size_t(0, out.size());
 }
+
+TEST_CASE("Base64 encodes input that views its own output", "[crypto][base64]")
+{
+  std::string buf   = "Man";  // Short enough to sit in the string's own (small-string) storage
+  const auto* bytes = reinterpret_cast<const uint8_t*>(buf.data());
+  TEST_ASSERT_TRUE(Base64::Encode(std::span<const uint8_t>(bytes, buf.size()), buf));
+  TEST_ASSERT_EQUAL_STRING("TWFu", buf.c_str());
+
+  std::string longBuf(100, 'x');  // On the heap, so a resize could reallocate under the input
+  const auto* longBytes = reinterpret_cast<const uint8_t*>(longBuf.data());
+  std::string expected;
+  TEST_ASSERT_TRUE(Base64::Encode(std::span<const uint8_t>(longBytes, longBuf.size()), expected));
+  TEST_ASSERT_TRUE(Base64::Encode(std::span<const uint8_t>(longBytes, longBuf.size()), longBuf));
+  TEST_ASSERT_EQUAL_STRING(expected.c_str(), longBuf.c_str());
+}
