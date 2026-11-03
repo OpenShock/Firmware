@@ -36,48 +36,10 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   m_staticFiles.registerHandler(m_server);
 }
 
-// The portal AP address in network byte order, set before the server starts
-static in_addr_t s_apAddr = 0;
-
-// True when the connection came in over the portal AP: its local address is the AP's. A client on the hub's LAN
-// connects to the STA address instead.
-static bool arrivedOnAp(int sockfd)
-{
-  sockaddr_storage local = {};
-  socklen_t len          = sizeof(local);
-  if (getsockname(sockfd, reinterpret_cast<sockaddr*>(&local), &len) != 0) {
-    return false;
-  }
-
-  in_addr_t addr;
-  if (local.ss_family == AF_INET) {
-    addr = reinterpret_cast<const sockaddr_in*>(&local)->sin_addr.s_addr;
-  } else if (local.ss_family == AF_INET6) {
-    // httpd listens on a dual-stack IPv6 socket when lwIP has IPv6, so an IPv4 client shows up as ::ffff:a.b.c.d
-    static constexpr uint8_t kV4MappedPrefix[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
-    const in6_addr& addr6                        = reinterpret_cast<const sockaddr_in6*>(&local)->sin6_addr;
-    if (memcmp(addr6.s6_addr, kV4MappedPrefix, sizeof(kV4MappedPrefix)) != 0) {
-      return false;
-    }
-    memcpy(&addr, addr6.s6_addr + sizeof(kV4MappedPrefix), sizeof(addr));
-  } else {
-    return false;
-  }
-
-  return addr == s_apAddr;
-}
-
 // httpd turns Nagle off only around error responses. A websocket frame goes out as two writes (header, then payload),
 // and Nagle holds the second until the first is acknowledged, which a delayed-ACK client sends up to ~200 ms later.
 static esp_err_t onSessionOpen(httpd_handle_t /*server*/, int sockfd)
 {
-  // httpd always listens on every interface and has no bind address, so the LAN is refused here instead. The portal's
-  // API is the local protocol, which has no compatibility rules: nothing on the LAN may come to depend on it.
-  if (!arrivedOnAp(sockfd)) {
-    OS_LOGW(TAG, "Refusing a connection that did not come in over the portal AP (fd %d)", sockfd);
-    return ESP_FAIL;  // httpd closes the socket
-  }
-
   int one = 1;
   if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0) {
     OS_LOGW(TAG, "Failed to set TCP_NODELAY on fd %d (errno %d)", sockfd, errno);
@@ -87,12 +49,17 @@ static esp_err_t onSessionOpen(httpd_handle_t /*server*/, int sockfd)
 
 bool CaptivePortal::CaptivePortalInstance::startHttpServer()
 {
-  in_addr apAddr = {};
-  if (inet_pton(AF_INET, CaptivePortal::ApIPv4String(), &apAddr) != 1) {
-    OS_LOGE(TAG, "Invalid portal AP address: %s", CaptivePortal::ApIPv4String());
+  // Bound to the AP interface (SO_BINDTODEVICE), so lwIP only hands it connections that arrive on the AP. Checking
+  // the local address is not enough: lwIP accepts a packet for any of the hub's addresses on any interface, so a LAN
+  // client that routes the AP address via the hub's STA address would get through. The portal's API is the local
+  // protocol, which has no compatibility rules: nothing on the LAN may come to depend on it.
+  ifreq apInterface    = {};
+  const char* apIfName = CaptivePortal::ApInterfaceName();
+  if (apIfName[0] == '\0' || strlen(apIfName) >= sizeof(apInterface.ifr_name)) {
+    OS_LOGE(TAG, "No usable AP interface name (\"%s\"), not starting the HTTP server", apIfName);
     return false;
   }
-  s_apAddr = apAddr.s_addr;
+  memcpy(apInterface.ifr_name, apIfName, strlen(apIfName) + 1);
 
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
   config.server_port      = HTTP_PORT;
@@ -105,6 +72,7 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   config.send_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
   config.uri_match_fn      = httpd_uri_match_wildcard;
   config.open_fn           = onSessionOpen;
+  config.if_name           = &apInterface;  // only read during httpd_start
   // Same core as the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.core_id = 0;
 
@@ -126,9 +94,9 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     return;
   }
 
-  // Start the wildcard DNS responder (all A queries -> the portal AP IP), on the AP address only: the hub's LAN
-  // address must not answer DNS.
-  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String(), CaptivePortal::ApIPv4String());
+  // Start the wildcard DNS responder (all A queries -> the portal AP IP), on the AP interface only: the LAN must not
+  // get its answers.
+  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String(), CaptivePortal::ApIPv4String(), CaptivePortal::ApInterfaceName());
   if (!m_dnsStarted) {
     OS_LOGE(TAG, "Failed to start DNS server");
   }

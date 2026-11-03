@@ -29,7 +29,7 @@ DNSServer::~DNSServer()
   stop();
 }
 
-bool DNSServer::start(const char* responseIpv4, const char* bindIpv4, uint16_t port)
+bool DNSServer::start(const char* responseIpv4, const char* bindIpv4, const char* bindIfName, uint16_t port)
 {
   if (m_task.running()) {
     return true;  // already running
@@ -52,6 +52,13 @@ bool DNSServer::start(const char* responseIpv4, const char* bindIpv4, uint16_t p
     return false;
   }
 
+  struct ifreq bindIf = {};
+  if (bindIfName == nullptr || bindIfName[0] == '\0' || strlen(bindIfName) >= sizeof(bindIf.ifr_name)) {
+    OS_LOGE(TAG, "Invalid bind interface: %s", bindIfName != nullptr ? bindIfName : "(null)");
+    return false;
+  }
+  memcpy(bindIf.ifr_name, bindIfName, strlen(bindIfName) + 1);
+
   m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (m_socket < 0) {
     OS_LOGE(TAG, "Failed to create DNS socket");
@@ -71,8 +78,17 @@ bool DNSServer::start(const char* responseIpv4, const char* bindIpv4, uint16_t p
     return false;
   }
 
-  // Bound to one address rather than INADDR_ANY: lwIP then delivers only datagrams addressed to it, so the hub does
-  // not answer every name with the portal address to anyone on the LAN it is connected to.
+  // Bound to one interface and one address rather than INADDR_ANY: lwIP then delivers only datagrams that arrive on
+  // that interface addressed to that address, so the hub does not answer every name with the portal address to anyone
+  // on the LAN it is connected to. The address alone would not do: lwIP accepts a datagram for any local address on
+  // any interface, so a LAN client could route the AP address via the hub's STA address.
+  if (setsockopt(m_socket, SOL_SOCKET, SO_BINDTODEVICE, &bindIf, sizeof(bindIf)) < 0) {
+    OS_LOGE(TAG, "Failed to bind DNS socket to interface %s (errno %d)", bindIfName, errno);
+    close(m_socket);
+    m_socket = -1;
+    return false;
+  }
+
   struct sockaddr_in addr = {};
   addr.sin_family         = AF_INET;
   addr.sin_addr           = bindAddr;

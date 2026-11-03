@@ -74,6 +74,8 @@ static std::atomic<bool> s_instanceLive = false;
 // Instances taken down whose destruction waits for other tasks to drop their references; destroyed by the manager task.
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
+// lwIP's name for s_apNetif, which the portal's servers bind to. Read once; the netif is never destroyed.
+static char s_apIfName[8] = {};
 
 static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
@@ -176,6 +178,15 @@ static bool captiveportal_start()
     }
 
     esp_netif_dhcps_start(s_apNetif);
+  }
+
+  if (s_apIfName[0] == '\0') {
+    esp_err_t nameErr = esp_netif_get_netif_impl_name(s_apNetif, s_apIfName);
+    if (nameErr != ESP_OK) {
+      s_apIfName[0] = '\0';
+      OS_LOGE(TAG, "Failed to get the AP interface name: %s", esp_err_to_name(nameErr));
+      return false;  // the servers could not be bound to the AP, and must not listen on the LAN
+    }
   }
 
   // AP SSID = prefix + this device's STA MAC (matches the old Arduino naming).
@@ -453,6 +464,11 @@ bool CaptivePortal::IsRunning()
 const char* CaptivePortal::ApIPv4String()
 {
   return CONFIG_OPENSHOCK_PORTAL_AP_IP;
+}
+
+const char* CaptivePortal::ApInterfaceName()
+{
+  return s_apIfName;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
