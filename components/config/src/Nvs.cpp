@@ -6,7 +6,6 @@ const char* const TAG = "Config::Nvs";
 
 #include <nvs_flash.h>
 
-#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -191,18 +190,8 @@ bool Nvs::Handle::SetStr(const char* key, std::string_view value)
     OS_LOGE(TAG, "Refusing to store %s: embedded NUL", key);
     return false;
   }
-  // Terminate a copy; on the stack for the short values almost every setting is
-  char stack[64];
-  std::string heap;
-  char* cstr = stack;
-  if (value.size() >= sizeof(stack)) {
-    heap.assign(value);
-    cstr = heap.data();
-  } else {
-    std::ranges::copy(value, stack);
-    stack[value.size()] = '\0';
-  }
-  return checkWrite(nvs_set_str(m_handle, key, cstr), key);
+  std::string copy(value);  // nvs_set_str needs the terminator; the flash write dwarfs this copy
+  return checkWrite(nvs_set_str(m_handle, key, copy.c_str()), key);
 }
 bool Nvs::Handle::SetBlob(const char* key, std::span<const uint8_t> value)
 {

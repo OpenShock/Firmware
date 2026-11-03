@@ -378,18 +378,12 @@ JSON::JsonView JSON::JsonView::operator[](std::string_view key) const
         return JsonView(m_json, m_tokens, m_count, valIdx);
       }
 
-      // A key written with escapes ("\u0069d" for "id") is still the same key. Decoded, it can only match if it
-      // fits in key.size() bytes, so a sink that refuses to grow past that (on the stack for any real key) is enough.
+      // A key written with escapes ("\u0069d" for "id") is still the same key. Escaped keys are rare enough that
+      // decoding one into a string is fine.
       if (keyView.find('\\') != std::string_view::npos) {
-        char stackKey[64];
-        std::string heapKey;
-        std::span<char> buffer(stackKey);
-        if (key.size() > sizeof(stackKey)) {
-          heapKey.resize(key.size());
-          buffer = heapKey;
-        }
-        SpanSink sink {buffer.first(key.size())};
-        if (jsonUnescape(keyView, sink) && std::string_view(buffer.data(), sink.len) == key) {
+        std::string decodedKey;
+        StringSink sink {decodedKey};
+        if (jsonUnescape(keyView, sink) && decodedKey == key) {
           return JsonView(m_json, m_tokens, m_count, valIdx);
         }
       }

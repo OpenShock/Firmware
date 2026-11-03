@@ -165,18 +165,23 @@ static esp_err_t sendNotAcceptable(httpd_req_t* req)
 // headers with the file's size, RFC 9110 §9.3.2) is written out directly.
 static esp_err_t sendHeadResponse(httpd_req_t* req, const Representation& rep)
 {
-  // Every field is a short literal or the 66-byte ETag, so the head always fits
-  char head[320];
-  int len = snprintf(
-    head, sizeof(head), "HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\nContent-Encoding: gzip\r\nVary: Accept-Encoding\r\nCache-Control: %s\r\nETag: %s\r\n\r\n", CaptivePortal::S200, rep.contentType, rep.size, rep.cacheControl, rep.etag
-  );
-  if (len < 0 || static_cast<std::size_t>(len) >= sizeof(head)) {
-    return ESP_FAIL;
-  }
+  std::string head;
+  head.reserve(256);
+  head += "HTTP/1.1 ";
+  head += CaptivePortal::S200;
+  head += "\r\nContent-Type: ";
+  head += rep.contentType;
+  head += "\r\nContent-Length: ";
+  head += std::to_string(rep.size);
+  head += "\r\nContent-Encoding: gzip\r\nVary: Accept-Encoding\r\nCache-Control: ";
+  head += rep.cacheControl;
+  head += "\r\nETag: ";
+  head += rep.etag;
+  head += "\r\n\r\n";
 
   std::size_t sent = 0;
-  while (sent < static_cast<std::size_t>(len)) {
-    int n = httpd_send(req, head + sent, static_cast<std::size_t>(len) - sent);
+  while (sent < head.size()) {
+    int n = httpd_send(req, head.data() + sent, head.size() - sent);
     if (n <= 0) {
       return ESP_FAIL;
     }

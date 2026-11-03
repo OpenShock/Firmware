@@ -8,19 +8,13 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...)
 {
   va_list args;
 
-  // One formatting pass for the common short result: format onto the stack, copy into `out` once. Only a longer
-  // result formats a second time, straight into the string (C++11 guarantees the trailing NUL slot).
-  char stack[128];
+  // Measure, then format straight into the string (C++11 guarantees the trailing NUL slot).
   va_start(args, format);
-  int length = vsnprintf(stack, sizeof(stack), format, args);
+  int length = vsnprintf(nullptr, 0, format, args);
   va_end(args);
 
   if (length < 0) {
     return false;
-  }
-  if (static_cast<std::size_t>(length) < sizeof(stack)) {
-    out.assign(stack, static_cast<std::size_t>(length));
-    return true;
   }
 
   out.resize(static_cast<std::size_t>(length));

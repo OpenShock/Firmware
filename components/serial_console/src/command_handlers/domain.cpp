@@ -7,7 +7,6 @@
 #include "http/HTTPRequestManager.h"
 #include "serialization/JsonAPI.h"
 
-#include <algorithm>
 #include <cstdio>
 #include <string>
 
@@ -26,17 +25,15 @@ static void handleDomainCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  // "https://" + up to 253 characters + "/1" + NUL, on the stack
   constexpr std::string_view kScheme = "https://";
   constexpr std::string_view kPath   = "/1";
-  char uri[kScheme.size() + 253 + kPath.size() + 1];
-  char* end = std::ranges::copy(kScheme, uri).out;
-  end       = std::ranges::copy(arg, end).out;
-  end       = std::ranges::copy(kPath, end).out;
-  *end      = '\0';
+
+  std::string uri;
+  uri.reserve(kScheme.size() + arg.size() + kPath.size());
+  uri.append(kScheme).append(arg).append(kPath);
 
   auto resp = OpenShock::HTTP::GetJSON<OpenShock::Serialization::JsonAPI::BackendVersionResponse>(
-    uri,
+    uri.c_str(),
     {
       {"Accept", OpenShock::HTTP::ContentType::JSON}
   },

@@ -2,7 +2,7 @@
 
 #include "Chipset.h"
 
-#include <charconv>
+#include <string>
 
 static void handleValidGpiosCommand(std::string_view arg, bool isAutomated)
 {
@@ -13,20 +13,21 @@ static void handleValidGpiosCommand(std::string_view arg, bool isAutomated)
 
   auto pins = OpenShock::GetValidGPIOPins();
 
-  // At most 3 digits and a comma per pin
-  char buffer[decltype(pins) {}.size() * 4];
-  char* end = buffer;
+  std::string buffer;
+  buffer.reserve(pins.count() * 4);
 
   for (std::size_t i = 0; i < pins.size(); i++) {
     if (pins[i]) {
-      if (end != buffer) {
-        *end++ = ',';
-      }
-      end = std::to_chars(end, buffer + sizeof(buffer), i).ptr;
+      buffer.append(std::to_string(i));
+      buffer.append(",");
     }
   }
 
-  SERPR_RESPONSE("ValidGPIOs|%.*s", static_cast<int>(end - buffer), buffer);
+  if (!buffer.empty()) {
+    buffer.pop_back();
+  }
+
+  SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::ValidGpiosHandler()
