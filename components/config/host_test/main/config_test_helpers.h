@@ -10,6 +10,7 @@
 #include "BackendConfig.h"
 #include "captiveportal/CaptivePortalConfig.h"
 #include "estop/EStopConfig.h"
+#include "visual/LedConfig.h"
 #include "OtaUpdateConfig.h"
 #include "radio/RFConfig.h"
 #include "serial_console/SerialInputConfig.h"
@@ -34,7 +35,8 @@ namespace ConfigTest {
       inline constexpr const char* kPortal  = "portal";
       inline constexpr const char* kSerial  = "serial";
       inline constexpr const char* kOta     = "ota";
-      inline constexpr const char* kAll[]   = {kBackend, kWifi, kWifiCfg, kRf, kEstop, kPortal, kSerial, kOta};
+      inline constexpr const char* kLed     = "led";
+      inline constexpr const char* kAll[]   = {kBackend, kWifi, kWifiCfg, kRf, kEstop, kPortal, kSerial, kOta, kLed};
     }  // namespace Ns
     namespace Backend {
       inline constexpr const char* kDomain = "domain";
@@ -66,6 +68,7 @@ namespace ConfigTest {
     OpenShock::Config::SerialInputConfig serialInput;
     OpenShock::Config::OtaUpdateConfig otaUpdate;
     OpenShock::Config::EStopConfig estop;
+    OpenShock::Config::LedConfig led;
 
     // Every section's keys
     bool SaveNvs(const char* partition) const;

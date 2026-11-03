@@ -16,7 +16,7 @@ namespace ConfigTest {
   bool Full::SaveNvs(const char* partition) const
   {
     return rf.SaveNvs(partition, nullptr) && wifi.SaveNvs(partition, nullptr) && captivePortal.SaveNvs(partition, nullptr) && backend.SaveNvs(partition, nullptr) && serialInput.SaveNvs(partition, nullptr) && otaUpdate.SaveNvs(partition, nullptr)
-        && estop.SaveNvs(partition, nullptr);
+        && estop.SaveNvs(partition, nullptr) && led.SaveNvs(partition, nullptr);
   }
 
   Full MakeSampleConfig()
@@ -36,6 +36,7 @@ namespace ConfigTest {
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
     config.estop         = Config::EStopConfig(true, GPIO_NUM_13);
+    config.led           = Config::LedConfig(false);
 
     return config;
   }
@@ -89,6 +90,7 @@ namespace ConfigTest {
     config.serialInput   = Config::GetSerialInputConfig();
     config.otaUpdate     = Config::GetOtaUpdateConfig();
     config.estop         = Config::GetEStopConfig();
+    config.led           = Config::GetLedConfig();
     return config;
   }
 
@@ -135,5 +137,7 @@ namespace ConfigTest {
 
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
+
+    TEST_ASSERT_EQUAL_MESSAGE(expected.led.statusEnabled, actual.led.statusEnabled, "led.statusEnabled");
   }
 }  // namespace ConfigTest

@@ -20,6 +20,7 @@ idf_component_register(
                # Each module's section
                "${_components}/device_control/src/radio/RFConfig.cpp"
                "${_components}/device_control/src/estop/EStopConfig.cpp"
+               "${_components}/device_control/src/visual/LedConfig.cpp"
                "${_components}/core/src/wifi/WiFiConfig.cpp"
                "${_components}/core/src/wifi/WiFiCredentials.cpp"
                "${_components}/core/src/BackendConfig.cpp"
@@ -33,7 +34,7 @@ idf_component_register(
                "${_components}/common/src/StringHelpers.cpp"
   INCLUDE_DIRS "."
                "${_components}/config/include"                 # config/*.h
-               "${_components}/device_control/include"         # radio/RFConfig.h, estop/EStopConfig.h
+               "${_components}/device_control/include"         # radio/RFConfig.h, estop/EStopConfig.h, visual/LedConfig.h
                "${_components}/core/include"                   # wifi/WiFiConfig.h, BackendConfig.h, OtaUpdateConfig.h
                "${_components}/captive_portal/include"         # captiveportal/CaptivePortalConfig.h
                "${_components}/serial_console/include"         # serial_console/SerialInputConfig.h

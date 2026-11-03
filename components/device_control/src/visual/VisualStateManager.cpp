@@ -13,6 +13,7 @@ const char* const TAG = "VisualStateManager";
 #include "led_drivers/RgbLedDriver.h"
 #include "Logging.h"
 #include "SimpleMutex.h"
+#include "visual/LedConfig.h"
 
 #include <esp_netif.h>
 #include <esp_wifi.h>
@@ -35,12 +36,16 @@ const uint32_t kWiFiScanningFlag                 = 1 << 7;
 // Bitmask of when the system is running normally
 const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
+// Still shown with the status LEDs turned off: a stopped or failing hub must stay visible
+const uint32_t kAlwaysShownMask = kCriticalErrorFlag | kEmergencyStoppedFlag | kEmergencyStopActiveClearingFlag | kEmergencyStopAwaitingReleaseFlag;
+
 // 32-bit so the atomic is lock-free. Both need seq_cst so a state change during the LED test isn't lost.
 static std::atomic<uint32_t> s_stateFlags = 0;
 static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test owns the LEDs; flags keep tracking live state
 static OpenShock::SimpleMutex s_applyMutex;         // Serializes reading the flags with applying them, so an older snapshot can't land last
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
+static std::atomic<bool> s_statusEnabled = true;  // The `led` section's statusEnabled, loaded in Init
 
 // Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
 // SetCriticalError, SetScanningStarted) each see their own change and none is missed.
@@ -188,6 +193,9 @@ const MonoLedDriver::State kSolidOnPattern[] = {
 const MonoLedDriver::State kSolidOffPattern[] = {
   {false, 100'000}
 };
+const RgbLedDriver::RGBState kSolidOffRGBPattern[] = {
+  {0, 0, 0, 100'000}
+};
 
 template<std::size_t N>
 static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[N])
@@ -228,10 +236,24 @@ static void updateVisualStateRGB(uint32_t flags)
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-static void applyVisualState(uint32_t flags)
+// `showAll` ignores the status LED setting, for the LED test.
+static void applyVisualState(uint32_t flags, bool showAll = false)
 {
   bool gpioActive = s_monoLedDriver != nullptr;
   bool rgbActive  = s_rgbLedDriver != nullptr;
+
+  if (!showAll && !s_statusEnabled.load()) {
+    flags &= kAlwaysShownMask;
+    if (flags == 0) {
+      if (gpioActive) {
+        s_monoLedDriver->SetPattern(kSolidOffPattern);
+      }
+      if (rgbActive) {
+        s_rgbLedDriver->SetPattern(kSolidOffRGBPattern);
+      }
+      return;
+    }
+  }
 
   if (gpioActive && rgbActive) {
     if (flags == kStatusOKMask) {
@@ -409,6 +431,8 @@ bool VisualStateManager::Init()
     return true;
   }
 
+  s_statusEnabled.store(Config::GetLedStatusEnabled());
+
   esp_err_t err;
 
   err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, handleEspWiFiEvent, nullptr);
@@ -431,6 +455,25 @@ bool VisualStateManager::Init()
 
   // Run the update on init, otherwise no inital pattern is set.
   updateVisualState();
+
+  return true;
+}
+
+bool VisualStateManager::GetStatusLedsEnabled()
+{
+  return s_statusEnabled.load();
+}
+
+bool VisualStateManager::SetStatusLedsEnabled(bool enabled)
+{
+  if (!Config::SetLedStatusEnabled(enabled)) {
+    OS_LOGE(TAG, "Failed to save the status LED setting to config");
+    return false;
+  }
+
+  if (s_statusEnabled.exchange(enabled) != enabled) {
+    updateVisualState();
+  }
 
   return true;
 }
@@ -578,7 +621,7 @@ void VisualStateManager::RunLedTest()
   OS_LOGI(TAG, "  State patterns:");
   for (const auto& step : steps) {
     OS_LOGI(TAG, "    %s", step.name);
-    applyVisualState(step.flags);
+    applyVisualState(step.flags, true);
     vTaskDelay(pdMS_TO_TICKS(step.durationMs));
   }
 

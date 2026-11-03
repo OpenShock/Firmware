@@ -39,6 +39,7 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetOtaUpdateStep(OtaUpdateStep::Updated));
   TEST_ASSERT_TRUE(Config::SetEStopGpioPin(GPIO_NUM_13));
   TEST_ASSERT_TRUE(Config::SetEStopEnabled(true));
+  TEST_ASSERT_TRUE(Config::SetLedStatusEnabled(false));
 
   const Full before = Snapshot();
   TEST_ASSERT_EQUAL_UINT8_ARRAY(bssid, before.wifi.credentialsList[0].bssid.data(), 6);
@@ -72,6 +73,7 @@ TEST_CASE("Whole-section setters round trip through the store", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetSerialInputConfig(sample.serialInput));
   TEST_ASSERT_TRUE(Config::SetOtaUpdateConfig(sample.otaUpdate));
   TEST_ASSERT_TRUE(Config::SetEStopConfig(sample.estop));
+  TEST_ASSERT_TRUE(Config::SetLedConfig(sample.led));
   AssertConfigEqual(sample, Snapshot());
 
   Reload();
