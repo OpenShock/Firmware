@@ -9,6 +9,8 @@ const char* const TAG = "CaptivePortalInstance";
 #include "Logging.h"
 #include "rfc8908/RFC8908Handler.h"
 
+#include <lwip/sockets.h>
+
 const uint16_t HTTP_PORT = 80;
 // httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
 static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3 + 3, "httpd client sockets would leave no lwIP sockets for the DNS server and outbound connections");
@@ -31,6 +33,17 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   m_staticFiles.registerHandler(m_server);
 }
 
+// httpd turns Nagle off only around error responses. A websocket frame goes out as two writes (header, then payload),
+// and Nagle holds the second until the first is acknowledged, which a delayed-ACK client sends up to ~200 ms later.
+static esp_err_t onSessionOpen(httpd_handle_t /*server*/, int sockfd)
+{
+  int one = 1;
+  if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0) {
+    OS_LOGW(TAG, "Failed to set TCP_NODELAY on fd %d (errno %d)", sockfd, errno);
+  }
+  return ESP_OK;  // Still usable, just slower
+}
+
 bool CaptivePortal::CaptivePortalInstance::startHttpServer()
 {
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
@@ -43,6 +56,7 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   config.recv_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
   config.send_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
   config.uri_match_fn      = httpd_uri_match_wildcard;
+  config.open_fn           = onSessionOpen;
   // Same core as the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.core_id = 0;
 
