@@ -401,6 +401,12 @@ void GatewayConnectionManager::Update()
   if (client != nullptr) {
     // Client exists; run its loop and optionally reconnect
     if (client->loop()) {
+      // loop() is also true while connecting: only time spent connected may reset the backoff, or a handshake that
+      // runs long and then fails would reset it too
+      if (client->state() != GatewayClientState::Connected) {
+        s_connectedSinceMs = 0;
+        return;
+      }
       int64_t now = OpenShock::millis();
       if (s_connectedSinceMs == 0) {
         s_connectedSinceMs = now;
