@@ -403,10 +403,11 @@ static void estopmgr_latchWithoutTask()
 {
   int64_t expected = 0;
   bool latched     = s_estopActivatedAt.compare_exchange_strong(expected, std::max<int64_t>(OpenShock::millis(), 1));  // 0 means inactive
-  s_estopActive.store(true);           // Active either way: just latched, or already was
-  s_externallyTriggered.store(false);  // Taken over by the latch
+  // Active either way: just latched, or already was. The external trigger is taken over by the latch.
+  s_estopActive.store(true);
+  s_externallyTriggered.store(false);
   if (!latched) {
-    return;                            // Already active
+    return;  // Already active
   }
 
   // Bounded: the latch itself is already in effect, the event only informs listeners
