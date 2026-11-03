@@ -1,5 +1,9 @@
 #include "serial_console/command_handlers/CommandEntry.h"
 
+#include "serial_console/command_handlers/common.h"
+
+#include <esp_system.h>
+
 using namespace OpenShock::SerialCmds;
 
 CommandEntry::CommandEntry(std::string_view description, CommandHandler commandHandler) noexcept
@@ -15,7 +19,7 @@ CommandEntry::CommandEntry(std::string_view name, std::string_view description, 
 {
 }
 
-CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::vector<std::string_view> constraintExtensions)
+CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::span<const std::string_view> constraintExtensions)
 {
   m_arguments.push_back({name, constraint, exampleValue, constraintExtensions});
   return m_arguments.back();
@@ -36,4 +40,23 @@ CommandEntry& CommandGroup::addCommand(std::string_view name, std::string_view d
 {
   m_commands.emplace_back(name, description, commandHandler);
   return m_commands.back();
+}
+
+void OpenShock::SerialCmds::ReportSaved(bool saved)
+{
+  if (saved) {
+    SERPR_SUCCESS("Saved config");
+  } else {
+    SERPR_ERROR("Failed to save config");
+  }
+}
+
+void OpenShock::SerialCmds::ReportSavedAndRestart(bool saved)
+{
+  if (!saved) {
+    SERPR_ERROR("Failed to save config");
+    return;
+  }
+  SERPR_SUCCESS("Saved config, restarting...");
+  esp_restart();
 }

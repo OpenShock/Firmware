@@ -1,204 +1,50 @@
-import type { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration.js';
-import { HubConfig } from '#lib/_fbs/open-shock/serialization/configuration/hub-config.js';
-
-// TODO: Update these configs and ensure that typescript enforces them to be up to date
-
-export interface RFConfig {
-  txPin: number;
-  keepaliveEnabled: boolean;
-}
-
-export interface WifiCredentials {
-  id: number;
-  ssid: string;
-  password: string | null;
-}
-
-export interface WifiConfig {
-  apSsid: string;
-  hostname: string;
-  credentials: WifiCredentials[];
-}
-
-export interface CaptivePortalConfig {
-  alwaysEnabled: boolean;
-}
-
-export interface BackendConfig {
-  domain: string;
-  authToken: string | null;
-}
-
-export interface SerialInputConfig {
-  echoEnabled: boolean;
-}
+import type { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
+import type { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
 
 export interface OtaUpdateConfig {
   isEnabled: boolean;
   cdnDomain: string;
-  updateChannel: OtaUpdateChannel;
-  checkOnStartup: boolean;
+  updateChannel: OtaChannel;
   checkInterval: number;
   allowBackendManagement: boolean;
   requireManualApproval: boolean;
 }
 
-export interface EStopConfig {
-  enabled: boolean;
-  gpioPin: number;
-  latching: boolean;
-  active: boolean;
-}
-
+// The settings the portal shows, as the hub reports them in its Ready message.
 export interface Config {
-  rf: RFConfig;
-  wifi: WifiConfig;
-  captivePortal: CaptivePortalConfig;
-  backend: BackendConfig;
-  serialInput: SerialInputConfig;
+  rf: { txPin: number };
+  estop: { enabled: boolean; gpioPin: number };
   otaUpdate: OtaUpdateConfig;
-  estop: EStopConfig;
+  savedSSIDs: string[];
 }
 
-function mapRfConfig(hubConfig: HubConfig): RFConfig {
-  const rf = hubConfig.rf();
-  if (!rf) throw new Error('hubConfig.rf is null');
+function mapOtaUpdateConfig(ready: ReadyMessage): OtaUpdateConfig {
+  const ota = ready.ota();
+  if (!ota) throw new Error('ready.ota is null');
 
-  const txPin = rf.txPin();
-  const keepaliveEnabled = rf.keepaliveEnabled();
+  const cdnDomain = ota.cdnDomain();
+  if (cdnDomain === null) throw new Error('ota.cdnDomain is null');
 
   return {
-    txPin,
-    keepaliveEnabled,
+    isEnabled: ota.enabled(),
+    cdnDomain,
+    updateChannel: ota.channel(),
+    checkInterval: ota.checkInterval(),
+    allowBackendManagement: ota.allowBackendManagement(),
+    requireManualApproval: ota.requireManualApproval(),
   };
 }
 
-function mapWifiConfig(hubConfig: HubConfig): WifiConfig {
-  const wifi = hubConfig.wifi();
-  if (!wifi) throw new Error('hubConfig.wifi is null');
-
-  const apSsid = wifi.apSsid();
-  const hostname = wifi.hostname();
-
-  if (apSsid === null) throw new Error('wifi.apSsid is null');
-  if (hostname === null) throw new Error('wifi.hostname is null');
-
-  const credentials: WifiCredentials[] = [];
-  const credentialsLength = wifi.credentialsLength();
-  for (let i = 0; i < credentialsLength; i++) {
-    const cred = wifi.credentials(i);
-    if (!cred) throw new Error('wifi.credentials is null');
-
-    const id = cred.id();
-    const ssid = cred.ssid();
-    const password = cred.password();
-
-    if (!id) throw new Error('cred.id is null');
-    if (ssid === null) throw new Error('cred.ssid is null');
-
-    credentials.push({
-      id,
-      ssid,
-      password,
-    });
+export function mapConfig(ready: ReadyMessage): Config {
+  const savedSSIDs: string[] = [];
+  for (let i = 0; i < ready.savedSsidsLength(); i++) {
+    savedSSIDs.push(ready.savedSsids(i));
   }
 
   return {
-    apSsid,
-    hostname,
-    credentials,
-  };
-}
-
-function mapCaptivePortalConfig(hubConfig: HubConfig): CaptivePortalConfig {
-  const captivePortal = hubConfig.captivePortal();
-  if (!captivePortal) throw new Error('hubConfig.captivePortal is null');
-
-  const alwaysEnabled = captivePortal.alwaysEnabled();
-
-  return {
-    alwaysEnabled,
-  };
-}
-
-function mapBackendConfig(hubConfig: HubConfig): BackendConfig {
-  const backend = hubConfig.backend();
-  if (!backend) throw new Error('hubConfig.backend is null');
-
-  const domain = backend.domain();
-  const authToken = backend.authToken();
-
-  if (domain === null) throw new Error('backend.domain is null');
-
-  return {
-    domain,
-    authToken,
-  };
-}
-
-function mapSerialInputConfig(hubConfig: HubConfig): SerialInputConfig {
-  const serialInput = hubConfig.serialInput();
-  if (!serialInput) throw new Error('hubConfig.serialInput is null');
-
-  const echoEnabled = serialInput.echoEnabled();
-
-  return {
-    echoEnabled,
-  };
-}
-
-function mapOtaUpdateConfig(hubConfig: HubConfig): OtaUpdateConfig {
-  const otaUpdate = hubConfig.otaUpdate();
-  if (!otaUpdate) throw new Error('hubConfig.otaUpdate is null');
-
-  const isEnabled = otaUpdate.isEnabled();
-  const cdnDomain = otaUpdate.cdnDomain();
-  const updateChannel = otaUpdate.updateChannel();
-  const checkOnStartup = otaUpdate.checkOnStartup();
-  const checkInterval = otaUpdate.checkInterval();
-  const allowBackendManagement = otaUpdate.allowBackendManagement();
-  const requireManualApproval = otaUpdate.requireManualApproval();
-
-  if (cdnDomain === null) throw new Error('otaUpdate.cdnDomain is null');
-
-  return {
-    isEnabled,
-    cdnDomain,
-    updateChannel,
-    checkOnStartup,
-    checkInterval,
-    allowBackendManagement,
-    requireManualApproval,
-  };
-}
-
-function mapEstopConfig(hubConfig: HubConfig): EStopConfig {
-  const estop = hubConfig.estop();
-  if (!estop) throw new Error('hubConfig.estop is null');
-
-  const enabled = estop.enabled();
-  const gpioPin = estop.gpioPin();
-  const latching = estop.latching();
-  const active = estop.active();
-
-  return {
-    enabled,
-    gpioPin,
-    latching,
-    active,
-  };
-}
-
-export function mapConfig(hubConfig: HubConfig | null): Config | null {
-  if (!hubConfig) return null;
-
-  return {
-    rf: mapRfConfig(hubConfig),
-    wifi: mapWifiConfig(hubConfig),
-    captivePortal: mapCaptivePortalConfig(hubConfig),
-    backend: mapBackendConfig(hubConfig),
-    serialInput: mapSerialInputConfig(hubConfig),
-    otaUpdate: mapOtaUpdateConfig(hubConfig),
-    estop: mapEstopConfig(hubConfig),
+    rf: { txPin: ready.rfTxPin() },
+    estop: { enabled: ready.estopEnabled(), gpioPin: ready.estopGpioPin() },
+    otaUpdate: mapOtaUpdateConfig(ready),
+    savedSSIDs,
   };
 }

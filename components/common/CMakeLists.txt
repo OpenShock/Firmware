@@ -7,7 +7,7 @@
 #   Common.h / FormatHelpers.h / OpenShock.h: basic defines and macros
 #   BoardDescriptor.h: the board descriptor stamped into the app image, Board::Get()
 #   enums/*.h:        shared enums (consumers include with the enums/ prefix)
-#   Convert.h, SemVer.h, Checksum.h, RateLimiter.h, TinyVec.h,
+#   Convert.h, SemVer.h, Checksum.h, RateLimiter.h,
 #   StringHelpers.h, SimpleMutex.h, util/*.h
 
 idf_component_register(
@@ -23,7 +23,7 @@ idf_component_register(
                 # this file rather than the whole project.
                 "src/Version.cpp"
   INCLUDE_DIRS  "include"
-  REQUIRES      logging      # Logging.h / OS_PANIC* (TinyVec.h) in public headers
+  REQUIRES      logging      # Logging.h (the sources in src/)
                 temporal     # Temporal.h (RateLimiter.h) in public header
                 freertos     # semphr.h in SimpleMutex.h public header
   PRIV_REQUIRES esp_system   # esp_task_wdt.h (TaskUtils watchdog helpers)

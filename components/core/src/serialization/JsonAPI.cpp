@@ -140,7 +140,8 @@ std::optional<JsonAPI::HubInfoResponse> JsonAPI::ParseHubInfoJsonResponse(int co
     }
     uint16_t shockerRfIdU16 = static_cast<uint16_t>(*shockerRfId);
 
-    auto shockerModel = shocker["model"].tryGetStr();
+    char modelScratch[32];
+    auto shockerModel = shocker["model"].tryGetStrView(modelScratch);
     if (!shockerModel) {
       ESP_LOGJSONE("value at 'shocker.model' is not a string", shocker);
       return std::nullopt;

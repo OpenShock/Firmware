@@ -2,10 +2,13 @@
 
 #include "serial_console/command_handlers/common.h"
 
+#include "config/Store.h"
 #include "FormatHelpers.h"
 #include "Temporal.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiNetwork.h"
+
+#include <cstring>
 
 static void handleDebugInfoCommand(std::string_view arg, bool isAutomated)
 {
@@ -23,6 +26,9 @@ static void handleDebugInfoCommand(std::string_view arg, bool isAutomated)
   const int64_t days    = hours / 24;
   SERPR_RESPONSE("RTOSInfo|Uptime|%llid %llih %llim %llis", days, hours % 24, minutes % 60, seconds % 60);
 
+  const char* store = OpenShock::Config::StorageLabel();
+  SERPR_RESPONSE("FlashInfo|Config store|%s", store != nullptr ? store : "RAM only");
+
   OpenShock::WiFiNetwork network;
   bool connected = OpenShock::WiFiManager::GetConnectedNetwork(network);
   SERPR_RESPONSE("WiFiInfo|Connected|%s", connected ? "true" : "false");
@@ -30,17 +36,20 @@ static void handleDebugInfoCommand(std::string_view arg, bool isAutomated)
     SERPR_RESPONSE("WiFiInfo|SSID|%s", network.ssid);
     SERPR_RESPONSE("WiFiInfo|BSSID|" BSSID_FMT, BSSID_ARG(network.bssid));
 
-    char ipAddressBuffer[64];
-    OpenShock::WiFiManager::GetIPAddress(ipAddressBuffer);
+    // The link can drop between the two calls; GetIPAddress leaves the buffer untouched then
+    char ipAddressBuffer[16];
+    if (!OpenShock::WiFiManager::GetIPAddress(ipAddressBuffer)) {
+      std::strcpy(ipAddressBuffer, "unknown");
+    }
     SERPR_RESPONSE("WiFiInfo|IPv4|%s", ipAddressBuffer);
   }
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::SysInfoHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("sysinfo"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("sysinfo");
 
-  group.addCommand("Get system information from RTOS, WiFi, etc."sv, handleDebugInfoCommand);
+  group.addCommand("Get system information from RTOS, WiFi, etc.", handleDebugInfoCommand);
 
   return group;
 }

@@ -33,7 +33,19 @@ void _Private::HandleOtaUpdateRequest(OpenShock::GatewayClient&, const OpenShock
 
   OpenShock::SemVer version(semver->major(), semver->minor(), semver->patch(), prerelease, build);
 
-  OS_LOGI(TAG, "OTA update requested for version %s", version.toString().c_str());  // TODO: This is abusing the SemVer::toString() method causing alot of string copies, fix this
+  OS_LOGI(
+    TAG,
+    "OTA update requested for version %u.%u.%u%s%.*s%s%.*s",
+    version.major,
+    version.minor,
+    version.patch,
+    prerelease.empty() ? "" : "-",
+    static_cast<int>(prerelease.size()),
+    prerelease.data(),
+    build.empty() ? "" : "+",
+    static_cast<int>(build.size()),
+    build.data()
+  );
 
   if (!OpenShock::AppHooks::OtaTryStartFirmwareUpdate(version)) {
     OS_LOGE(TAG, "Failed to update firmware");  // TODO: Send error message to server

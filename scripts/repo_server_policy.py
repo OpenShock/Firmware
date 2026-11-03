@@ -46,7 +46,7 @@ def require_staged_draft(repo: str, version: str) -> None:
     """release.yml stages a draft for the version before it may go live; a stray tag must not reach a channel devices follow.
 
     A draft is not reachable by tag name, so this reads the release list.
-    release.yml pushes the tag that triggers this run and only then stages the draft, so poll through that window.
+    release.yml stages the draft before dispatching this run; poll anyway, as the release list can lag.
     """
     for attempt in range(1, DRAFT_ATTEMPTS + 1):
         releases = github_json(f'/repos/{repo}/releases?per_page=100') or []

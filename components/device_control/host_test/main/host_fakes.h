@@ -13,8 +13,9 @@
 // A timed receive on an empty queue advances the fake clock by its timeout (inside a
 // task, a zero-timeout poll by 1 ms), and every RMT frame advances it by RmtFrameMs, so
 // task loops replay deterministically.
-#include "config/Config.h"
+#include "estop/EStopConfig.h"
 #include "events/Events.h"
+#include "radio/RFConfig.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -45,6 +46,8 @@ namespace HostFake {
   extern OpenShock::Config::RFConfig RfConfig;
   extern OpenShock::Config::EStopConfig EStopCfg;
   extern esp_event_handler_t EStopHandler;  // Handler registered for OPENSHOCK_EVENT_ESTOP_STATE_CHANGED
+  extern int ActivityPosts;                 // OPENSHOCK_EVENT_DEVICE_ACTIVITY posts since Reset()
+  extern bool FailEventPost;                // esp_event_post fails (and counts nothing) while set
 
   /// @brief Clears recorded frames and hooks and releases the e-stop. Queues and tasks are owned by the code under test.
   void Reset();

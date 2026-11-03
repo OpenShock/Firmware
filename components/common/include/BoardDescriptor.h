@@ -69,7 +69,7 @@ namespace OpenShock {
 
   namespace Board {
     /// @brief The number of leading bytes the crc32 field covers: everything before itself.
-    constexpr std::size_t kCrcCoverage = offsetof(BoardDescriptor, crc32);
+    inline constexpr std::size_t kCrcCoverage = offsetof(BoardDescriptor, crc32);
 
     /// @brief The descriptor with its crc32 filled in (Checksum::Crc32, what scripts/utils/espimage.py checks against).
     constexpr BoardDescriptor Seal(BoardDescriptor desc)

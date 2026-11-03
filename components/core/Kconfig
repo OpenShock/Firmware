@@ -27,6 +27,17 @@ menu "OpenShock WiFi"
         help
             A network that failed to connect is retried after 2 s, 4 s, 8 s, ... up to this.
 
+    config OPENSHOCK_WIFI_POWERSAVE_IDLE_MS
+        int "Radio stays awake after the last command (ms)"
+        range 300000 86400000
+        default 3600000
+        help
+            Modem sleep has the AP hold frames until the next DTIM beacon, delaying each one
+            by up to a beacon interval (typically 100-300 ms). Power save is switched off on
+            the first shocker command and back on after this long without one. The command
+            handler reports activity at most once a minute; that minute is added on top, so the
+            radio stays awake at least this long after the last command.
+
 endmenu
 
 menu "OpenShock gateway"
@@ -35,6 +46,15 @@ menu "OpenShock gateway"
         int "Largest gateway message (bytes)"
         range 1024 32768
         default 4096
+
+    config OPENSHOCK_GATEWAY_WS_BUFFER_SIZE
+        int "Websocket buffer (bytes)"
+        range 1024 OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE
+        default 2048
+        help
+            esp_websocket_client allocates a receive and a send buffer of this size. A message
+            larger than it arrives in pieces that are reassembled into a copy; one that fits is
+            handled in place.
 
     config OPENSHOCK_GATEWAY_PING_TIMEOUT_MS
         int "Ping timeout (ms)"
@@ -54,9 +74,17 @@ menu "OpenShock gateway"
         default 300000
 
     config OPENSHOCK_GATEWAY_CONNECT_RETRY_MS
-        int "Retry between gateway connection attempts (ms)"
+        int "Retry between gateway connection attempts, cap (ms)"
         range 1000 600000
         default 20000
+
+    config OPENSHOCK_GATEWAY_CONNECT_RETRY_MIN_MS
+        int "Retry between gateway connection attempts, first (ms)"
+        range 1000 OPENSHOCK_GATEWAY_CONNECT_RETRY_MS
+        default 2000
+        help
+            The delay before each connection attempt doubles from this up to the cap. It
+            starts over once a connection has stayed up for the cap.
 
     config OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS
         int "Hub info fetch retry, first (ms)"

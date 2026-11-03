@@ -37,7 +37,14 @@ def test_fragment_defaults_to_no_pins(tmp_path):
     assert spec.chip == 'ESP32-C3'
     assert (spec.rf_tx_gpio, spec.estop_gpio, spec.led_gpio, spec.ws2812b_gpio) == (-1, -1, -1, -1)
     assert spec.gpio_bypass == ()
+    assert spec.estop_latching is False
     assert spec.flags == 0
+
+
+def test_fragment_sets_the_estop_latching_flag(tmp_path):
+    spec = boards.read_board_fragment(write_fragment(tmp_path, 'Twist', 'CONFIG_IDF_TARGET="esp32"\nOPENSHOCK_ESTOP_LATCHING=y\n'))
+    assert spec.estop_latching is True
+    assert spec.flags == boards.FLAG_ESTOP_LATCHING
 
 
 @pytest.mark.parametrize(

@@ -4,13 +4,11 @@
 #include "json/Json.h"
 
 #include <cstdint>
-#include <map>
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <string>
-#include <string_view>
 #include <utility>
-#include <vector>
 
 // Forward declarations so this public header doesn't pull in <esp_http_client.h>.
 // These match the real typedefs exactly, so including the real header elsewhere
@@ -72,13 +70,21 @@ namespace OpenShock::HTTP {
     }
   };
 
+  // A request header. esp_http_client copies both strings when the header is set, so they only have to live for the
+  // duration of the request call; they must be NUL-terminated (the client takes C strings).
+  struct Header {
+    const char* key;
+    const char* value;
+  };
+
   // Callbacks are only invoked during the request call they are passed to, never stored.
   template<typename T>
   using JsonParser               = Util::FunctionRef<std::optional<T>(int code, JSON::JsonView json)>;
   using GotContentLengthCallback = Util::FunctionRef<bool(int contentLength)>;
   using DownloadCallback         = Util::FunctionRef<bool(std::size_t offset, const uint8_t* data, std::size_t len)>;
 
-  // A reusable HTTP client. Sequential requests on the same instance reuse the
+  // A reusable HTTP client. URLs are NUL-terminated C strings: esp_http_client parses them as such, and every caller
+  // already owns one, so a view would only force a copy. Sequential requests on the same instance reuse the
   // underlying TCP/TLS connection (HTTP keep-alive) when they target the same
   // host, and transparently reconnect when the host changes or the connection
   // drops. The caller owns the lifetime: construct one where several requests
@@ -95,12 +101,11 @@ namespace OpenShock::HTTP {
     Client(Client&&)                 = delete;
     Client& operator=(Client&&)      = delete;
 
-    Response<std::size_t>
-      Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
-    Response<std::string> GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+    Response<std::size_t> Download(const char* url, std::initializer_list<Header> headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
+    Response<std::string> GetString(const char* url, std::initializer_list<Header> headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000);
 
     template<typename T>
-    Response<T> GetJSON(std::string_view url, const std::map<std::string, std::string>& headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+    Response<T> GetJSON(const char* url, std::initializer_list<Header> headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
     {
       auto response = GetString(url, headers, acceptedCodes, timeoutMs);
       if (response.result != RequestResult::Success) {
@@ -127,28 +132,27 @@ namespace OpenShock::HTTP {
     void drop();
 
     esp_http_client_handle_t m_handle;
-    std::vector<std::string> m_headerKeys;  // headers set on the last request, cleared before reuse
-    std::string m_retryAfter;               // "Retry-After" response header, captured by eventHandler
+    std::string m_host;                     // host m_handle was created for; its saved TLS session belongs to it
+    std::optional<uint32_t> m_retryAfterS;  // "Retry-After" delay-seconds, captured by eventHandler
     bool m_connectionClose;                 // server sent "Connection: close"
   };
 
   // One-shot helpers: perform a single request on a temporary client. Use a
   // Client directly when issuing several requests to the same host.
-  inline Response<std::size_t>
-    Download(std::string_view url, const std::map<std::string, std::string>& headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  inline Response<std::size_t> Download(const char* url, std::initializer_list<Header> headers, GotContentLengthCallback contentLengthCallback, DownloadCallback downloadCallback, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     Client client;
     return client.Download(url, headers, contentLengthCallback, downloadCallback, acceptedCodes, timeoutMs);
   }
 
-  inline Response<std::string> GetString(std::string_view url, const std::map<std::string, std::string>& headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  inline Response<std::string> GetString(const char* url, std::initializer_list<Header> headers, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     Client client;
     return client.GetString(url, headers, acceptedCodes, timeoutMs);
   }
 
   template<typename T>
-  Response<T> GetJSON(std::string_view url, const std::map<std::string, std::string>& headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
+  Response<T> GetJSON(const char* url, std::initializer_list<Header> headers, JsonParser<T> jsonParser, std::span<const uint16_t> acceptedCodes, uint32_t timeoutMs = 10'000)
   {
     Client client;
     return client.GetJSON<T>(url, headers, jsonParser, acceptedCodes, timeoutMs);

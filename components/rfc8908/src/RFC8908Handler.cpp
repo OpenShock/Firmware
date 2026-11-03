@@ -6,22 +6,23 @@ const char* const TAG = "RFC8908Handler";
 
 #include "json/Json.h"
 
+#include <cstdio>
 #include <string>
 
 using namespace OpenShock;
 
-// The portal AP IP, captured at registration. Handlers are static C callbacks, so we
-// keep it here; there is only ever one captive portal server at a time.
-static const char* s_apIpv4 = "4.3.2.1";
+// "http://<portal AP IP>/", built once at registration. Handlers are static C callbacks, so it lives here; there is
+// only ever one captive portal server at a time. Static storage also satisfies httpd_resp_set_hdr, which keeps the
+// pointer until the response is sent.
+static char s_portalUrl[sizeof("http://255.255.255.255/")] = "http://4.3.2.1/";
+static std::size_t s_portalUrlLen                          = sizeof("http://4.3.2.1/") - 1;
 
 static const char* const captivePortalApiPath = "/captive-portal/api";
 
 esp_err_t RFC8908::EmitRedirect(httpd_req_t* req)
 {
-  std::string location = std::string("http://") + s_apIpv4 + "/";
-
   httpd_resp_set_status(req, "302 Found");
-  httpd_resp_set_hdr(req, "Location", location.c_str());
+  httpd_resp_set_hdr(req, "Location", s_portalUrl);
   httpd_resp_set_hdr(req, "Cache-Control", "no-store, no-cache, must-revalidate");
   httpd_resp_set_hdr(req, "Pragma", "no-cache");
   httpd_resp_set_hdr(req, "Expires", "0");
@@ -42,13 +43,11 @@ static esp_err_t captiveApiHandler(httpd_req_t* req)
 {
   OS_LOGI(TAG, "Got Captive API request");
 
-  std::string portalUrl = std::string("http://") + s_apIpv4 + "/";
-
   OpenShock::JSON::StringWriter writer;
   json_gen_str_t* gen = writer.gen();
   json_gen_start_object(gen);
   json_gen_obj_set_bool(gen, "captive", true);
-  JSON::objSetString(gen, "user-portal-url", portalUrl.c_str());
+  JSON::objSetString(gen, "user-portal-url", std::string_view(s_portalUrl, s_portalUrlLen));
   if constexpr (sizeof(CONFIG_OPENSHOCK_PORTAL_VENUE_INFO_URL) > 1) {  // empty: leave it out
     JSON::objSetString(gen, "venue-info-url", CONFIG_OPENSHOCK_PORTAL_VENUE_INFO_URL);
   }
@@ -69,7 +68,12 @@ static esp_err_t err404Handler(httpd_req_t* req, httpd_err_code_t)
 esp_err_t RFC8908::RegisterProbeHandlers(httpd_handle_t server, const char* apIpv4)
 {
   if (apIpv4 != nullptr) {
-    s_apIpv4 = apIpv4;
+    int len = snprintf(s_portalUrl, sizeof(s_portalUrl), "http://%s/", apIpv4);
+    if (len < 0 || static_cast<std::size_t>(len) >= sizeof(s_portalUrl)) {
+      OS_LOGE(TAG, "Not an IPv4 address: %s", apIpv4);
+      return ESP_ERR_INVALID_ARG;
+    }
+    s_portalUrlLen = static_cast<std::size_t>(len);
   }
 
   // Well-known OS probe paths. Prefix forms (e.g. "/hotspot-detect*") require the

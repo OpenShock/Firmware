@@ -5,6 +5,7 @@
 #include "SimpleMutex.h"
 
 #include <esp_event.h>
+#include <esp_transport.h>
 #include <esp_websocket_client.h>
 
 #include <atomic>
@@ -20,12 +21,12 @@ namespace OpenShock {
     DISABLE_MOVE(GatewayClient);
 
   public:
-    GatewayClient(const std::string& authToken);
+    explicit GatewayClient(std::string_view authToken);
     ~GatewayClient();
 
     inline GatewayClientState state() const { return m_state; }
 
-    void connect(const std::string& host, uint16_t port, const std::string& path);
+    void connect(const char* host, uint16_t port, const char* path);
 
     bool sendMessageTXT(std::string_view data);
     bool sendMessageBIN(std::span<const uint8_t> data);
@@ -36,6 +37,10 @@ namespace OpenShock {
     // received messages, posting state changes, sending the boot status and (re)connecting. Don't call it under a lock
     // other tasks wait on: it posts an event.
     void retire();
+
+    // Sends the gateway a close frame, waiting up to a second. Used by the shutdown handler so the gateway sees a
+    // clean close before esp_restart() stops WiFi. Leaves the handle alive; the destructor still destroys it.
+    void close();
 
     bool loop();
 
@@ -49,6 +54,8 @@ namespace OpenShock {
 
     esp_websocket_client_handle_t _takeHandle();
     void _destroyHandle();
+    esp_transport_handle_t _prepareTransport(const char* host, const char* path);
+    void _destroyTransport();
 
     std::string m_headers;
     SimpleMutex m_handleMutex;                            // Held across sends from other tasks so the handle can't be destroyed mid-send
@@ -57,6 +64,12 @@ namespace OpenShock {
     std::atomic<GatewayClientState> m_state;              // Written from both the owning task and the websocket task
     std::atomic<int64_t> m_lastPingTimestamp;
     std::atomic<bool> m_retired;
+
+    // The TLS and websocket transports, kept across connections so the TLS session saved on each connect resumes the
+    // next handshake. Only touched while no websocket task runs, except the session save on CONNECTED (on that task).
+    esp_transport_handle_t m_tls;
+    esp_transport_handle_t m_wss;  // Websocket framing over m_tls; handed to the client as ext_transport
+    std::string m_tlsHost;         // The host m_tls's saved session belongs to
 
     // Reassembly of fragmented/chunked binary messages, only touched from the websocket task
     std::vector<uint8_t> m_binReasm;

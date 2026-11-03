@@ -5,7 +5,7 @@ menu "OpenShock serial console"
         range 256 16384
         default 4096
         help
-            A longer line is discarded. rawconfig and jsonconfig take the whole config on
-            one line, so this bounds the config the console can set.
+            A longer line is discarded. jsonconfig takes the whole config on one line, so
+            this bounds the config the console can set.
 
 endmenu

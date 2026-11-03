@@ -7,13 +7,15 @@
 const char* const TAG = "CaptivePortal";
 
 #include "AppHooks.h"
+#include "BackendConfig.h"
+#include "captiveportal/CaptivePortalConfig.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "Temporal.h"
+#include "wifi/WiFiConfig.h"
 
 #include <esp_mac.h>
 #include <esp_netif.h>
@@ -48,7 +50,7 @@ enum : uint32_t {
 struct ManagerState {
   bool alwaysEnabled      = false;
   bool closeWhenOnline    = false;  // Setup finished or the backend disabled the portal: close it once online
-  bool forceClosed        = false;  // OTA is flashing the static filesystem; cleared by ReleaseForceClose()
+  bool forceClosed        = false;  // OTA is flashing the www image; cleared by ReleaseForceClose()
   bool forceCloseAckOwed  = false;  // ForceClose() is waiting for s_forceCloseDone
   int64_t startupGraceEnd = 0;      // esp_timer time until which the portal must not open; 0 = no grace period
   int64_t autoCloseAt     = 0;      // esp_timer time at which an idle portal closes; 0 = not armed
@@ -84,11 +86,7 @@ static void sendCommand(uint32_t command)
 
 static bool isDeviceFullyConfigured()
 {
-  auto credentialsList = Config::GetWiFiCredentials();
-  if (!credentialsList || credentialsList->empty()) {
-    return false;
-  }
-  return Config::HasBackendAuthToken();
+  return Config::HasWiFiCredentials() && Config::HasBackendAuthToken();
 }
 
 static std::shared_ptr<CaptivePortalInstance> GetInstance()
@@ -259,7 +257,7 @@ static void applyCommands(ManagerState& state, uint32_t commands)
 }
 
 // Runs the captive-portal state machine once. This does heavy work (starting the portal constructs
-// CaptivePortalInstance, which mounts LittleFS and spins up the HTTP/WS/DNS servers), so it runs on the dedicated
+// CaptivePortalInstance, which maps the www image and spins up the HTTP/WS/DNS servers), so it runs on the dedicated
 // manager task, never on the esp_timer task, whose 3.5KB stack would overflow.
 static void captiveportal_tick(ManagerState& state)
 {
@@ -325,8 +323,8 @@ static void captiveportal_tick(ManagerState& state)
     state.autoCloseAt = 0;
   }
 
-  // Open portal if not running and device needs setup. Not while a retired instance still holds the static
-  // filesystem and ports 80/53: the new one would fail to start and flap the AP on every tick.
+  // Open portal if not running and device needs setup. Not while a retired instance still holds the www
+  // image and ports 80/53: the new one would fail to start and flap the AP on every tick.
   if (!running && allDestroyed && (state.alwaysEnabled || !CommandHandler::Ok() || !isDeviceFullyConfigured())) {
     captiveportal_start();
   }
@@ -358,12 +356,9 @@ bool CaptivePortal::Init()
   auto* initialState = new ManagerState();
 
   // Restore the persisted always-enabled setting before the hook can change it, so it survives a reboot.
-  if (auto config = Config::GetCaptivePortalConfig()) {
-    initialState->alwaysEnabled = config->alwaysEnabled;
-    s_alwaysEnabled             = config->alwaysEnabled;
-  } else {
-    OS_LOGE(TAG, "Failed to get captive portal config");
-  }
+  const bool alwaysEnabled    = Config::GetCaptivePortalConfig().alwaysEnabled;
+  initialState->alwaysEnabled = alwaysEnabled;
+  s_alwaysEnabled             = alwaysEnabled;
 
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {
@@ -440,7 +435,7 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
   xSemaphoreTake(s_forceCloseDone, 0);  // Drop an acknowledgement left over from an earlier, timed-out call
   sendCommand(kCmdForceClose);
 
-  // The manager task stops the portal and answers once it is fully torn down (filesystem unmounted). It stays
+  // The manager task stops the portal and answers once it is fully torn down (www image unmounted). It stays
   // force-closed even if this times out.
   return xSemaphoreTake(s_forceCloseDone, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
 }

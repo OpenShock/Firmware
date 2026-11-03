@@ -10,8 +10,8 @@
 !/sdkconfig.defaults
 !/sdkconfig.defaults.*
 
-# Staging directory of scripts/gen_staticfs.py when run from the repository root (the CI
-# build-staticfs action); CMake builds stage under build/<board>/staticfs instead.
+# Where the CI package-firmware action downloads the staticfs artifact (www.bin) when run from the
+# repository root; a local build writes its image under build/<board>/ instead.
 /staticfs/
 
 # PlatformIO build

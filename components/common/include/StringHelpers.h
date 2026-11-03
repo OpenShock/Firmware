@@ -3,12 +3,10 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 namespace OpenShock {
   bool FormatToString(std::string& out, const char* format, ...) __attribute__((format(printf, 2, 3)));
@@ -17,6 +15,10 @@ namespace OpenShock {
   constexpr bool CharIsSpace(char c)
   {
     return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
+  }
+  constexpr bool CharIsAlnum(char c)
+  {
+    return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
   }
   constexpr char CharToLower(char c)
   {
@@ -158,14 +160,6 @@ namespace OpenShock {
     parts[N - 1] = view.substr(pos);  // remainder (may still contain delimiters)
     return parts;
   }
-  // Splits on every `delimiter`, keeping empty fields between delimiters ("a,,b" -> a, "", b). After `maxSplits`
-  // splits the rest is returned as one final part. An empty input, or a trailing delimiter, adds no empty field.
-  std::vector<std::string_view> StringSplit(std::string_view view, char delimiter, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
-  // Splits on runs of characters matching `predicate`, dropping empty fields. After `maxSplits` fields the rest
-  // (from the start of the next field) is returned as one final part.
-  std::vector<std::string_view> StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
-  std::vector<std::string_view> StringSplitNewLines(std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
-  std::vector<std::string_view> StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits = std::numeric_limits<std::size_t>::max());
   constexpr std::pair<std::string_view, std::string_view> StringSplitByFirst(std::string_view view, char delimiter)
   {
     size_t pos = view.find(delimiter);

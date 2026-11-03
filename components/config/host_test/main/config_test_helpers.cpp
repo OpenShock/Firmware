@@ -1,6 +1,10 @@
+#include <freertos/FreeRTOS.h>
+
 #include "config_test_helpers.h"
 
 #include "unity.h"
+
+#include <nvs_flash.h>
 
 #include <cstring>
 #include <string>
@@ -9,9 +13,15 @@
 using namespace OpenShock;
 
 namespace ConfigTest {
-  Config::RootConfig MakeSampleConfig()
+  bool Full::SaveNvs(const char* partition) const
   {
-    Config::RootConfig config;
+    return rf.SaveNvs(partition, nullptr) && wifi.SaveNvs(partition, nullptr) && captivePortal.SaveNvs(partition, nullptr) && backend.SaveNvs(partition, nullptr) && serialInput.SaveNvs(partition, nullptr) && otaUpdate.SaveNvs(partition, nullptr)
+        && estop.SaveNvs(partition, nullptr);
+  }
+
+  Full MakeSampleConfig()
+  {
+    Full config;
 
     config.rf = Config::RFConfig(GPIO_NUM_25, false);
 
@@ -25,74 +35,60 @@ namespace ConfigTest {
     config.backend       = Config::BackendConfig("api.example.org", "tok_0123456789abcdef");
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
-    config.estop         = Config::EStopConfig(true, GPIO_NUM_13, true, true);
+    config.estop         = Config::EStopConfig(true, GPIO_NUM_13, true);
 
     return config;
   }
 
-  std::vector<uint8_t> Serialize(const Config::RootConfig& config, bool withSensitiveData)
+  void WipeStore()
   {
-    // ForceDefaults like the firmware's own writes, so the bytes match what Config stores and GetRaw returns
-    flatbuffers::FlatBufferBuilder builder;
-    builder.ForceDefaults(true);
-    auto root = config.ToFlatbuffers(builder, withSensitiveData);
-    Serialization::Configuration::FinishHubConfigBuffer(builder, root);
-    return std::vector<uint8_t>(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
-  }
-
-  bool Deserialize(const uint8_t* data, std::size_t size, Config::RootConfig& out)
-  {
-    if (size > Config::MaxConfigSize) {
-      return false;  // the Verifier constructor would assert
-    }
-    flatbuffers::Verifier::Options options {
-      .max_size = Config::MaxConfigSize + 1,
-    };
-    flatbuffers::Verifier verifier(data, size, options);
-    if (!verifier.VerifyBuffer<Serialization::Configuration::HubConfig>()) {
-      return false;
-    }
-    return out.FromFlatbuffers(flatbuffers::GetRoot<Serialization::Configuration::HubConfig>(data));
-  }
-
-  bool InitFrom(const uint8_t* data, std::size_t size)
-  {
-    HostConfigFs::reset();
-    if (data != nullptr) {
-      HostConfigFs::files()[kConfigPath].assign(data, data + size);
-    }
-    Config::Init();
-    return HostConfigFs::writeCount == 0;
+    nvs_flash_deinit_partition(Keys::kPartitionCfg);  // ESP_ERR_NVS_NOT_INITIALIZED when it is not up, which is fine
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_erase_partition(Keys::kPartitionCfg));
+    // Back up right away, so a test can write straight into the store; Config::Init's own init is then a no-op
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_flash_init_partition(Keys::kPartitionCfg));
   }
 
   void InitDefault()
   {
-    InitFrom(nullptr, 0);
-    HostConfigFs::writeCount = 0;
+    WipeStore();
+    Config::Init();
   }
 
-  std::vector<uint8_t> StoredFile()
+  void Reload()
   {
-    auto it = HostConfigFs::files().find(kConfigPath);
-    return it == HostConfigFs::files().end() ? std::vector<uint8_t>() : it->second;
+    Config::Init();
   }
 
-  Config::RootConfig Snapshot()
+  void InitWith(const Full& config)
   {
-    // Every getter must succeed; unwraps the returned optional.
-    auto get = [](auto section) {
-      TEST_ASSERT_TRUE(section.has_value());
-      return *std::move(section);
-    };
+    WipeStore();
+    TEST_ASSERT_TRUE(config.SaveNvs(Keys::kPartitionCfg));
+    Reload();
+  }
 
-    Config::RootConfig config;
-    config.rf            = get(Config::GetRFConfig());
-    config.wifi          = get(Config::GetWiFiConfig());
-    config.captivePortal = get(Config::GetCaptivePortalConfig());
-    config.backend       = get(Config::GetBackendConfig());
-    config.serialInput   = get(Config::GetSerialInputConfig());
-    config.otaUpdate     = get(Config::GetOtaUpdateConfig());
-    config.estop         = get(Config::GetEStopConfig());
+  std::size_t UsedEntries()
+  {
+    nvs_stats_t stats {};
+    TEST_ASSERT_EQUAL(ESP_OK, nvs_get_stats(Keys::kPartitionCfg, &stats));
+    return stats.used_entries;
+  }
+
+  bool NamespaceExists(const char* partition, const char* ns)
+  {
+    auto handle = OpenShock::Config::Nvs::Handle::OpenForLoad(partition, ns);
+    return handle && handle->Exists();
+  }
+
+  Full Snapshot()
+  {
+    Full config;
+    config.rf            = Config::GetRFConfig();
+    config.wifi          = Config::GetWiFiConfig();
+    config.captivePortal = Config::GetCaptivePortalConfig();
+    config.backend       = Config::GetBackendConfig();
+    config.serialInput   = Config::GetSerialInputConfig();
+    config.otaUpdate     = Config::GetOtaUpdateConfig();
+    config.estop         = Config::GetEStopConfig();
     return config;
   }
 
@@ -105,7 +101,7 @@ namespace ConfigTest {
     TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(expected.bssid.data(), actual.bssid.data(), 6, "wifi credentials bssid");
   }
 
-  void AssertConfigEqual(const Config::RootConfig& expected, const Config::RootConfig& actual, bool withSensitiveData)
+  void AssertConfigEqual(const Full& expected, const Full& actual, bool withSensitiveData)
   {
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.rf.txPin, actual.rf.txPin, "rf.txPin");
     TEST_ASSERT_EQUAL_MESSAGE(expected.rf.keepAliveEnabled, actual.rf.keepAliveEnabled, "rf.keepAliveEnabled");
@@ -140,6 +136,5 @@ namespace ConfigTest {
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.latching, actual.estop.latching, "estop.latching");
-    TEST_ASSERT_EQUAL_MESSAGE(expected.estop.active, actual.estop.active, "estop.active");
   }
 }  // namespace ConfigTest

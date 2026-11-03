@@ -32,9 +32,9 @@ static void handleValidGpiosCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::ValidGpiosHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("validgpios"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("validgpios");
 
-  group.addCommand("List all valid GPIO pins"sv, handleValidGpiosCommand);
+  group.addCommand("List all valid GPIO pins", handleValidGpiosCommand);
 
   return group;
 }

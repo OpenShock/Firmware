@@ -35,7 +35,8 @@ WiFiNetwork::WiFiNetwork(const wifi_ap_record_t* apRecord, uint8_t credentialsId
   static_assert(sizeof(ssid) == sizeof(apRecord->ssid) && sizeof(ssid) == 33, "SSID buffers must be 33 bytes long! (32 bytes for the SSID + 1 byte for the null terminator)");
   static_assert(sizeof(bssid) == sizeof(apRecord->bssid) && sizeof(bssid) == 6, "BSSIDs must be 6 bytes long!");
 
-  memcpy(ssid, apRecord->ssid, sizeof(ssid));
+  memcpy(ssid, apRecord->ssid, sizeof(ssid) - 1);
+  ssid[sizeof(ssid) - 1] = '\0';  // the driver's field is not guaranteed to be terminated
   memcpy(bssid, apRecord->bssid, sizeof(bssid));
 }
 
@@ -53,7 +54,8 @@ WiFiNetwork::WiFiNetwork(const char (&ssid)[33], const uint8_t (&bssid)[6], uint
   static_assert(sizeof(ssid) == sizeof(this->ssid) && sizeof(ssid) == 33, "SSID buffers must be 33 bytes long! (32 bytes for the SSID + 1 byte for the null terminator)");
   static_assert(sizeof(bssid) == sizeof(this->bssid) && sizeof(bssid) == 6, "BSSIDs must be 6 bytes long!");
 
-  memcpy(this->ssid, ssid, sizeof(ssid));
+  memcpy(this->ssid, ssid, sizeof(ssid) - 1);
+  this->ssid[sizeof(ssid) - 1] = '\0';
   memcpy(this->bssid, bssid, sizeof(bssid));
 }
 

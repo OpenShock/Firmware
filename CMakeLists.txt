@@ -140,6 +140,7 @@ if(_os_idf_activated)
 endif()
 
 project(firmware)
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/cxx_standard.cmake)
 
 # --- ccache by absolute path ---------------------------------------------------
 # idf.py configures with CCACHE_ENABLE, and ESP-IDF then launches compiles through a bare `ccache`,
@@ -185,29 +186,26 @@ if(NOT CMAKE_BINARY_DIR STREQUAL _os_compile_db_dir)
     VERBATIM)
 endif()
 
-# --- Static filesystem image (captive-portal web assets) ---------------------
-# gen_staticfs.py packs the frontend into the `static0` partition image; skipped when the partition table has none.
-partition_table_get_partition_info(_staticfs_offset "--partition-name static0" "offset")
-partition_table_get_partition_info(_staticfs_size   "--partition-name static0" "size")
+# --- Captive-portal asset image (www) ----------------------------------------
+# gen_staticfs.py packs the frontend into the flat `www` image, which the firmware needs for its captive portal.
+partition_table_get_partition_info(_www_offset "--partition-name www" "offset")
 
-if("${_staticfs_offset}" STREQUAL "" OR "${_staticfs_size}" STREQUAL "")
-  message(WARNING "No `static0` partition in the active partition table; "
-                  "skipping static filesystem image generation.")
-else()
-  set(_staticfs_image ${CMAKE_BINARY_DIR}/staticfs.bin)
-
-  # CI never builds this target: its staticfs job runs gen_staticfs.py --skip-frontend-build once for every variant.
-  add_custom_target(staticfs ALL
-    BYPRODUCTS ${_staticfs_image}
-    COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
-            --frontend-dir   ${CMAKE_CURRENT_LIST_DIR}/frontend
-            --staging-dir    ${CMAKE_BINARY_DIR}/staticfs
-            --output         ${_staticfs_image}
-            --partition-size ${_staticfs_size}
-    COMMENT "Building static filesystem image (staticfs.bin) for static0"
-    VERBATIM USES_TERMINAL)
-
-  # Register the image with the flasher so `idf.py flash` writes it to the
-  # static0 offset alongside the app and partition table.
-  esptool_py_flash_target_image(flash "static0" "${_staticfs_offset}" "${_staticfs_image}")
+if("${_www_offset}" STREQUAL "")
+  message(FATAL_ERROR "No `www` partition in the active partition table.")
 endif()
+
+set(_www_image ${CMAKE_BINARY_DIR}/www.bin)
+
+# CI never builds this target: its staticfs job runs gen_staticfs.py --skip-frontend-build once for every variant.
+add_custom_target(www ALL
+  BYPRODUCTS ${_www_image}
+  COMMAND ${_os_python} ${CMAKE_CURRENT_LIST_DIR}/scripts/gen_staticfs.py
+          --frontend-dir  ${CMAKE_CURRENT_LIST_DIR}/frontend
+          --output        ${_www_image}
+          --partition-csv ${CMAKE_CURRENT_LIST_DIR}/${CONFIG_PARTITION_TABLE_CUSTOM_FILENAME}
+  COMMENT "Building captive-portal asset image (www.bin) for www"
+  VERBATIM USES_TERMINAL)
+
+# Register the image with the flasher so `idf.py flash` writes it to the
+# www offset alongside the app and partition table.
+esptool_py_flash_target_image(flash "www" "${_www_offset}" "${_www_image}")

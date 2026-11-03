@@ -91,7 +91,7 @@ with the list.
 image after linking. Anything after the board name is passed to `idf.py`.
 
 ```sh
-python scripts/build.py OpenShock-Core-V2                    # full build, incl. staticfs
+python scripts/build.py OpenShock-Core-V2                    # full build, incl. the www image
 python scripts/build.py OpenShock-Core-V2 app                # app only
 python scripts/build.py OpenShock-Core-V2 flash -p COM4      # build and flash
 python scripts/build.py OpenShock-Core-V2 monitor -p COM4    # serial monitor
@@ -165,7 +165,7 @@ file and activates an installer-registered ESP-IDF itself, so no exported shell 
 
 ```sh
 cmake --preset OpenShock-Core-V2
-cmake --build --preset OpenShock-Core-V2                      # everything, incl. staticfs
+cmake --build --preset OpenShock-Core-V2                      # everything, incl. the www image
 cmake --build --preset OpenShock-Core-V2 --target app
 ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target flash
 ESPPORT=COM4 cmake --build --preset OpenShock-Core-V2 --target monitor
@@ -177,9 +177,11 @@ The inline `ESPPORT=COM4` form is POSIX shell syntax. In PowerShell set it first
 The presets build into `build/<board>/`, the same directories `scripts/build.py` uses, so the
 two can be mixed. Flash and monitor read the port from `ESPPORT`; `menuconfig` is a target too.
 A preset build stamps the board like the script does, since the stamp is a CMake post-build step.
-The file also has a `default` preset with no board. It exists for `idf.py`, which configures with
-the preset of that name once a `CMakePresets.json` is present, and it is what `scripts/build.py`
-runs under; the script's own `-B` and `-D` arguments take precedence, so it changes nothing.
+The file also has a `default` preset, which configures `OpenShock-Core-V2` (`DEFAULT_BOARD` in
+`scripts/gen_cmake_presets.py`). `idf.py` configures with the preset of that name once a
+`CMakePresets.json` is present, so a bare `idf.py menuconfig` or `idf.py build` works on that board;
+`idf.py --preset <board> menuconfig` picks another. `scripts/build.py` runs under it too, and the
+script's own `-B` and `-D` arguments take precedence, so it changes nothing there.
 Differences from the script: a tree configured by a preset has ccache off (idf.py turns it on),
 and the bootloader's nested configure prints a warning about `ESP_ROM_ELF_DIR` when the shell is
 not exported; it is harmless. A tree the script configured keeps ccache when CLion or a bare
@@ -216,10 +218,10 @@ settings stay local. The presets file is generated from `boards/`; after adding 
 python scripts/gen_cmake_presets.py
 ```
 
-### Captive-portal frontend and staticfs
+### Captive-portal frontend and the www image
 
-The web UI in `frontend/` is built with Vite, gzipped, and packed into a littlefs image for the
-`static0` partition. The CMake `staticfs` target does this automatically during a full build and
+The web UI in `frontend/` is built with Vite, gzipped, and packed into the flat `www` image
+([STORAGE.md](STORAGE.md)). The CMake `www` target does this automatically during a full build and
 only rebuilds the frontend when its sources changed. To work on the frontend itself:
 
 ```sh
@@ -234,8 +236,8 @@ pnpm test:unit
 To build only the image, as CI does:
 
 ```sh
-python scripts/gen_staticfs.py --frontend-dir frontend --staging-dir build/staticfs \
-    --output build/staticfs.bin --partition-csv partitions/ota_4mb.csv
+python scripts/gen_staticfs.py --frontend-dir frontend --output build/www.bin \
+    --partition-csv partitions/ota_4mb.csv
 ```
 
 ### Packaged and merged images
@@ -255,7 +257,7 @@ cp build/esp32s3-6832dbd5/partition_table/partition-table.bin out/variants/esp32
 
 python scripts/package_boards.py --variants out/variants --board "OpenShock-Core-V2" --out out/boards
 python scripts/merge_image.py --board OpenShock-Core-V2 --bindir 'out/boards/{board}' \
-    --staticfs build/staticfs.bin --output 'out/merged/{board}.bin'
+    --www build/www.bin --output 'out/merged/{board}.bin'
 esptool write_flash 0x0 out/merged/OpenShock-Core-V2.bin
 ```
 

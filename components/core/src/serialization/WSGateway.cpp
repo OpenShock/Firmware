@@ -3,6 +3,7 @@
 const char* const TAG = "WSGateway";
 
 #include <esp_wifi.h>
+#include <utility>
 
 #include "Logging.h"
 #include "OpenShock.h"
@@ -43,12 +44,29 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
   return finishMessage(builder, Gateway::HubToGatewayMessagePayload::Pong, pong, callback);
 }
 
+// SerializeBootStatusMessage casts between these by value, and the gateway protocol must stay compatible
+static_assert(std::to_underlying(OpenShock::FirmwareBootType::Normal) == std::to_underlying(Types::FirmwareBootType::Normal));
+static_assert(std::to_underlying(OpenShock::FirmwareBootType::NewFirmware) == std::to_underlying(Types::FirmwareBootType::NewFirmware));
+static_assert(std::to_underlying(OpenShock::FirmwareBootType::Rollback) == std::to_underlying(Types::FirmwareBootType::Rollback));
+
+// Empty prerelease/build stay absent from the message rather than going out as "" (both messages the same way)
+static flatbuffers::Offset<Types::SemVer> createSemVer(flatbuffers::FlatBufferBuilder& builder, const OpenShock::SemVer& version)
+{
+  flatbuffers::Offset<flatbuffers::String> prerelease, build;
+  if (!version.prerelease.empty()) {
+    prerelease = builder.CreateString(version.prerelease);
+  }
+  if (!version.build.empty()) {
+    build = builder.CreateString(version.build);
+  }
+  return Types::CreateSemVer(builder, version.major, version.minor, version.patch, prerelease, build);
+}
+
 bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBootType bootType, Common::SerializationCallbackFn callback)
 {
   flatbuffers::FlatBufferBuilder builder(128);
 
-  const OpenShock::SemVer& version = OpenShock::Constants::FirmwareVersion();
-  auto fbsVersion                  = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.empty() ? nullptr : version.prerelease.c_str(), version.build.empty() ? nullptr : version.build.c_str());
+  auto fbsVersion = createSemVer(builder, OpenShock::Constants::FirmwareVersion());
 
   auto fbsBootStatus = Gateway::CreateBootStatus(builder, static_cast<Types::FirmwareBootType>(bootType), fbsVersion, updateId);
 
@@ -59,7 +77,7 @@ bool Gateway::SerializeOtaUpdateStartedMessage(int32_t updateId, const OpenShock
 {
   flatbuffers::FlatBufferBuilder builder(128);
 
-  auto versionOffset = Types::CreateSemVerDirect(builder, version.major, version.minor, version.patch, version.prerelease.data(), version.build.data());
+  auto versionOffset = createSemVer(builder, version);
 
   auto otaUpdateStartedOffset = Gateway::CreateOtaUpdateStarted(builder, updateId, versionOffset);
 

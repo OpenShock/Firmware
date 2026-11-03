@@ -1,5 +1,6 @@
 ---
 kind: changed
+pr: 530
 ---
 Stamp a board descriptor into the firmware image instead of compiling each board in
 
@@ -8,7 +9,7 @@ Firmware images now carry a small board descriptor: which board they are for, wh
 
 - Add a 256-byte board descriptor at a fixed offset of the app image, written by `scripts/stamp_board.py` after linking and validated on the device with a CRC
 - Read pins, LED flags, pin bypasses and the OTA board name from the descriptor at startup; the compiled image describes no board and has no pins until it is stamped
-- Refuse an OTA download whose descriptor names a different board before it is made bootable, and roll back on first boot if the previous slot disagrees
+- Refuse an OTA download whose descriptor is missing or names a different board before it is made bootable, and roll back on first boot if the previous slot disagrees
 - Boot into the captive portal with no pins, and say so on the serial console, when an image was never stamped or its descriptor is corrupt
 - Validate the descriptor at boot: chip matches the build, every pin is usable on the chip, no two features share a pin; an unusable LED pin disables that LED instead of failing startup
 - Move per-board pin bypass lists out of `Chipset.h` into an `OPENSHOCK_GPIO_BYPASS` line in each board fragment

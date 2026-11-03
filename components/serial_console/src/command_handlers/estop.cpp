@@ -1,20 +1,15 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/command_handlers/common.h"
 
-#include "config/Config.h"
 #include "Convert.h"
+#include "estop/EStopConfig.h"
 #include "estop/EStopManager.h"
 
 static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto configEnabled = OpenShock::Config::GetEStopEnabled();
-    if (!configEnabled) {
-      SERPR_ERROR("Failed to get EStop enabled from config");
-      return;
-    }
-
-    // Get EStop enabled
-    SERPR_RESPONSE("EStopEnabled|%s", *configEnabled ? "true" : "false");
+    SERPR_RESPONSE("EStopEnabled|%s", OpenShock::Config::GetEStopEnabled() ? "true" : "false");
     return;
   }
 
@@ -35,14 +30,7 @@ static void handleEStopEnabledCommand(std::string_view arg, bool isAutomated)
 static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto configPin = OpenShock::Config::GetEStopGpioPin();
-    if (!configPin) {
-      SERPR_ERROR("Failed to get EStop pin from config");
-      return;
-    }
-
-    // Get EStop pin
-    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(*configPin));
+    SERPR_RESPONSE("EStopPin|%hhi", static_cast<int8_t>(OpenShock::Config::GetEStopGpioPin()));
     return;
   }
 
@@ -63,14 +51,7 @@ static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
 static void handleEStopLatchingCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
-    auto configLatching = OpenShock::Config::GetEStopLatching();
-    if (!configLatching) {
-      SERPR_ERROR("Failed to get EStop latching from config");
-      return;
-    }
-
-    // Get EStop latching
-    SERPR_RESPONSE("EStopLatching|%s", *configLatching ? "true" : "false");
+    SERPR_RESPONSE("EStopLatching|%s", OpenShock::Config::GetEStopLatching() ? "true" : "false");
     return;
   }
 
@@ -90,19 +71,19 @@ static void handleEStopLatchingCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EStopHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("estop"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("estop");
 
-  group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, handleEStopEnabledCommand);
-  auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, handleEStopEnabledCommand);
-  setEnabledCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+  group.addCommand("enabled", "Get the E-Stop enabled state.", handleEStopEnabledCommand);
+  auto& setEnabledCommand = group.addCommand("enabled", "Set the E-Stop enabled state.", handleEStopEnabledCommand);
+  setEnabledCommand.addArgument("enabled", "must be a boolean", "true");
 
-  group.addCommand("pin"sv, "Get the GPIO pin used for the E-Stop."sv, handleEStopPinCommand);
-  auto& setPinCommand = group.addCommand("pin"sv, "Set the GPIO pin used for the E-Stop."sv, handleEStopPinCommand);
-  setPinCommand.addArgument("pin"sv, "must be a number"sv, "4"sv);
+  group.addCommand("pin", "Get the GPIO pin used for the E-Stop.", handleEStopPinCommand);
+  auto& setPinCommand = group.addCommand("pin", "Set the GPIO pin used for the E-Stop.", handleEStopPinCommand);
+  setPinCommand.addArgument("pin", "must be a number", "4");
 
-  group.addCommand("latching"sv, "Get whether the E-Stop is a latching switch."sv, handleEStopLatchingCommand);
-  auto& setLatchingCommand = group.addCommand("latching"sv, "Set whether the E-Stop is a latching switch (clears when released) or a momentary button (hold to clear)."sv, handleEStopLatchingCommand);
-  setLatchingCommand.addArgument("latching"sv, "must be a boolean"sv, "true"sv);
+  group.addCommand("latching", "Get whether the E-Stop is a latching switch.", handleEStopLatchingCommand);
+  auto& setLatchingCommand = group.addCommand("latching", "Set whether the E-Stop is a latching switch (clears when disengaged) or a momentary button (hold to clear).", handleEStopLatchingCommand);
+  setLatchingCommand.addArgument("latching", "must be a boolean", "true");
 
   return group;
 }

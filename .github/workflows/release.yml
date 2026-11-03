@@ -3,6 +3,11 @@ name: release
 on:
   # Releases are cut manually, never on push. Run from beta for an rc, from master for a stable release.
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'master only: release this MAJOR.MINOR.PATCH instead of the computed version (e.g. to skip a version an immutable release used up)'
+        required: false
+        default: ''
 
 concurrency:
   group: release-${{ github.ref }}
@@ -10,6 +15,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write # dispatch ci-build on the release tag
 
 defaults:
   run:
@@ -23,7 +29,7 @@ jobs:
     if: github.ref_name == 'beta' || github.ref_name == 'master'
 
     steps:
-      # An App token, not GITHUB_TOKEN, so the tag push below triggers ci-build
+      # An App token pushes the release commit and tag
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510  # v3.3.0
         id: app-token
         with:
@@ -50,6 +56,7 @@ jobs:
           mode: release
           output: release.json
           notes-output: release-notes.md
+          version: ${{ inputs.version }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
 
@@ -60,20 +67,31 @@ jobs:
           echo "::error::No change files present since the last tag - nothing to release."
           exit 1
 
-      - name: Push commit and tag
-        uses: OpenShock/actions/publish-tag@21ca2d511bca92cf24fb502fa302f82700822584  # v1.1.1
-        with:
-          tag: ${{ steps.meta.outputs.tag }}
+      # The commit first: tags are immutable, so a tag pushed with a rejected commit would be stranded on no branch
+      - name: Push release commit
+        run: git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 
-      # A draft, the tag push triggers ci-build whose release job attaches the binaries and publishes it
+      - name: Push tag
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: git push origin "refs/tags/${TAG}"
+
+      # A draft until ci-build's release job attaches the binaries and publishes it
       - name: Stage GitHub Release (draft)
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TAG: ${{ steps.meta.outputs.tag }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
         run: |
-          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md --draft)
+          ARGS=("$TAG" "release.json" --title "$TAG" --notes-file release-notes.md --draft --verify-tag)
           if [ "$PRERELEASE" = "true" ]; then
             ARGS+=(--prerelease)
           fi
           gh release create "${ARGS[@]}"
+
+      # The tag push does not trigger ci-build; this dispatch does, once the commit, tag and draft all exist
+      - name: Dispatch ci-build for the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: gh workflow run ci-build.yml --ref "$TAG" -f release=true

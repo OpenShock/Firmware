@@ -5,6 +5,14 @@ menu "OpenShock HTTP client"
         range 512 32768
         default 4096
 
+    config OPENSHOCK_HTTP_RX_BUFFER_SIZE
+        int "Client receive buffer (bytes)"
+        range 512 16384
+        default 2048
+        help
+            esp_http_client's own receive buffer, held for each client's lifetime. Every
+            transport read is capped at this, so it sets how many TLS reads a download takes.
+
     config OPENSHOCK_HTTP_MAX_STRING_RESPONSE_SIZE
         int "Largest response read into memory (bytes)"
         range 4096 262144

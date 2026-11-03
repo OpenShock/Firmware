@@ -79,6 +79,8 @@ namespace HostFake {
   OpenShock::Config::RFConfig RfConfig    = {.txPin = static_cast<gpio_num_t>(4), .keepAliveEnabled = false};
   OpenShock::Config::EStopConfig EStopCfg = {.enabled = false, .gpioPin = GPIO_NUM_NC};
   esp_event_handler_t EStopHandler        = nullptr;
+  int ActivityPosts                       = 0;
+  bool FailEventPost                      = false;
 
   static std::vector<FakeQueue*> s_liveQueues;  // Queues only; mutexes are not counted
   static std::vector<std::unique_ptr<FakeTask>> s_tasks;
@@ -93,6 +95,8 @@ namespace HostFake {
     FailRmtChannel  = false;
     FailRmtTransmit = false;
     TaskDelays      = 0;
+    ActivityPosts   = 0;
+    FailEventPost   = false;
     Transmissions.clear();
     OnIdle     = nullptr;
     OnTransmit = nullptr;
@@ -363,6 +367,17 @@ static esp_err_t fakeEventHandlerRegister(esp_event_base_t, int32_t event_id, es
   return ESP_OK;
 }
 
+static esp_err_t fakeEventPost(esp_event_base_t event_base, int32_t event_id, const void*, size_t, TickType_t, int)
+{
+  if (FailEventPost) {
+    return ESP_FAIL;
+  }
+  if (event_base == OPENSHOCK_EVENTS && event_id == OPENSHOCK_EVENT_DEVICE_ACTIVITY) {
+    ++ActivityPosts;
+  }
+  return ESP_OK;
+}
+
 // Installed before any C++ static constructor runs: CommandHandler.cpp's static
 // SimpleMutexes call xSemaphoreCreateMutexStatic during static initialization.
 __attribute__((constructor(101))) static void installMockCallbacks()
@@ -390,6 +405,7 @@ __attribute__((constructor(101))) static void installMockCallbacks()
   rmt_tx_wait_all_done_Stub(fakeRmtTxWaitAllDone);
 
   esp_event_handler_register_Stub(fakeEventHandlerRegister);
+  esp_event_post_Stub(fakeEventPost);
 }
 
 // --- TaskUtils (common's util/TaskUtils.h): record tasks instead of starting them ---
@@ -435,12 +451,12 @@ void OpenShock::TaskUtils::StopTask(TaskHandle_t taskHandle, TaskExitFlag& exite
 
 // --- Config ---
 
-std::optional<OpenShock::Config::RFConfig> OpenShock::Config::GetRFConfig()
+OpenShock::Config::RFConfig OpenShock::Config::GetRFConfig()
 {
   return RfConfig;
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetRFConfigTxPin()
+gpio_num_t OpenShock::Config::GetRFConfigTxPin()
 {
   return RfConfig.txPin;
 }
@@ -451,7 +467,7 @@ bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
   return true;
 }
 
-std::optional<bool> OpenShock::Config::GetRFConfigKeepAliveEnabled()
+bool OpenShock::Config::GetRFConfigKeepAliveEnabled()
 {
   return RfConfig.keepAliveEnabled;
 }
@@ -462,12 +478,12 @@ bool OpenShock::Config::SetRFConfigKeepAliveEnabled(bool enabled)
   return true;
 }
 
-std::optional<OpenShock::Config::EStopConfig> OpenShock::Config::GetEStopConfig()
+OpenShock::Config::EStopConfig OpenShock::Config::GetEStopConfig()
 {
   return EStopCfg;
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetEStopGpioPin()
+gpio_num_t OpenShock::Config::GetEStopGpioPin()
 {
   return EStopCfg.gpioPin;
 }

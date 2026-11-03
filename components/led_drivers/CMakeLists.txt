@@ -6,7 +6,7 @@
 #   led_drivers/RgbLedDriver.h
 #
 # Note: this is driver-level only. The VisualStateManager that picks patterns
-# based on estop/gateway/wifi state is a separate concern and lives in main.
+# based on estop/gateway/wifi state is a separate concern and lives in device_control.
 
 idf_component_register(
   SRCS          "src/MonoLedDriver.cpp"

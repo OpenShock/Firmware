@@ -61,8 +61,9 @@ MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
 
   ledc_channel_config(&ledc_channel);  // TODO: Error handling
 
-  char name[32];
-  snprintf(name, sizeof(name), "MonoLedDriver-%d", gpioPin);
+  // FreeRTOS keeps 15 characters of a task name: short enough that a two-digit pin isn't cut off
+  char name[configMAX_TASK_NAME_LEN];
+  snprintf(name, sizeof(name), "MonoLed-%d", static_cast<int>(gpioPin));
   if (!startTask(name, 1536)) {  // PROFILED (old per-pattern task): 0.5KB stack usage
     OS_LOGE(TAG, "[pin-%d] Failed to create task", gpioPin);
     ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);

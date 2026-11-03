@@ -1,8 +1,6 @@
 #include "serial_console/command_handlers/common.h"
 
-#include "config/Config.h"
-
-#include <esp_system.h>
+#include "config/Store.h"
 
 static void handleJsonConfigCommand(std::string_view arg, bool isAutomated)
 {
@@ -14,24 +12,17 @@ static void handleJsonConfigCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  if (!OpenShock::Config::SaveFromJSON(arg)) {
-    SERPR_ERROR("Failed to save config");
-    return;
-  }
-
-  SERPR_SUCCESS("Saved config, restarting...");
-
-  esp_restart();
+  OpenShock::SerialCmds::ReportSavedAndRestart(OpenShock::Config::SaveFromJSON(arg));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::JsonConfigHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("jsonconfig"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("jsonconfig");
 
-  group.addCommand("Get the configuration as JSON"sv, handleJsonConfigCommand);
+  group.addCommand("Get the configuration as JSON", handleJsonConfigCommand);
 
-  auto& setCommand = group.addCommand("Set the configuration from JSON, and restart"sv, handleJsonConfigCommand);
-  setCommand.addArgument("json"sv, "must be a valid JSON object"sv, "{ ... }"sv);
+  auto& setCommand = group.addCommand("Set the configuration from JSON, and restart", handleJsonConfigCommand);
+  setCommand.addArgument("json", "must be a valid JSON object", "{ ... }");
 
   return group;
 }

@@ -6,9 +6,11 @@ const char* const TAG = "CommandHandler";
 
 #include "BoardDescriptor.h"
 #include "Chipset.h"
-#include "config/Config.h"
+#include "estop/EStopConfig.h"
 #include "estop/EStopManager.h"
+#include "events/Events.h"
 #include "Logging.h"
+#include "radio/RFConfig.h"
 
 #include "OpenShock.h"
 #include "radio/RFTransmitter.h"
@@ -23,6 +25,10 @@ const char* const TAG = "CommandHandler";
 #include <algorithm>
 #include <memory>
 #include <unordered_map>
+
+// WiFiManager keeps the radio out of power save for its idle period (at least 5 minutes) after the last command, so a
+// session only needs refreshing now and then, not a broadcast per command.
+const int64_t ACTIVITY_POST_INTERVAL = OPENSHOCK_EVENT_DEVICE_ACTIVITY_INTERVAL_MS;
 
 static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
@@ -109,7 +115,7 @@ static void commandhandler_keepalivetask()
 
       uint32_t key = (static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId;
       if (activityMap.size() >= CONFIG_OPENSHOCK_KEEPALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
-        auto oldest = std::min_element(activityMap.begin(), activityMap.end(), [](const auto& a, const auto& b) { return a.second.lastActivityTimestamp < b.second.lastActivityTimestamp; });
+        auto oldest = std::ranges::min_element(activityMap, {}, [](const auto& entry) { return entry.second.lastActivityTimestamp; });
         OS_LOGW(TAG, "Keeping more than %d shockers alive, dropping shocker %u", CONFIG_OPENSHOCK_KEEPALIVE_MAX_SHOCKERS, oldest->second.shockerId);
         activityMap.erase(oldest);
       }
@@ -154,6 +160,23 @@ static void commandhandler_keepalivetask()
 
       timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS);
     }
+  }
+}
+
+// Requires s_keepAliveMutex. Lets WiFiManager keep the radio awake while commands are coming in, at most once per
+// ACTIVITY_POST_INTERVAL. Never waits: when the event queue is full the next command reports the activity instead.
+static void reportActivity()
+{
+  static int64_t lastPost = 0;
+  static bool posted      = false;
+
+  int64_t now = OpenShock::millis();
+  if (posted && now - lastPost < ACTIVITY_POST_INTERVAL) {
+    return;
+  }
+  if (esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_DEVICE_ACTIVITY, nullptr, 0, 0) == ESP_OK) {
+    lastPost = now;
+    posted   = true;
   }
 }
 
@@ -218,18 +241,14 @@ bool CommandHandler::Init()
   }
   initialized = true;
 
-  auto rfConfig = Config::GetRFConfig();
-  if (!rfConfig) {
-    OS_LOGE(TAG, "Failed to get RF config");
-    return false;
-  }
+  const Config::RFConfig rfConfig = Config::GetRFConfig();
 
   // Runs through E-Stops too; the task itself sends nothing while e-stopped
-  if (rfConfig->keepAliveEnabled) {
+  if (rfConfig.keepAliveEnabled) {
     internalSetKeepAliveEnabled(true);
   }
 
-  gpio_num_t txPin = rfConfig->txPin;
+  gpio_num_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     const int8_t boardTxPin = Board::Get().rfTxGpio;
     if (!OpenShock::IsValidOutputPin(boardTxPin)) {
@@ -269,11 +288,8 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
   // Driving the E-Stop input as the RF output would defeat the kill switch. Checked against the configured pin even
   // while the E-Stop is disabled, so enabling it later can't collide either.
-  auto estopPin = Config::GetEStopGpioPin();
-  if (!estopPin) {
-    return SetGPIOResultCode::InternalError;
-  }
-  if (*estopPin != GPIO_NUM_NC && txPin == *estopPin) {
+  const gpio_num_t estopPin = Config::GetEStopGpioPin();
+  if (estopPin != GPIO_NUM_NC && txPin == estopPin) {
     return SetGPIOResultCode::PinInUse;
   }
 
@@ -331,13 +347,7 @@ gpio_num_t CommandHandler::GetRfTxPin()
     return transmitter->GetTxPin();
   }
 
-  auto txPin = Config::GetRFConfigTxPin();
-  if (!txPin) {
-    OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    return static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
-  }
-
-  return *txPin;
+  return Config::GetRFConfigTxPin();
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)
@@ -356,6 +366,10 @@ bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, S
   bool ok = transmitter->SendCommand(model, shockerId, type, intensity, durationMs);
 
   ScopedLock lock__ka(&s_keepAliveMutex);
+
+  if (ok) {
+    reportActivity();
+  }
 
   if (ok && s_keepAliveQueue != nullptr) {
     KnownShocker cmd {.killTask = false, .model = model, .shockerId = shockerId, .lastActivityTimestamp = OpenShock::millis() + durationMs};

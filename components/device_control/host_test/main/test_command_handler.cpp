@@ -37,7 +37,7 @@ static void resetCommandHandler()
 
 static TaskHandle_t transmitTask()
 {
-  TaskHandle_t task = HostFake::FindTask("RFTransmitter-4");
+  TaskHandle_t task = HostFake::FindTask("RFTx-4");
   TEST_ASSERT_NOT_NULL(task);
   return task;
 }
@@ -72,6 +72,66 @@ TEST_CASE("CommandHandler transmits commands while not e-stopped", "[device_cont
   TEST_ASSERT_TRUE(TestFrames::Count(shock) > 0);
 }
 
+TEST_CASE("CommandHandler reports activity at most once a minute", "[device_control][command]")
+{
+  resetCommandHandler();
+  HostFake::Now += 60'000;  // Clear of whatever an earlier test reported
+
+  // The activity event keeps WiFiManager's radio out of power save; one per command would flood the event loop.
+  for (int i = 0; i < 3; i++) {
+    TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  }
+  TEST_ASSERT_EQUAL(1, HostFake::ActivityPosts);
+
+  HostFake::Now += 59'999;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(1, HostFake::ActivityPosts);
+
+  HostFake::Now += 1;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(2, HostFake::ActivityPosts);
+
+  HostFake::RunTask(transmitTask(), kBudget);  // Send what was queued so the next test starts with an empty queue
+}
+
+TEST_CASE("CommandHandler posts no activity when the transmit queue rejects a command", "[device_control][command]")
+{
+  resetCommandHandler();
+  HostFake::Now += 60'000;  // Clear the throttle window left by earlier tests
+
+  // Fill the transmit queue until a command is rejected
+  int accepted = 0;
+  while (CommandHandler::HandleCommand(kModel, kShockerId + accepted, ShockerCommandType::Vibrate, 10, 300)) {
+    accepted++;
+  }
+  TEST_ASSERT_GREATER_THAN(0, accepted);
+
+  // Past the throttle window, so an unconditional post would not be suppressed
+  HostFake::Now += 60'000;
+  const int postsBefore = HostFake::ActivityPosts;
+  TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId + accepted, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(postsBefore, HostFake::ActivityPosts);
+
+  HostFake::RunTask(transmitTask(), kBudget);  // Drain the queue for the next test
+}
+
+TEST_CASE("CommandHandler reports activity again after a failed event post", "[device_control][command]")
+{
+  resetCommandHandler();
+  HostFake::Now += 60'000;  // Clear the throttle window left by earlier tests
+
+  HostFake::FailEventPost = true;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(0, HostFake::ActivityPosts);
+
+  // The failed post did not start the throttle window: the next command posts right away
+  HostFake::FailEventPost = false;
+  TEST_ASSERT_TRUE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 10, 300));
+  TEST_ASSERT_EQUAL(1, HostFake::ActivityPosts);
+
+  HostFake::RunTask(transmitTask(), kBudget);
+}
+
 TEST_CASE("CommandHandler refuses commands while e-stopped", "[device_control][command][estop]")
 {
   resetCommandHandler();
@@ -80,6 +140,7 @@ TEST_CASE("CommandHandler refuses commands while e-stopped", "[device_control][c
   TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Shock, 100, 1000));
   TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Vibrate, 100, 1000));
   TEST_ASSERT_FALSE(CommandHandler::HandleCommand(kModel, kShockerId, ShockerCommandType::Sound, 0, 1000));
+  TEST_ASSERT_EQUAL(0, HostFake::ActivityPosts);  // Refused commands are not activity
 
   // Nothing even reached the transmitter's queue.
   HostFake::EStopped = false;
