@@ -76,6 +76,10 @@ namespace OpenShock::CaptivePortal {
     WsClient m_clients[CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS] {};
     SimpleMutex m_clientsMutex;
 
+    // Received frame payloads, reused across frames: only wsHandler, on the single httpd task, touches it. Grows to
+    // the largest frame seen, at most CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE, and lives as long as the portal.
+    std::vector<uint8_t> m_rxBuf;
+
     struct WsSend {
       int fd;  // -1 to broadcast
       bool binary;
