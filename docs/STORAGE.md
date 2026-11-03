@@ -143,8 +143,8 @@ char strings[body_start - strings_start] @ strings_start [[sealed]];
 u8   trailing[std::mem::size() - header.image_len] @ header.image_len [[sealed, comment("partition space after the image")]];
 ```
 
-The rules a valid image follows. The pattern warns on a few; the firmware (`Www::Image::Parse`) enforces all of them, in
-this order:
+The rules a valid image follows. The pattern warns on a few; the firmware (`Www::Image::Parse`) enforces rules 1-5 and
+the part of rule 6 marked as checked, in this order:
 
 1. `image_len` is 4-aligned, at least the 64-byte header and within the partition.
 2. `image_hash` is the SHA-256 of the first `image_len` bytes with `image_hash` zeroed. Nothing past the version and
@@ -157,6 +157,9 @@ this order:
    previous one ended, the first at node 1, and together they cover every node.
 6. Bodies lie between the end of the directory and `image_len`, 4-aligned, in node order, each padded to 4 bytes;
    `image_len` is exactly the end of the last one's padding. Every body is gzipped (there is no flag for it).
+   *Checked:* each body is 4-aligned and within that range, and `image_len` is the furthest padded body end.
+   *Producer guarantee only* (the packer writes them; the parser does not check): bodies are in node order and do not
+   overlap, and their contents are gzip. The image hash already rules out a body changed after packing.
 
 The packer's output is a pure function of the assets (sorted, no timestamps), so an unchanged frontend gives a
 byte-identical image. `scripts/utils/wwwimage.py`, `WwwImage.h` and this section describe the same format: change them
