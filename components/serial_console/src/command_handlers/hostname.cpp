@@ -26,12 +26,12 @@ static void handleHostnameCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::HostnameHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("hostname"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("hostname");
 
-  group.addCommand("Get the network hostname."sv, handleHostnameCommand);
+  group.addCommand("Get the network hostname.", handleHostnameCommand);
 
-  auto& setCommand = group.addCommand("Set the network hostname."sv, handleHostnameCommand);
-  setCommand.addArgument("hostname"sv, "letters, digits and hyphens, max 32 characters"sv, std::string_view(CONFIG_OPENSHOCK_FW_HOSTNAME));
+  auto& setCommand = group.addCommand("Set the network hostname.", handleHostnameCommand);
+  setCommand.addArgument("hostname", "letters, digits and hyphens, max 32 characters", std::string_view(CONFIG_OPENSHOCK_FW_HOSTNAME));
 
   return group;
 }

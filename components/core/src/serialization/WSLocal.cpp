@@ -102,9 +102,7 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
 
   // Only what the portal shows. The whole config has no wire form, and secrets never go into this message.
   std::vector<flatbuffers::Offset<flatbuffers::String>> savedSsids;
-  for (const auto& credentials : OpenShock::Config::GetWiFiCredentials()) {
-    savedSsids.push_back(builder.CreateString(credentials.ssid));
-  }
+  OpenShock::Config::ForEachWiFiSsid([&](std::string_view ssid) { savedSsids.push_back(builder.CreateString(ssid.data(), ssid.size())); });
   auto savedSsidsOffset = builder.CreateVector(savedSsids);
 
   auto otaOffset = createOtaSettings(builder);

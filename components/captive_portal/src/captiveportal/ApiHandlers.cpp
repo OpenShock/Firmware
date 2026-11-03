@@ -246,8 +246,12 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
     }
   }
 
-  bool connect = true;
-  if (auto connectStr = getFormParam(*body, "connect")) {
+  bool connect    = true;
+  auto connectStr = getFormParam(*body, "connect");
+  if (!connectStr && connectStr.error() != ParamError::Missing) {
+    return sendParamError(req, connectStr.error());
+  }
+  if (connectStr) {
     auto parsed = parseBool(*connectStr);
     if (!parsed) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
@@ -256,7 +260,11 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   }
 
   wifi_auth_mode_t authMode = WIFI_AUTH_MAX;
-  if (auto securityStr = getFormParam(*body, "security")) {
+  auto securityStr          = getFormParam(*body, "security");
+  if (!securityStr && securityStr.error() != ParamError::Missing) {
+    return sendParamError(req, securityStr.error());
+  }
+  if (securityStr) {
     auto sec = Convert::ToUint8(*securityStr);
     if (!sec || *sec > static_cast<uint8_t>(WIFI_AUTH_MAX)) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
@@ -319,14 +327,23 @@ static esp_err_t apiOtaSettings(httpd_req_t* req)
     return response;
   }
 
-  if (auto channelStr = getQueryParam(req, "channel")) {
+  // Present but undecodable (an encoded NUL) is an error like an unknown value, never a silently skipped setting
+  auto channelStr = getQueryParam(req, "channel");
+  if (!channelStr && channelStr.error() != ParamError::Missing) {
+    return sendParamError(req, channelStr.error());
+  }
+  if (channelStr) {
     channel = TryParseOtaUpdateChannel(*channelStr);
     if (!channel) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_CHANNEL);
     }
   }
 
-  if (auto intervalStr = getQueryParam(req, "interval")) {
+  auto intervalStr = getQueryParam(req, "interval");
+  if (!intervalStr && intervalStr.error() != ParamError::Missing) {
+    return sendParamError(req, intervalStr.error());
+  }
+  if (intervalStr) {
     // Minutes; 0 would make periodic checks fire on every OTA task wake-up
     interval = Convert::ToUint16(*intervalStr);
     if (!interval || *interval == 0) {

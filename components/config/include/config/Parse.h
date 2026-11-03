@@ -52,7 +52,8 @@ namespace OpenShock::Config::Parse {
 
     // Wrong type or unknown value: fall back to the default like every other field, rather than keeping
     // whatever value `val` held before (the current running config when importing JSON).
-    auto str = jsonVal.tryGetStr();
+    char scratch[64];  // only for a value with escapes: anything longer is not a valid value of any parsed field
+    auto str = jsonVal.tryGetStrView(scratch);
     if (!str) {
       val = defaultVal;
       return false;

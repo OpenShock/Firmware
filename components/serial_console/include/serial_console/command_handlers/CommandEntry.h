@@ -1,5 +1,6 @@
 #pragma once
 
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -11,7 +12,7 @@ namespace OpenShock::SerialCmds {
     std::string_view name;
     std::string_view constraint;
     std::string_view exampleValue;
-    std::vector<std::string_view> constraintExtensions;
+    std::span<const std::string_view> constraintExtensions;  // static storage: help text lines, never copied
   };
 
   class CommandEntry {
@@ -24,7 +25,7 @@ namespace OpenShock::SerialCmds {
     inline const std::vector<CommandArgument>& arguments() const { return m_arguments; }
     inline CommandHandler commandHandler() { return m_commandHandler; }
 
-    CommandArgument& addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::vector<std::string_view> constraintExtensions = {});
+    CommandArgument& addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::span<const std::string_view> constraintExtensions = {});
 
   private:
     std::string_view m_name;

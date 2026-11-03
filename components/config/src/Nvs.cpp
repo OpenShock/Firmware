@@ -183,15 +183,18 @@ bool Nvs::Handle::SetI32(const char* key, int32_t value)
 {
   return checkWrite(nvs_set_i32(m_handle, key, value), key);
 }
-bool Nvs::Handle::SetStr(const char* key, std::string_view value)
+bool Nvs::Handle::SetStr(const char* key, const char* value)
 {
-  // nvs_set_str wants a C string: a value with an embedded NUL would be silently cut, so refuse it
-  if (value.find('\0') != std::string_view::npos) {
+  return checkWrite(nvs_set_str(m_handle, key, value), key);
+}
+bool Nvs::Handle::SetStr(const char* key, const std::string& value)
+{
+  // nvs_set_str stops at the first NUL: a value with one inside would be stored cut short, so refuse it
+  if (value.find('\0') != std::string::npos) {
     OS_LOGE(TAG, "Refusing to store %s: embedded NUL", key);
     return false;
   }
-  std::string copy(value);
-  return checkWrite(nvs_set_str(m_handle, key, copy.c_str()), key);
+  return SetStr(key, value.c_str());
 }
 bool Nvs::Handle::SetBlob(const char* key, std::span<const uint8_t> value)
 {

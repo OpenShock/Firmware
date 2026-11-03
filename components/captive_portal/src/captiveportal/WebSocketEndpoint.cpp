@@ -179,7 +179,11 @@ esp_err_t CaptivePortal::WebSocketEndpoint::wsHandler(httpd_req_t* req)
     return ESP_FAIL;
   }
 
-  std::vector<uint8_t> buf(frame.len);
+  // onWsFrame copies what it keeps (reassembly), so the buffer is free again once it returns
+  std::vector<uint8_t>& buf = self->m_rxBuf;
+  if (buf.size() < frame.len) {
+    buf.resize(frame.len);
+  }
   frame.payload = buf.data();
   ret           = httpd_ws_recv_frame(req, &frame, frame.len);
   if (ret != ESP_OK) {
@@ -219,7 +223,7 @@ void CaptivePortal::WebSocketEndpoint::onWsFrame(int fd, httpd_ws_type_t opcode,
         if (!final) {
           m_clients[idx].reasmActive = true;
           m_clients[idx].reasmType   = type;
-          m_clients[idx].reasm.assign(payload.begin(), payload.end());
+          m_clients[idx].reasm.assign_range(payload);
           break;
         }
       }
@@ -245,7 +249,7 @@ void CaptivePortal::WebSocketEndpoint::onWsFrame(int fd, httpd_ws_type_t opcode,
           httpd_sess_trigger_close(m_server, fd);
           break;
         }
-        m_clients[idx].reasm.insert(m_clients[idx].reasm.end(), payload.begin(), payload.end());
+        m_clients[idx].reasm.append_range(payload);
         if (!final) {
           break;
         }
@@ -330,7 +334,7 @@ bool CaptivePortal::WebSocketEndpoint::queueSend(int fd, bool broadcast, bool bi
       OS_LOGW(TAG, "WebSocket send queue full, dropping message");
       return false;
     }
-    m_sendQueue.push_back(WsSend {.fd = broadcast ? -1 : fd, .binary = binary, .data = std::vector<uint8_t>(data.begin(), data.end())});
+    m_sendQueue.push_back(WsSend {.fd = broadcast ? -1 : fd, .binary = binary, .data = std::vector<uint8_t>(std::from_range, data)});
   }
 
   scheduleDrain();

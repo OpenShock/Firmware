@@ -69,10 +69,7 @@ WiFiCredentials::WiFiCredentials(uint8_t id, std::string_view ssid, std::string_
 
 bool WiFiCredentials::HasPinnedBSSID() const
 {
-  for (auto b : bssid) {
-    if (b != 0) return true;
-  }
-  return false;
+  return std::ranges::any_of(bssid, [](uint8_t b) { return b != 0; });
 }
 
 bool WiFiCredentials::FromJSON(JSON::JsonView json)
@@ -90,7 +87,8 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
   authMode = fromBlobAuthMode(json["authMode"].tryGetU8().value_or(kBlobAuthUnknown));
 
   bssid.fill(0);
-  if (auto bssidStr = json["bssid"].tryGetStr(); bssidStr && bssidStr->size() == 12) {
+  char bssidScratch[12];
+  if (auto bssidStr = json["bssid"].tryGetStrView(bssidScratch); bssidStr && bssidStr->size() == 12) {
     // Parse into a temporary: TryParseHex writes byte by byte and stops at the first bad pair, and a partial
     // BSSID would pin the network to an AP that doesn't exist.
     std::array<uint8_t, 6> parsed {};
@@ -137,7 +135,7 @@ std::vector<uint8_t> WiFiCredentials::ToBlob() const
   blob.push_back(kBlobVersion);
   blob.push_back(id);
   blob.push_back(toBlobAuthMode(authMode));
-  blob.insert(blob.end(), bssid.begin(), bssid.end());
+  blob.append_range(bssid);
   blob.push_back(static_cast<uint8_t>(std::min<std::size_t>(ssid.size(), 255)));
   blob.insert(blob.end(), ssid.begin(), ssid.begin() + std::min<std::size_t>(ssid.size(), 255));
   blob.push_back(static_cast<uint8_t>(std::min<std::size_t>(password.size(), 255)));
@@ -155,7 +153,7 @@ bool WiFiCredentials::FromBlob(std::span<const uint8_t> blob)
   uint8_t storedId   = blob[pos++];
   uint8_t storedAuth = blob[pos++];
   std::array<uint8_t, 6> storedBssid;
-  std::copy_n(blob.begin() + pos, 6, storedBssid.begin());
+  std::ranges::copy_n(blob.begin() + pos, storedBssid.size(), storedBssid.begin());
   pos += 6;
   const std::size_t ssidLen = blob[pos++];
   if (blob.size() < pos + ssidLen + 1) {

@@ -5,6 +5,10 @@
 #include <string>
 #include <string_view>
 
+// printf a SemVer without building a string: OS_LOGI(TAG, "version " SEMVER_FMT, SEMVER_ARG(v)). Like BSSID_FMT.
+#define SEMVER_FMT    "%u.%u.%u%s%s%s%s"
+#define SEMVER_ARG(v) static_cast<unsigned>((v).major), static_cast<unsigned>((v).minor), static_cast<unsigned>((v).patch), (v).prerelease.empty() ? "" : "-", (v).prerelease.c_str(), (v).build.empty() ? "" : "+", (v).build.c_str()
+
 namespace OpenShock {
   struct SemVer {
     uint16_t major;
@@ -33,8 +37,8 @@ namespace OpenShock {
       : major(major)
       , minor(minor)
       , patch(patch)
-      , prerelease(std::string(prerelease))
-      , build(std::string(build))
+      , prerelease(prerelease)
+      , build(build)
     {
     }
 

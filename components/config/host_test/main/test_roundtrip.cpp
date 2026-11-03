@@ -7,6 +7,8 @@
 #include "config_test_helpers.h"
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 using namespace OpenShock;
 using namespace ConfigTest;
@@ -47,10 +49,15 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
   TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", Config::GetBackendAuthToken().c_str());
 
-  auto creds = Config::TryGetWiFiCredentialsBySSID("Guest");
-  TEST_ASSERT_TRUE(creds.has_value());
-  TEST_ASSERT_EQUAL_UINT8(2, creds->id);
   TEST_ASSERT_EQUAL_UINT8(2, Config::GetWiFiCredentialsIDbySSID("Guest"));
+  TEST_ASSERT_EQUAL_UINT8(0, Config::GetWiFiCredentialsIDbySSID("Gues"));
+
+  std::vector<std::string> ssids;
+  Config::ForEachWiFiSsid([&](std::string_view ssid) { ssids.emplace_back(ssid); });
+  TEST_ASSERT_EQUAL_size_t(before.wifi.credentialsList.size(), ssids.size());
+  for (size_t i = 0; i < ssids.size(); ++i) {
+    TEST_ASSERT_EQUAL_STRING(before.wifi.credentialsList[i].ssid.c_str(), ssids[i].c_str());
+  }
 }
 
 TEST_CASE("Whole-section setters round trip through the store", "[config][roundtrip]")

@@ -19,7 +19,7 @@ CommandEntry::CommandEntry(std::string_view name, std::string_view description, 
 {
 }
 
-CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::vector<std::string_view> constraintExtensions)
+CommandArgument& CommandEntry::addArgument(std::string_view name, std::string_view constraint, std::string_view exampleValue, std::span<const std::string_view> constraintExtensions)
 {
   m_arguments.push_back({name, constraint, exampleValue, constraintExtensions});
   return m_arguments.back();

@@ -29,14 +29,15 @@ namespace OpenShock::CaptivePortal {
   /// @brief Registers a route, logging a failure. With wildcard matching, routes registered earlier take priority.
   void registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*), void* userCtx);
 
-  // Read and URL-decode a query-string parameter. httpd does not decode for us.
-  [[nodiscard]] std::expected<std::string, ParamError> getQueryParam(httpd_req_t* req, const char* key);
-  [[nodiscard]] std::expected<bool, ParamError> getBoolQueryParam(httpd_req_t* req, const char* key);
+  // Read and URL-decode a query-string parameter (key matched case-insensitively, as httpd does). The query is
+  // parsed in place in the request URI: no copy, and no limit on the value's length.
+  [[nodiscard]] std::expected<std::string, ParamError> getQueryParam(httpd_req_t* req, std::string_view key);
+  [[nodiscard]] std::expected<bool, ParamError> getBoolQueryParam(httpd_req_t* req, std::string_view key);
 
   // The web UI sends booleans as "1"/"0"; "true"/"false" are accepted too.
   [[nodiscard]] std::optional<bool> parseBool(std::string_view str);
 
   // Read a urlencoded request body (application/x-www-form-urlencoded).
   [[nodiscard]] std::optional<std::string> recvBody(httpd_req_t* req);
-  [[nodiscard]] std::expected<std::string, ParamError> getFormParam(const std::string& body, const char* key);
+  [[nodiscard]] std::expected<std::string, ParamError> getFormParam(std::string_view body, std::string_view key);
 }  // namespace OpenShock::CaptivePortal

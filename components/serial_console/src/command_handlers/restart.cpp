@@ -13,9 +13,9 @@ static void handleRestartCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RestartHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("restart"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("restart");
 
-  group.addCommand("Restart the board"sv, handleRestartCommand);
+  group.addCommand("Restart the board", handleRestartCommand);
 
   return group;
 }

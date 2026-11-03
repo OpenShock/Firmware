@@ -146,6 +146,12 @@ def _decide_nightly(ref: str, sha: str, api: Api) -> Decision:
 
 
 def _decide_dispatch(ref: str, inputs: dict) -> Decision:
+    # release.yml dispatches a release tag once its draft is staged; that always goes to prod.
+    if str(inputs.get('release')).lower() == 'true':
+        if parse_ref(ref).kind != 'tag':
+            fail(f'A release was dispatched on {ref}; releases run against their tag.')
+        return Decision(build=True, publish=True, server='prod')
+
     # A manual dispatch always publishes; the channel and the ref are chosen by hand.
     d = Decision(build=True, publish=True, server='prod' if inputs.get('server') == 'prod' else 'dev')
     # The ref picker offers tags as well as branches, so prod still means running against the tag being released.
@@ -155,12 +161,6 @@ def _decide_dispatch(ref: str, inputs: dict) -> Decision:
     return d
 
 
-def _decide_push(ref: str) -> Decision:
-    # The workflow only triggers on release tags, which publish to prod; a branch push builds without publishing.
-    is_tag = parse_ref(ref).kind == 'tag'
-    return Decision(build=True, publish=is_tag, server='prod' if is_tag else 'dev')
-
-
 def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Decision:
     if event_name == 'pull_request':
         return _decide_pull_request(payload)
@@ -168,8 +168,6 @@ def decide(event_name: str, ref: str, sha: str, payload: dict, api: Api) -> Deci
         return _decide_nightly(ref, sha, api)
     if event_name == 'workflow_dispatch':
         return _decide_dispatch(ref, payload.get('inputs') or {})
-    if event_name == 'push':
-        return _decide_push(ref)
     fail(f'Unsupported event {event_name!r}')
 
 

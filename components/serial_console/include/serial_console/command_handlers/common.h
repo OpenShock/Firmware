@@ -11,8 +11,6 @@
 #define SERPR_SUCCESS(format, ...)  SERPR_SYS("Success|" format, ##__VA_ARGS__)
 #define SERPR_ERROR(format, ...)    SERPR_SYS("Error|" format, ##__VA_ARGS__)
 
-using namespace std::string_view_literals;
-
 namespace OpenShock::SerialCmds {
   /// @brief The tail of every handler that saved a setting: Success or Error for the save's result.
   void ReportSaved(bool saved);

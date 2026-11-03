@@ -21,7 +21,7 @@ idf_component_register(
   PRIV_REQUIRES     core device_control                        # wifi/gateway/message handlers/AppHooks; Config::; CommandHandler/EStopManager
                     common chipset logging temporal osjson serialization   # foundation utilities, json, HubToLocalMessage fbs
                     dns_server http rfc8908 www                # DNSServer, ContentTypes, RFC8908Handler, the www image
-                    esp_http_server esp_netif esp_timer esp_wifi
+                    esp_http_server esp_netif esp_timer esp_wifi lwip
 )
 
 # Match core: IDF compiles application components with -Werror, the legacy build did not.
