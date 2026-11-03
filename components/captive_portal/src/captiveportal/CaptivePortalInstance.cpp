@@ -12,7 +12,7 @@ const char* const TAG = "CaptivePortalInstance";
 #include <lwip/sockets.h>
 
 #include <cstdint>
-#include <cstring>
+#include <string_view>
 
 const uint16_t HTTP_PORT = 80;
 // httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
@@ -53,13 +53,13 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   // the local address is not enough: lwIP accepts a packet for any of the hub's addresses on any interface, so a LAN
   // client that routes the AP address via the hub's STA address would get through. The portal's API is the local
   // protocol, which has no compatibility rules: nothing on the LAN may come to depend on it.
-  ifreq apInterface    = {};
-  const char* apIfName = CaptivePortal::ApInterfaceName();
-  if (apIfName[0] == '\0' || strlen(apIfName) >= sizeof(apInterface.ifr_name)) {
-    OS_LOGE(TAG, "No usable AP interface name (\"%s\"), not starting the HTTP server", apIfName);
+  ifreq apInterface         = {};  // zeroed, so the copied name is NUL-terminated
+  std::string_view apIfName = CaptivePortal::ApInterfaceName();
+  if (apIfName.empty() || apIfName.size() >= sizeof(apInterface.ifr_name)) {
+    OS_LOGE(TAG, "No usable AP interface name (\"%.*s\"), not starting the HTTP server", static_cast<int>(apIfName.size()), apIfName.data());
     return false;
   }
-  memcpy(apInterface.ifr_name, apIfName, strlen(apIfName) + 1);
+  apIfName.copy(apInterface.ifr_name, apIfName.size());
 
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
   config.server_port      = HTTP_PORT;

@@ -9,6 +9,7 @@ const char* const TAG = "RFC8908Handler";
 #include "http/ContentTypes.h"
 #include "json/Json.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <string_view>
@@ -54,17 +55,14 @@ static esp_err_t SendNotFound(httpd_req_t* req)
     return httpd_resp_send(req, kBody.data(), kBody.size());
   }
 
-  std::string head;
-  head.reserve(96);
-  head += "HTTP/1.1 404 Not Found\r\nContent-Type: ";
-  head += HTTP::ContentType::TextPlain;
-  head += "\r\nContent-Length: ";
-  head += std::to_string(kBody.size());
-  head += "\r\n\r\n";
+  // Fixed at compile time, so spelled out; the asserts keep it in step with the GET response above
+  static constexpr std::string_view kHead = "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\n";
+  static_assert(std::string_view(HTTP::ContentType::TextPlain) == "text/plain");
+  static_assert(kBody.size() == 9);
 
   std::size_t sent = 0;
-  while (sent < head.size()) {
-    int n = httpd_send(req, head.data() + sent, head.size() - sent);
+  while (sent < kHead.size()) {
+    int n = httpd_send(req, kHead.data() + sent, kHead.size() - sent);
     if (n <= 0) {
       return ESP_FAIL;
     }
@@ -103,12 +101,7 @@ static constexpr std::string_view kProbePaths[] = {
 
 static bool IsProbePath(std::string_view path)
 {
-  for (std::string_view probePath : kProbePaths) {
-    if (StringIEquals(path, probePath)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(kProbePaths, [path](std::string_view probePath) { return StringIEquals(path, probePath); });
 }
 
 bool RFC8908::IsProbeRequest(httpd_req_t* req)

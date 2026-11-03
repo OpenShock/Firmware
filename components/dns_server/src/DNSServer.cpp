@@ -14,6 +14,7 @@ const char* const TAG = "DNSServer";
 #include <cerrno>
 #include <cstddef>
 #include <cstring>
+#include <string_view>
 
 using namespace OpenShock;
 
@@ -52,12 +53,13 @@ bool DNSServer::start(const char* responseIpv4, const char* bindIpv4, const char
     return false;
   }
 
-  struct ifreq bindIf = {};
-  if (bindIfName == nullptr || bindIfName[0] == '\0' || strlen(bindIfName) >= sizeof(bindIf.ifr_name)) {
-    OS_LOGE(TAG, "Invalid bind interface: %s", bindIfName != nullptr ? bindIfName : "(null)");
+  struct ifreq bindIf         = {};  // zeroed, so the copied name is NUL-terminated
+  std::string_view ifNameView = bindIfName != nullptr ? bindIfName : "";
+  if (ifNameView.empty() || ifNameView.size() >= sizeof(bindIf.ifr_name)) {
+    OS_LOGE(TAG, "Invalid bind interface: \"%.*s\"", static_cast<int>(ifNameView.size()), ifNameView.data());
     return false;
   }
-  memcpy(bindIf.ifr_name, bindIfName, strlen(bindIfName) + 1);
+  ifNameView.copy(bindIf.ifr_name, ifNameView.size());
 
   m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (m_socket < 0) {
