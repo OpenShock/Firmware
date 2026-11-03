@@ -14,10 +14,10 @@ namespace OpenShock::HTTP::JsonAPI {
   /// @brief Gets the hub info for the given hub token. Valid response codes: 200, 401
   /// @param hubToken
   /// @return
-  HTTP::Response<Serialization::JsonAPI::HubInfoResponse> GetHubInfo(std::string_view hubToken);
+  HTTP::Response<Serialization::JsonAPI::HubInfoResponse> GetHubInfo(const char* hubToken);
 
   /// @brief Requests a Live Control Gateway to connect to. Valid response codes: 200, 401
   /// @param hubToken
   /// @return
-  HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> AssignLcg(std::string_view hubToken);
+  HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> AssignLcg(const char* hubToken);
 }  // namespace OpenShock::HTTP::JsonAPI

@@ -229,9 +229,9 @@ static std::optional<WiFiNetwork> setCredentialsID(const char* ssid, uint8_t cre
 
 // Requires s_networksMutex. Records the attempt and returns the scanned channel of the strongest BSSID, or 0 if the
 // network isn't in the scan results (hidden or out of range).
-[[nodiscard]] static uint8_t prepareConnectAttempt(const std::string& ssid)
+[[nodiscard]] static uint8_t prepareConnectAttempt(const char* ssid)
 {
-  auto it = findNetworkBySSID(ssid.c_str());
+  auto it = findNetworkBySSID(ssid);
   if (it == s_wifiNetworks.end()) {
     return 0;
   }
@@ -255,22 +255,22 @@ static std::optional<WiFiNetwork> setCredentialsID(const char* ssid, uint8_t cre
 // Must be called without s_networksMutex held, after prepareConnectAttempt(). A known `channel` (from a scan) lets
 // esp_wifi probe just that channel instead of sweeping all of them. `authMode` is the security the network was saved
 // with (WIFI_AUTH_MAX if unknown): esp_wifi skips every BSSID weaker than that (evil twin protection).
-static bool connectWiFi(const std::string& ssid, const std::string& password, wifi_auth_mode_t authMode, const uint8_t* pinnedBssid, uint8_t channel)
+static bool connectWiFi(const char* ssid, const char* password, wifi_auth_mode_t authMode, const uint8_t* pinnedBssid, uint8_t channel)
 {
-  if (ssid.empty()) {
+  if (ssid[0] == '\0') {
     OS_LOGW(TAG, "Cannot connect to network with empty SSID");
     return false;
   }
 
   if (pinnedBssid != nullptr) {
-    OS_LOGV(TAG, "Connecting to network %s (pinned " BSSID_FMT ")", ssid.c_str(), BSSID_ARG(pinnedBssid));
+    OS_LOGV(TAG, "Connecting to network %s (pinned " BSSID_FMT ")", ssid, BSSID_ARG(pinnedBssid));
   } else {
-    OS_LOGV(TAG, "Connecting to network %s", ssid.c_str());
+    OS_LOGV(TAG, "Connecting to network %s", ssid);
   }
 
   wifi_config_t config = {};
-  std::strncpy(reinterpret_cast<char*>(config.sta.ssid), ssid.c_str(), sizeof(config.sta.ssid));
-  std::strncpy(reinterpret_cast<char*>(config.sta.password), password.c_str(), sizeof(config.sta.password));
+  std::strncpy(reinterpret_cast<char*>(config.sta.ssid), ssid, sizeof(config.sta.ssid));
+  std::strncpy(reinterpret_cast<char*>(config.sta.password), password, sizeof(config.sta.password));
   // With a known channel, a fast scan takes the first matching BSSID it finds there. Without one, an all-channel scan
   // picks the strongest matching BSSID (sort_method defaults to WIFI_CONNECT_AP_BY_SIGNAL) and retries it a few times;
   // esp_wifi applies failure_retry_cnt to all-channel scans only.
@@ -555,10 +555,10 @@ static bool tryConnect()
       }
     }
 
-    channel = prepareConnectAttempt(creds->ssid);
+    channel = prepareConnectAttempt(creds->ssid.c_str());
   }
 
-  return connectWiFi(creds->ssid, creds->password, creds->authMode, creds->HasPinnedBSSID() ? creds->bssid.data() : nullptr, channel);
+  return connectWiFi(creds->ssid.c_str(), creds->password.c_str(), creds->authMode, creds->HasPinnedBSSID() ? creds->bssid.data() : nullptr, channel);
 }
 
 // Published once the update task exists; wakes before that are no-ops and its 1 s poll picks the work up

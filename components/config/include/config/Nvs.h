@@ -66,7 +66,9 @@ namespace OpenShock::Config::Nvs {
     [[nodiscard]] bool SetI8(const char* key, int8_t value);
     [[nodiscard]] bool SetU16(const char* key, uint16_t value);
     [[nodiscard]] bool SetI32(const char* key, int32_t value);
-    [[nodiscard]] bool SetStr(const char* key, std::string_view value);
+    [[nodiscard]] bool SetStr(const char* key, const char* value);
+    /// @brief SetStr for a std::string: refuses one with an embedded NUL, which the C string would silently cut.
+    [[nodiscard]] bool SetStr(const char* key, const std::string& value);
     [[nodiscard]] bool SetBlob(const char* key, std::span<const uint8_t> value);
 
     /// @brief Removes `key`; a key that is not there counts as removed.
@@ -160,7 +162,7 @@ namespace OpenShock::Config::Nvs {
         return &Handle::SetI32;
       } else {
         static_assert(std::is_same_v<S, std::string>, "no NVS type for this member; name the stored type: Set<uint8_t>(key, &T::member)");
-        return &Handle::SetStr;
+        return static_cast<bool (Handle::*)(const char*, const std::string&)>(&Handle::SetStr);
       }
     }
 

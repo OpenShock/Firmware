@@ -7,6 +7,7 @@
 #include "http/JsonAPI.h"
 
 #include <string>
+#include <utility>
 
 static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
 {
@@ -15,7 +16,10 @@ static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(arg);
+  // One copy: terminated for the request, then moved into the config
+  std::string token(arg);
+
+  auto apiResponse = OpenShock::HTTP::JsonAPI::GetHubInfo(token.c_str());
   if (apiResponse.code == 401) {
     SERPR_ERROR("Invalid auth token, refusing to save it!");
     return;
@@ -23,7 +27,7 @@ static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
 
   // If we have some other kind of request fault just set it anyway, we probably arent connected to a network
 
-  OpenShock::SerialCmds::ReportSaved(OpenShock::GatewayConnectionManager::SetAuthToken(std::string(arg)));
+  OpenShock::SerialCmds::ReportSaved(OpenShock::GatewayConnectionManager::SetAuthToken(std::move(token)));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::AuthTokenHandler()

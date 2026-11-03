@@ -40,32 +40,30 @@ HTTP::Response<Serialization::JsonAPI::AccountLinkResponse> HTTP::JsonAPI::LinkA
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(std::string_view hubToken)
+HTTP::Response<Serialization::JsonAPI::HubInfoResponse> HTTP::JsonAPI::GetHubInfo(const char* hubToken)
 {
   const std::string uri = backendUri("/1/device/self");
-  const std::string token(hubToken);  // the client takes C strings
 
   return HTTP::GetJSON<Serialization::JsonAPI::HubInfoResponse>(
     uri.c_str(),
     {
       {     "Accept", ContentType::JSON},
-      {"DeviceToken",     token.c_str()}
+      {"DeviceToken",          hubToken}
   },
     Serialization::JsonAPI::ParseHubInfoJsonResponse,
     std::array<uint16_t, 2> {200}
   );
 }
 
-HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(std::string_view hubToken)
+HTTP::Response<Serialization::JsonAPI::AssignLcgResponse> HTTP::JsonAPI::AssignLcg(const char* hubToken)
 {
   const std::string uri = backendUri("/2/device/assignLCG?version=2");
-  const std::string token(hubToken);  // the client takes C strings
 
   return HTTP::GetJSON<Serialization::JsonAPI::AssignLcgResponse>(
     uri.c_str(),
     {
       {     "Accept", ContentType::JSON},
-      {"DeviceToken",     token.c_str()}
+      {"DeviceToken",          hubToken}
   },
     Serialization::JsonAPI::ParseAssignLcgJsonResponse,
     std::array<uint16_t, 2> {200}

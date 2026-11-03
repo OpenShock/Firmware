@@ -145,7 +145,7 @@ void GatewayClient::_destroyTransport()
 // handle and the handle is recreated per connection, so the session would die with it: the transports live here
 // instead and go to the client as ext_transport. The client never creates or destroys an ext_transport. If the server
 // declines the session the handshake falls back to a full one.
-esp_transport_handle_t GatewayClient::_prepareTransport(const std::string& host, const std::string& path)
+esp_transport_handle_t GatewayClient::_prepareTransport(const char* host, const char* path)
 {
   // A session is only offered to the host that issued it. And when no session was saved, USE leaves the TLS config
   // pointing at the session the last SAVE freed, so the transports are rebuilt rather than reused without one.
@@ -172,7 +172,7 @@ esp_transport_handle_t GatewayClient::_prepareTransport(const std::string& host,
 
   // What esp_websocket_client applies to the transports it creates itself. The strings are copied.
   const esp_transport_ws_config_t wsConfig = {
-    .ws_path                  = path.c_str(),
+    .ws_path                  = path,
     .sub_protocol             = nullptr,
     .user_agent               = OpenShock::Constants::UserAgent(),
     .headers                  = m_headers.c_str(),
@@ -187,7 +187,7 @@ esp_transport_handle_t GatewayClient::_prepareTransport(const std::string& host,
   return m_wss;
 }
 
-void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
+void GatewayClient::connect(const char* host, uint16_t port, const char* path)
 {
   // A retired client may still be connected by a caller that fetched it before it was retired (the LCG lookup is slow)
   if (m_state != GatewayClientState::Disconnected || m_retired.load()) {
@@ -208,9 +208,9 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   }
 
   esp_websocket_client_config_t config = {};
-  config.host                          = host.c_str();
+  config.host                          = host;
   config.port                          = port;
-  config.path                          = path.c_str();
+  config.path                          = path;
   config.transport                     = WEBSOCKET_TRANSPORT_OVER_SSL;
   config.user_agent                    = OpenShock::Constants::UserAgent();
   config.headers                       = m_headers.c_str();
