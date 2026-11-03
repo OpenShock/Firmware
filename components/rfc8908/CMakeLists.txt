@@ -7,5 +7,4 @@ idf_component_register(
   REQUIRES esp_http_server          # esp_http_server.h in public header
   PRIV_REQUIRES common logging osjson  # .cpp-only (StringHelpers, IPv4Utils for the Host check)
                 http                   # ContentTypes.h
-                lwip                   # getsockname/inet_pton for the AP check
 )

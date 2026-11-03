@@ -150,7 +150,7 @@ void CaptivePortal::WebSocketEndpoint::wsSessCtxFree(void* ctx)
 // httpd answers the handshake. Failing closes the connection after the redirect is sent.
 esp_err_t CaptivePortal::WebSocketEndpoint::wsPreHandshake(httpd_req_t* req)
 {
-  if (RFC8908::IsCaptured(req)) {
+  if (RFC8908::IsForeignHost(req)) {
     OS_LOGW(TAG, "Rejecting WebSocket for another host on fd %d", httpd_req_to_sockfd(req));
     RFC8908::EmitRedirect(req);
     return ESP_FAIL;

@@ -9,11 +9,7 @@ const char* const TAG = "RFC8908Handler";
 #include "http/ContentTypes.h"
 #include "json/Json.h"
 
-#include <lwip/sockets.h>
-
-#include <cstdint>
 #include <cstdio>
-#include <cstring>
 #include <string>
 #include <string_view>
 
@@ -25,41 +21,7 @@ using namespace OpenShock;
 static char s_portalUrl[sizeof("http://255.255.255.255/")] = "http://4.3.2.1/";
 static std::size_t s_portalUrlLen                          = sizeof("http://4.3.2.1/") - 1;
 
-// The same address in network byte order, matched against a connection's local address. Zero (no match) until
-// registration sets it.
-static in_addr_t s_apAddr = 0;
-
-// True when the connection came in over the portal AP: its local address is the AP's. A client on the hub's LAN
-// connects to the STA address instead, and must get the plain server: no captive redirects, no RFC 8908.
-static bool ArrivedOnAp(httpd_req_t* req)
-{
-  sockaddr_storage local = {};
-  socklen_t len          = sizeof(local);
-  if (getsockname(httpd_req_to_sockfd(req), reinterpret_cast<sockaddr*>(&local), &len) != 0) {
-    return false;
-  }
-
-  in_addr_t addr;
-  if (local.ss_family == AF_INET) {
-    addr = reinterpret_cast<const sockaddr_in*>(&local)->sin_addr.s_addr;
-  } else if (local.ss_family == AF_INET6) {
-    // httpd listens on a dual-stack IPv6 socket when lwIP has IPv6, so an IPv4 client shows up as ::ffff:a.b.c.d
-    static constexpr std::uint8_t kV4MappedPrefix[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
-    const in6_addr& addr6                             = reinterpret_cast<const sockaddr_in6*>(&local)->sin6_addr;
-    if (std::memcmp(addr6.s6_addr, kV4MappedPrefix, sizeof(kV4MappedPrefix)) != 0) {
-      return false;
-    }
-    std::memcpy(&addr, addr6.s6_addr + sizeof(kV4MappedPrefix), sizeof(addr));
-  } else {
-    return false;
-  }
-
-  return addr == s_apAddr;
-}
-
-// True when the request's Host header is a name rather than an IP literal. On the AP our own pages are always
-// requested by IP, so a name is one the wildcard DNS server sent here.
-static bool HostIsName(httpd_req_t* req)
+bool RFC8908::IsForeignHost(httpd_req_t* req)
 {
   // Long enough for any IPv4 literal with a port. A longer Host comes back truncated, so it is a name (or an IPv6
   // literal, which the '[' check below catches either way).
@@ -78,12 +40,6 @@ static bool HostIsName(httpd_req_t* req)
   }
 
   return !IPv4Utils::IsDottedDecimal(StringBeforeFirst(hostView, ':'));
-}
-
-// The Host check first: it is a header lookup, while getsockname goes through the lwIP core
-bool RFC8908::IsCaptured(httpd_req_t* req)
-{
-  return HostIsName(req) && ArrivedOnAp(req);
 }
 
 // httpd derives Content-Length from the buffer it is handed and has no bodiless send, so the HEAD response (the GET's
@@ -161,25 +117,20 @@ esp_err_t RFC8908::HandleMiss(httpd_req_t* req)
   std::string_view path(req->uri);
   path = path.substr(0, path.find('?'));
 
-  if ((HostIsName(req) || IsProbePath(path)) && ArrivedOnAp(req)) {
+  if (IsForeignHost(req) || IsProbePath(path)) {
     return EmitRedirect(req);
   }
 
-  // Addressed to us, or from the LAN: a real miss (a stale asset name, a typo), so say so instead of answering with
-  // the portal
+  // Addressed to us, so a real miss (a stale asset name, a typo): say so instead of answering with the portal
   return SendNotFound(req);
 }
 
 // RFC 8908 Captive Portal API endpoint: machine-readable captive state. Complements
 // the classic redirect-based detection used by Android, iOS/macOS, and Windows.
 // Registered directly rather than through the portal's Host-checked routes: the API is meant to be fetched by the OS
-// and only reports public state. On the LAN the hub is not captive, so there it does not exist.
+// and only reports public state.
 static esp_err_t captiveApiHandler(httpd_req_t* req)
 {
-  if (!ArrivedOnAp(req)) {
-    return SendNotFound(req);
-  }
-
   OS_LOGI(TAG, "Got Captive API request");
 
   OpenShock::JSON::StringWriter writer;
@@ -201,23 +152,14 @@ static esp_err_t captiveApiHandler(httpd_req_t* req)
 
 esp_err_t RFC8908::RegisterProbeHandlers(httpd_handle_t server, const char* apIpv4)
 {
-  if (apIpv4 == nullptr) {
-    apIpv4 = "4.3.2.1";  // the s_portalUrl default
+  if (apIpv4 != nullptr) {
+    int len = snprintf(s_portalUrl, sizeof(s_portalUrl), "http://%s/", apIpv4);
+    if (len < 0 || static_cast<std::size_t>(len) >= sizeof(s_portalUrl)) {
+      OS_LOGE(TAG, "Not an IPv4 address: %s", apIpv4);
+      return ESP_ERR_INVALID_ARG;
+    }
+    s_portalUrlLen = static_cast<std::size_t>(len);
   }
-
-  in_addr addr = {};
-  if (inet_pton(AF_INET, apIpv4, &addr) != 1) {
-    OS_LOGE(TAG, "Not an IPv4 address: %s", apIpv4);
-    return ESP_ERR_INVALID_ARG;
-  }
-  s_apAddr = addr.s_addr;
-
-  int len = snprintf(s_portalUrl, sizeof(s_portalUrl), "http://%s/", apIpv4);
-  if (len < 0 || static_cast<std::size_t>(len) >= sizeof(s_portalUrl)) {
-    OS_LOGE(TAG, "Not an IPv4 address: %s", apIpv4);
-    return ESP_ERR_INVALID_ARG;
-  }
-  s_portalUrlLen = static_cast<std::size_t>(len);
 
   // RFC 8908 API. The DHCP option 114 URI (Manager.cpp) points at the first path.
   static const char* const apiPaths[] = {

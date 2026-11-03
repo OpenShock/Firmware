@@ -11,6 +11,9 @@ const char* const TAG = "CaptivePortalInstance";
 
 #include <lwip/sockets.h>
 
+#include <cstdint>
+#include <cstring>
+
 const uint16_t HTTP_PORT = 80;
 // httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
 static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3 + 3, "httpd client sockets would leave no lwIP sockets for the DNS server and outbound connections");
@@ -33,10 +36,48 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   m_staticFiles.registerHandler(m_server);
 }
 
+// The portal AP address in network byte order, set before the server starts
+static in_addr_t s_apAddr = 0;
+
+// True when the connection came in over the portal AP: its local address is the AP's. A client on the hub's LAN
+// connects to the STA address instead.
+static bool arrivedOnAp(int sockfd)
+{
+  sockaddr_storage local = {};
+  socklen_t len          = sizeof(local);
+  if (getsockname(sockfd, reinterpret_cast<sockaddr*>(&local), &len) != 0) {
+    return false;
+  }
+
+  in_addr_t addr;
+  if (local.ss_family == AF_INET) {
+    addr = reinterpret_cast<const sockaddr_in*>(&local)->sin_addr.s_addr;
+  } else if (local.ss_family == AF_INET6) {
+    // httpd listens on a dual-stack IPv6 socket when lwIP has IPv6, so an IPv4 client shows up as ::ffff:a.b.c.d
+    static constexpr uint8_t kV4MappedPrefix[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff};
+    const in6_addr& addr6                        = reinterpret_cast<const sockaddr_in6*>(&local)->sin6_addr;
+    if (memcmp(addr6.s6_addr, kV4MappedPrefix, sizeof(kV4MappedPrefix)) != 0) {
+      return false;
+    }
+    memcpy(&addr, addr6.s6_addr + sizeof(kV4MappedPrefix), sizeof(addr));
+  } else {
+    return false;
+  }
+
+  return addr == s_apAddr;
+}
+
 // httpd turns Nagle off only around error responses. A websocket frame goes out as two writes (header, then payload),
 // and Nagle holds the second until the first is acknowledged, which a delayed-ACK client sends up to ~200 ms later.
 static esp_err_t onSessionOpen(httpd_handle_t /*server*/, int sockfd)
 {
+  // httpd always listens on every interface and has no bind address, so the LAN is refused here instead. The portal's
+  // API is the local protocol, which has no compatibility rules: nothing on the LAN may come to depend on it.
+  if (!arrivedOnAp(sockfd)) {
+    OS_LOGW(TAG, "Refusing a connection that did not come in over the portal AP (fd %d)", sockfd);
+    return ESP_FAIL;  // httpd closes the socket
+  }
+
   int one = 1;
   if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) != 0) {
     OS_LOGW(TAG, "Failed to set TCP_NODELAY on fd %d (errno %d)", sockfd, errno);
@@ -46,6 +87,13 @@ static esp_err_t onSessionOpen(httpd_handle_t /*server*/, int sockfd)
 
 bool CaptivePortal::CaptivePortalInstance::startHttpServer()
 {
+  in_addr apAddr = {};
+  if (inet_pton(AF_INET, CaptivePortal::ApIPv4String(), &apAddr) != 1) {
+    OS_LOGE(TAG, "Invalid portal AP address: %s", CaptivePortal::ApIPv4String());
+    return false;
+  }
+  s_apAddr = apAddr.s_addr;
+
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
   config.server_port      = HTTP_PORT;
   config.max_uri_handlers = 40;
