@@ -31,6 +31,8 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   const uint8_t bssid[6] = {0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc};
   TEST_ASSERT_TRUE(Config::PinWiFiCredentialsBSSID(1, bssid));
   TEST_ASSERT_TRUE(Config::SetWiFiHostname("my-hub"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointSSID("MyHubAP"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("ap-s3cret!"));
   TEST_ASSERT_TRUE(Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(true)));
   TEST_ASSERT_TRUE(Config::SetBackendDomain("api.example.org"));
   TEST_ASSERT_TRUE(Config::SetBackendAuthToken("tok_0123456789abcdef"));
@@ -318,4 +320,21 @@ TEST_CASE("Factory reset wipes every setting and survives a reload", "[config][r
   AssertConfigEqual(Full(), Snapshot());
   Reload();
   AssertConfigEqual(Full(), Snapshot());
+}
+
+TEST_CASE("Access point setters refuse what WPA2 can't use", "[config][roundtrip]")
+{
+  InitDefault();
+
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID(""));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID(std::string(33, 'a')));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword("1234567"));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword(std::string(64, 'a')));
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
+
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("12345678"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword(""));  // back to an open access point
+  Reload();
+  TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
 }

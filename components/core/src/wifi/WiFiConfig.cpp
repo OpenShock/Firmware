@@ -24,6 +24,7 @@ static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "
 static constexpr const char* kNamespaceCfg   = "wifi.cfg";
 static constexpr const char* kNamespaceCreds = "wifi";
 static constexpr const char* kKeyApSsid      = "ap_ssid";
+static constexpr const char* kKeyApPassword  = "ap_pass";
 static constexpr const char* kKeyHostname    = "hostname";
 
 static constexpr const char* kNamespaces[] = {kNamespaceCfg, kNamespaceCreds};
@@ -31,16 +32,33 @@ static Section<WiFiConfig> s_section({.name = "wifi", .order = 1, .namespaces = 
 
 WiFiConfig::WiFiConfig()
   : accessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX)
+  , accessPointPassword()
   , hostname(CONFIG_OPENSHOCK_FW_HOSTNAME)
   , credentialsList()
 {
 }
 
 WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList)
+  : WiFiConfig(accessPointSSID, {}, hostname, credentialsList)
+{
+}
+
+WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view accessPointPassword, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList)
   : accessPointSSID(accessPointSSID)
+  , accessPointPassword(accessPointPassword)
   , hostname(hostname)
   , credentialsList(credentialsList)
 {
+}
+
+bool OpenShock::Config::IsValidAccessPointSSID(std::string_view ssid)
+{
+  return !ssid.empty() && ssid.size() <= 32;
+}
+
+bool OpenShock::Config::IsValidAccessPointPassword(std::string_view password)
+{
+  return password.empty() || (password.size() >= 8 && password.size() <= 63);
 }
 
 bool WiFiConfig::FromJSON(JSON::JsonView json)
@@ -50,6 +68,8 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
   }
 
   accessPointSSID = json["accessPointSSID"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PREFIX);
+
+  accessPointPassword = json["accessPointPassword"].tryGetStr().value_or("");
 
   hostname = json["hostname"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_HOSTNAME);
 
@@ -73,6 +93,9 @@ void WiFiConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSensitiv
 {
   JSON::objBegin(gen, name);
   JSON::objSetString(gen, "accessPointSSID", accessPointSSID);
+  if (withSensitiveData) {
+    JSON::objSetString(gen, "accessPointPassword", accessPointPassword);
+  }
   JSON::objSetString(gen, "hostname", hostname);
 
   json_gen_push_array(gen, "credentials");
@@ -121,6 +144,15 @@ namespace {
 
 void WiFiConfig::Normalize()
 {
+  if (!IsValidAccessPointSSID(accessPointSSID)) {
+    OS_LOGW(TAG, "Access point SSID is not 1-32 characters, using the default");
+    accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
+  }
+  if (!IsValidAccessPointPassword(accessPointPassword)) {
+    OS_LOGW(TAG, "Access point password is not 8-63 characters, leaving the access point open");
+    accessPointPassword.clear();
+  }
+
   if (!HostnameUtils::IsValid(hostname)) {
     OS_LOGW(TAG, "Hostname \"%s\" is not valid, using the default", hostname.c_str());
     hostname = CONFIG_OPENSHOCK_FW_HOSTNAME;
@@ -151,7 +183,7 @@ void WiFiConfig::Normalize()
 bool WiFiConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::OpenForLoad(partition, kNamespaceCfg);
-  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
+  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyApPassword, accessPointPassword, "") || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
     return false;
   }
 
@@ -194,7 +226,7 @@ bool WiFiConfig::SaveNvs(const char* partition, const WiFiConfig* previous) cons
     if (!handle) {
       return false;
     }
-    if (!Nvs::Saver(*handle, *this, previous).Set(kKeyApSsid, &WiFiConfig::accessPointSSID).Set(kKeyHostname, &WiFiConfig::hostname).Commit()) {
+    if (!Nvs::Saver(*handle, *this, previous).Set(kKeyApSsid, &WiFiConfig::accessPointSSID).Set(kKeyApPassword, &WiFiConfig::accessPointPassword).Set(kKeyHostname, &WiFiConfig::hostname).Commit()) {
       return false;
     }
   }
@@ -406,6 +438,42 @@ bool OpenShock::Config::ClearWiFiCredentials()
 {
   return s_section.Update([](WiFiConfig& wifi) {
     wifi.credentialsList.clear();
+    return true;
+  });
+}
+
+std::string OpenShock::Config::GetWiFiAccessPointSSID()
+{
+  return s_section.Read([](const WiFiConfig& wifi) { return wifi.accessPointSSID; });
+}
+
+bool OpenShock::Config::SetWiFiAccessPointSSID(std::string ssid)
+{
+  if (!IsValidAccessPointSSID(ssid)) {
+    OS_LOGE(TAG, "Invalid access point SSID length %zu", ssid.size());
+    return false;
+  }
+
+  return s_section.Update([&](WiFiConfig& wifi) {
+    wifi.accessPointSSID = std::move(ssid);
+    return true;
+  });
+}
+
+std::string OpenShock::Config::GetWiFiAccessPointPassword()
+{
+  return s_section.Read([](const WiFiConfig& wifi) { return wifi.accessPointPassword; });
+}
+
+bool OpenShock::Config::SetWiFiAccessPointPassword(std::string password)
+{
+  if (!IsValidAccessPointPassword(password)) {
+    OS_LOGE(TAG, "Invalid access point password length %zu", password.size());
+    return false;
+  }
+
+  return s_section.Update([&](WiFiConfig& wifi) {
+    wifi.accessPointPassword = std::move(password);
     return true;
   });
 }

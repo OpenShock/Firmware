@@ -40,6 +40,7 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, config.rf.txPin);
   TEST_ASSERT_TRUE(config.rf.keepAliveEnabled);
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, config.wifi.accessPointSSID.c_str());
+  TEST_ASSERT_TRUE(config.wifi.accessPointPassword.empty());  // An open access point
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_HOSTNAME, config.wifi.hostname.c_str());
   TEST_ASSERT_TRUE(config.wifi.credentialsList.empty());
   TEST_ASSERT_FALSE(config.captivePortal.alwaysEnabled);
@@ -253,4 +254,19 @@ TEST_CASE("jsonconfig set requires the wifi credentials array when wifi is given
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub"}})"));
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub","credentials":{}}})"));
   TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
+}
+
+TEST_CASE("A stored access point password WPA2 can't use leaves the access point open", "[config][defaults]")
+{
+  WipeStore();
+  {
+    auto wifi = Open(Keys::Ns::kWifiCfg);
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_ssid", "MyHubAP"));
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_pass", "short"));  // under WPA2's 8 characters
+    TEST_ASSERT_TRUE(wifi.Commit());
+  }
+  Reload();
+
+  TEST_ASSERT_EQUAL_STRING("MyHubAP", Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-// The `wifi` config section: the soft-AP SSID, the hostname and the saved networks. Owned by core (WiFiManager) and
-// kept in NVS through the config framework (config/Section.h):
-//   namespace "wifi.cfg": ap_ssid (str), hostname (str)
+// The `wifi` config section: the soft-AP SSID and password, the hostname and the saved networks. Owned by core
+// (WiFiManager) and kept in NVS through the config framework (config/Section.h):
+//   namespace "wifi.cfg": ap_ssid (str), ap_pass (str), hostname (str)
 //   namespace "wifi":     one blob per credential, key = its id in decimal ("1".."255"); enumerated, never counted
 
 #include "config/Section.h"
@@ -19,14 +19,20 @@ namespace OpenShock::Config {
   struct WiFiConfig {
     WiFiConfig();  // The defaults: the one place they are defined
     WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList);
+    WiFiConfig(std::string_view accessPointSSID, std::string_view accessPointPassword, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList);
 
+    // The captive portal's network name. The default (CONFIG_OPENSHOCK_FW_AP_PREFIX) gets the hub's MAC appended, so
+    // hubs side by side stay apart; any other name is used as it is.
     std::string accessPointSSID;
+    // Empty: an open network. Otherwise its WPA2 passphrase, 8-63 characters. A factory reset clears it.
+    std::string accessPointPassword;
     std::string hostname;
     std::vector<OpenShock::Config::WiFiCredentials> credentialsList;  // in id order once loaded from NVS
 
     /// @brief The section runs it on every value it takes in: a hostname esp_netif would refuse (empty, over 32
-    ///        characters, or not letters, digits and hyphens) becomes the default, and a credential with no id (0) or
-    ///        a repeated one gets the lowest free id (or is dropped when none is left), whichever way it came in.
+    ///        characters, or not letters, digits and hyphens) becomes the default, as does an AP SSID that is empty or
+    ///        over 32 bytes; an AP password WPA2 can't use is dropped (an open AP); and a credential with no id (0) or a
+    ///        repeated one gets the lowest free id (or is dropped when none is left), whichever way it came in.
     void Normalize();
 
     bool LoadNvs(const char* partition);
@@ -59,6 +65,16 @@ namespace OpenShock::Config {
   bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
+  /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes.
+  [[nodiscard]] bool IsValidAccessPointSSID(std::string_view ssid);
+  /// @brief Whether `password` can protect it: empty (open), or 8-63 characters for WPA2.
+  [[nodiscard]] bool IsValidAccessPointPassword(std::string_view password);
+  [[nodiscard]] std::string GetWiFiAccessPointSSID();
+  /// @brief Refuses an SSID IsValidAccessPointSSID rejects. Takes effect the next time the captive portal starts.
+  bool SetWiFiAccessPointSSID(std::string ssid);
+  [[nodiscard]] std::string GetWiFiAccessPointPassword();
+  /// @brief Refuses a password IsValidAccessPointPassword rejects. Takes effect the next time the captive portal starts.
+  bool SetWiFiAccessPointPassword(std::string password);
   [[nodiscard]] std::string GetWiFiHostname();
   bool SetWiFiHostname(std::string hostname);
 }  // namespace OpenShock::Config

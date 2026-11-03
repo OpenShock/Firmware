@@ -28,6 +28,7 @@ const char* const TAG = "CaptivePortal";
 #include "util/RetiredList.h"
 #include "util/TaskUtils.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -178,15 +179,29 @@ static bool captiveportal_start()
     esp_netif_dhcps_start(s_apNetif);
   }
 
-  // AP SSID = prefix + this device's STA MAC (matches the old Arduino naming).
-  uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  // The default SSID is the prefix + this device's STA MAC (matches the old Arduino naming); a name the user set is
+  // used as it is. Both are validated by the wifi section (Normalize), so they fit the config struct.
+  const std::string apSsid     = Config::GetWiFiAccessPointSSID();
+  const std::string apPassword = Config::GetWiFiAccessPointPassword();
 
   wifi_config_t apConfig = {};
-  snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s" BSSID_FMT, CONFIG_OPENSHOCK_FW_AP_PREFIX, BSSID_ARG(mac));
-  apConfig.ap.ssid_len        = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
-  apConfig.ap.channel         = 1;
-  apConfig.ap.authmode        = WIFI_AUTH_OPEN;
+  if (apSsid == CONFIG_OPENSHOCK_FW_AP_PREFIX) {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s" BSSID_FMT, CONFIG_OPENSHOCK_FW_AP_PREFIX, BSSID_ARG(mac));
+    apConfig.ap.ssid_len = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
+  } else {
+    apConfig.ap.ssid_len = std::min(apSsid.size(), sizeof(apConfig.ap.ssid));
+    memcpy(apConfig.ap.ssid, apSsid.data(), apConfig.ap.ssid_len);
+  }
+  apConfig.ap.channel = 1;
+  if (apPassword.empty()) {
+    apConfig.ap.authmode = WIFI_AUTH_OPEN;
+  } else {
+    apConfig.ap.authmode    = WIFI_AUTH_WPA2_PSK;
+    std::size_t passwordLen = std::min(apPassword.size(), sizeof(apConfig.ap.password) - 1);
+    memcpy(apConfig.ap.password, apPassword.data(), passwordLen);
+  }
   apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
   apConfig.ap.beacon_interval = 100;
 

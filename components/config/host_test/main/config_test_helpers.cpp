@@ -29,7 +29,7 @@ namespace ConfigTest {
     home.bssid = {0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc};
     Config::WiFiCredentials guest(2, "Guest", "", WIFI_AUTH_OPEN);
     Config::WiFiCredentials office(7, "Office \"5G\"", "p@ss w0rd/\\", WIFI_AUTH_WPA3_PSK);
-    config.wifi = Config::WiFiConfig("MyHubAP", "my-hub", {home, guest, office});
+    config.wifi = Config::WiFiConfig("MyHubAP", "ap-s3cret!", "my-hub", {home, guest, office});
 
     config.captivePortal = Config::CaptivePortalConfig(true);
     config.backend       = Config::BackendConfig("api.example.org", "tok_0123456789abcdef");
@@ -107,6 +107,7 @@ namespace ConfigTest {
     TEST_ASSERT_EQUAL_MESSAGE(expected.rf.keepAliveEnabled, actual.rf.keepAliveEnabled, "rf.keepAliveEnabled");
 
     TEST_ASSERT_EQUAL_STRING_MESSAGE(expected.wifi.accessPointSSID.c_str(), actual.wifi.accessPointSSID.c_str(), "wifi.accessPointSSID");
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(withSensitiveData ? expected.wifi.accessPointPassword.c_str() : "", actual.wifi.accessPointPassword.c_str(), "wifi.accessPointPassword");
     TEST_ASSERT_EQUAL_STRING_MESSAGE(expected.wifi.hostname.c_str(), actual.wifi.hostname.c_str(), "wifi.hostname");
     TEST_ASSERT_EQUAL_size_t_MESSAGE(expected.wifi.credentialsList.size(), actual.wifi.credentialsList.size(), "wifi.credentialsList size");
     for (std::size_t i = 0; i < expected.wifi.credentialsList.size() && i < actual.wifi.credentialsList.size(); ++i) {
