@@ -23,7 +23,7 @@ bool Base64::Encode(std::span<const uint8_t> data, std::string& output)
   std::size_t requiredLen = CalculateEncodedSize(data.size());
 
   // Allocate buffer for base64 string
-  TinyVec<uint8_t> buffer(requiredLen);
+  std::vector<uint8_t> buffer(requiredLen);
 
   std::size_t written = 0;
 
@@ -42,7 +42,7 @@ bool Base64::Encode(std::span<const uint8_t> data, std::string& output)
   return true;
 }
 
-bool Base64::Decode(std::string_view data, TinyVec<uint8_t>& output) noexcept
+bool Base64::Decode(std::string_view data, std::vector<uint8_t>& output)
 {
   std::size_t requiredLen = CalculateDecodedSize(data.size());
 

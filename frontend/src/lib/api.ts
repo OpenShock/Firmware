@@ -1,4 +1,4 @@
-import { OtaUpdateChannel } from '#lib/_fbs/open-shock/serialization/configuration/ota-update-channel.js';
+import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import type { OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
 import { hubState } from '#lib/stores/index.js';
 import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
@@ -212,10 +212,10 @@ export async function disconnectWifiNetwork(): Promise<void> {
 
 // OTA
 
-const _otaChannelNames: Record<OtaUpdateChannel, string> = {
-  [OtaUpdateChannel.Stable]: 'stable',
-  [OtaUpdateChannel.Beta]: 'beta',
-  [OtaUpdateChannel.Develop]: 'develop',
+const _otaChannelNames: Record<OtaChannel, string> = {
+  [OtaChannel.Stable]: 'stable',
+  [OtaChannel.Beta]: 'beta',
+  [OtaChannel.Develop]: 'develop',
 };
 
 // On success the change is mirrored into hubState.config, which is otherwise only sent once on
@@ -255,7 +255,7 @@ export function setOtaEnabled(isEnabled: boolean): Promise<boolean> {
   });
 }
 
-export function setOtaChannel(updateChannel: OtaUpdateChannel): Promise<boolean> {
+export function setOtaChannel(updateChannel: OtaChannel): Promise<boolean> {
   return setOtaSettings(
     { channel: _otaChannelNames[updateChannel] },
     'Failed to update OTA channel',
@@ -291,7 +291,7 @@ export function setOtaRequireManualApproval(requireManualApproval: boolean): Pro
   );
 }
 
-export function checkOtaUpdates(channel: OtaUpdateChannel): Promise<boolean> {
+export function checkOtaUpdates(channel: OtaChannel): Promise<boolean> {
   return otaRequest(
     'check?' + new URLSearchParams({ channel: _otaChannelNames[channel] }),
     'POST',

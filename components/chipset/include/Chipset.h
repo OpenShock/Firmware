@@ -3,7 +3,7 @@
 #include "BoardDescriptor.h"
 #include "OpenShock.h"
 
-#include <driver/gpio.h>
+#include <hal/gpio_types.h>  // gpio_num_t, GPIO_IS_VALID_*: the types only, no driver
 
 #include <bitset>
 #include <limits>

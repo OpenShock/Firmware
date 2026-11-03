@@ -1,10 +1,10 @@
-// Corrupt input: truncated, garbage or tampered config buffers (from flash or from
-// rawconfig/jsonconfig over serial) must be rejected without crashing, and must not
-// replace the stored config.
+// Corrupt input: a malformed credential blob or bad JSON over serial must
+// be rejected without crashing, and must not replace the stored config.
+#include <freertos/FreeRTOS.h>
+
 #include "unity.h"
 
 #include "config_test_helpers.h"
-#include "legacy_fixtures.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -25,118 +25,81 @@ namespace {
     state ^= state << 5;
     return state;
   }
-
-  // Loads a buffer through every path a corrupt config can arrive by. Returns
-  // whether SetRaw accepted it; never crashes (that is the point of the callers).
-  bool TryAllLoadPaths(const std::vector<uint8_t>& data)
-  {
-    InitDefault();
-    const bool accepted = Config::SetRaw(data.data(), data.size());
-    if (!accepted) {
-      TEST_ASSERT_EQUAL_INT_MESSAGE(0, HostConfigFs::writeCount, "rejected SetRaw must not write");
-    }
-
-    // Booting with it stored: Init either loads it or falls back to defaults.
-    InitFrom(data);
-    Snapshot();
-    return accepted;
-  }
 }  // namespace
 
-TEST_CASE("SetRaw rejects null and too-short buffers", "[config][corrupt]")
+TEST_CASE("Every truncation and corruption of a credential blob is rejected without crashing", "[config][corrupt]")
 {
-  InitDefault();
-  const std::vector<uint8_t> before = StoredFile();
+  Config::WiFiCredentials sample(7, "Office", "s3cret!", WIFI_AUTH_WPA2_PSK);
+  sample.bssid                    = {1, 2, 3, 4, 5, 6};
+  const std::vector<uint8_t> blob = sample.ToBlob();
 
-  const uint8_t tiny[3] = {0x04, 0x00, 0x00};
-  TEST_ASSERT_FALSE(Config::SetRaw(nullptr, 0));
-  TEST_ASSERT_FALSE(Config::SetRaw(nullptr, 128));
-  TEST_ASSERT_FALSE(Config::SetRaw(tiny, 0));
-  TEST_ASSERT_FALSE(Config::SetRaw(tiny, sizeof(tiny)));
+  Config::WiFiCredentials decoded;
+  TEST_ASSERT_TRUE(decoded.FromBlob(blob));
+  AssertCredentialsEqual(sample, decoded);
 
-  TEST_ASSERT_EQUAL_INT(0, HostConfigFs::writeCount);
-  TEST_ASSERT_EQUAL_size_t(before.size(), StoredFile().size());
-}
-
-TEST_CASE("Every truncation of a legacy config is rejected", "[config][corrupt]")
-{
-  for (std::size_t len = 0; len < sizeof(Legacy::kDevelopConfig); ++len) {
-    std::vector<uint8_t> data(Legacy::kDevelopConfig, Legacy::kDevelopConfig + len);
+  for (std::size_t len = 0; len < blob.size(); ++len) {
+    Config::WiFiCredentials out;
+    std::vector<uint8_t> cut(blob.begin(), blob.begin() + len);
     char msg[48];
-    snprintf(msg, sizeof(msg), "truncated to %zu bytes", len);
-    TEST_ASSERT_FALSE_MESSAGE(TryAllLoadPaths(data), msg);
+    snprintf(msg, sizeof(msg), "blob truncated to %zu bytes", len);
+    TEST_ASSERT_FALSE_MESSAGE(out.FromBlob(cut), msg);
   }
-}
 
-TEST_CASE("Truncated config on flash boots with defaults and rewrites the file", "[config][corrupt]")
-{
-  const std::vector<uint8_t> truncated(Legacy::kDevelopConfig, Legacy::kDevelopConfig + sizeof(Legacy::kDevelopConfig) / 2);
-  TEST_ASSERT_FALSE(InitFrom(truncated));  // fell back
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
+  // Length prefixes past the end, an id of 0, an empty ssid
+  std::vector<uint8_t> bad = blob;
+  bad[9]                   = 200;
+  TEST_ASSERT_FALSE(decoded.FromBlob(bad));
+  bad    = blob;
+  bad[1] = 0;
+  TEST_ASSERT_FALSE(decoded.FromBlob(bad));
+  bad    = blob;
+  bad[9] = 0;
+  TEST_ASSERT_FALSE(decoded.FromBlob(bad));
 
-  // The rewritten file is a valid default config.
-  TEST_ASSERT_TRUE(InitFrom(StoredFile()));
-  AssertConfigEqual(Config::RootConfig(), Snapshot());
-}
-
-TEST_CASE("Random garbage is rejected", "[config][corrupt]")
-{
-  uint32_t state = 0x12345678;
-  for (int round = 0; round < 300; ++round) {
-    std::vector<uint8_t> data(4 + NextRandom(state) % 600);
+  uint32_t state = 0x9E3779B9;
+  for (int round = 0; round < 200; ++round) {
+    std::vector<uint8_t> data(NextRandom(state) % 300);
     for (auto& b : data) b = static_cast<uint8_t>(NextRandom(state));
-    char msg[48];
-    snprintf(msg, sizeof(msg), "garbage round %d", round);
-    TEST_ASSERT_FALSE_MESSAGE(TryAllLoadPaths(data), msg);
+    Config::WiFiCredentials out;
+    out.FromBlob(data);  // must not crash; the result does not matter
   }
 }
 
-TEST_CASE("Bit flips in a legacy config never crash the loader", "[config][corrupt]")
+TEST_CASE("The credential blob's auth mode codes never change", "[config][corrupt]")
 {
-  // A flipped byte may still form a valid (different) config; what matters is that
-  // verification keeps every read in bounds (run under ASan/UBSan to see it).
-  for (std::size_t i = 0; i < sizeof(Legacy::kDevelopConfig); ++i) {
-    for (uint8_t mask : {0x01, 0x80, 0xFF}) {
-      std::vector<uint8_t> data(Legacy::kDevelopConfig, Legacy::kDevelopConfig + sizeof(Legacy::kDevelopConfig));
-      data[i] ^= mask;
-      TryAllLoadPaths(data);
-    }
+  // What hubs hold on flash: owned by the blob format, not by ESP-IDF or the FlatBuffers schema
+  const std::pair<wifi_auth_mode_t, uint8_t> codes[] = {
+    {           WIFI_AUTH_OPEN, 0},
+    {            WIFI_AUTH_WEP, 1},
+    {        WIFI_AUTH_WPA_PSK, 2},
+    {       WIFI_AUTH_WPA2_PSK, 3},
+    {   WIFI_AUTH_WPA_WPA2_PSK, 4},
+    {WIFI_AUTH_WPA2_ENTERPRISE, 5},
+    {       WIFI_AUTH_WPA3_PSK, 6},
+    {  WIFI_AUTH_WPA2_WPA3_PSK, 7},
+    {       WIFI_AUTH_WAPI_PSK, 8},
+    {            WIFI_AUTH_MAX, 9},
+  };
+  for (const auto& [mode, code] : codes) {
+    const auto blob = Config::WiFiCredentials(1, "Net", "pw", mode).ToBlob();
+    TEST_ASSERT_EQUAL_UINT8(code, blob[2]);
+    Config::WiFiCredentials decoded;
+    TEST_ASSERT_TRUE(decoded.FromBlob(blob));
+    TEST_ASSERT_EQUAL(mode, decoded.authMode);
   }
+  // An auth mode the format has no code for is stored as unknown
+  TEST_ASSERT_EQUAL_UINT8(9, Config::WiFiCredentials(1, "Net", "pw", WIFI_AUTH_OWE).ToBlob()[2]);
 }
 
-TEST_CASE("Out-of-range offsets in the root table are rejected", "[config][corrupt]")
+TEST_CASE("A version 1 blob with fields appended after the known ones still reads", "[config][corrupt]")
 {
-  std::vector<uint8_t> data(Legacy::kDevelopConfig, Legacy::kDevelopConfig + sizeof(Legacy::kDevelopConfig));
-
-  // Root offset pointing past the end of the buffer.
-  data[0] = 0xF0;
-  data[1] = 0xFF;
-  TEST_ASSERT_FALSE(TryAllLoadPaths(data));
-
-  // Root offset pointing at the last byte.
-  const uint32_t last = static_cast<uint32_t>(data.size() - 1);
-  data[0]             = static_cast<uint8_t>(last);
-  data[1]             = static_cast<uint8_t>(last >> 8);
-  TEST_ASSERT_FALSE(TryAllLoadPaths(data));
-}
-
-TEST_CASE("Unterminated and oversized strings are rejected", "[config][corrupt]")
-{
-  // Make the length prefix of the backend domain string ("api.example.org") absurd.
-  std::vector<uint8_t> data(Legacy::kDevelopConfig, Legacy::kDevelopConfig + sizeof(Legacy::kDevelopConfig));
-  const std::string needle = "api.example.org";
-  auto it                  = std::search(data.begin(), data.end(), needle.begin(), needle.end());
-  TEST_ASSERT_TRUE(it != data.end());
-  const std::size_t lenPos = static_cast<std::size_t>(it - data.begin()) - 4;
-  TEST_ASSERT_EQUAL_UINT8(needle.size(), data[lenPos]);
-
-  data[lenPos + 1] = 0x7F;  // ~32 KiB long
-  TEST_ASSERT_FALSE(TryAllLoadPaths(data));
-
-  // Correct length, but the terminating NUL overwritten.
-  data[lenPos + 1]                 = 0x00;
-  data[lenPos + 4 + needle.size()] = 'X';
-  TEST_ASSERT_FALSE(TryAllLoadPaths(data));
+  // How the format grows: what a later firmware appends, an older one (after a rollback) skips
+  Config::WiFiCredentials sample(7, "Office", "s3cret!", WIFI_AUTH_WPA2_PSK);
+  std::vector<uint8_t> blob = sample.ToBlob();
+  blob.insert(blob.end(), {0x01, 0x02, 0x03});
+  Config::WiFiCredentials decoded;
+  TEST_ASSERT_TRUE(decoded.FromBlob(blob));
+  AssertCredentialsEqual(sample, decoded);
 }
 
 TEST_CASE("jsonconfig set rejects malformed JSON without touching the store", "[config][corrupt][json]")
@@ -158,73 +121,28 @@ TEST_CASE("jsonconfig set rejects malformed JSON without touching the store", "[
     "{\"captivePortal\":[]}",
   };
 
+  InitWith(MakeSampleConfig());
+  const std::size_t before = UsedEntries();
   for (const char* input : inputs) {
-    TEST_ASSERT_TRUE(InitFrom(Serialize(MakeSampleConfig())));
-    const std::vector<uint8_t> before = StoredFile();
-
     TEST_ASSERT_FALSE_MESSAGE(Config::SaveFromJSON(input), input);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, HostConfigFs::writeCount, input);
-    TEST_ASSERT_EQUAL_size_t(before.size(), StoredFile().size());
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(before.data(), StoredFile().data(), before.size());
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(before, UsedEntries(), input);
+    AssertConfigEqual(MakeSampleConfig(), Snapshot());
   }
+  Reload();
+  AssertConfigEqual(MakeSampleConfig(), Snapshot());
 }
 
 TEST_CASE("Rejected jsonconfig set leaves the running config unchanged", "[config][corrupt][json]")
 {
-  const Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  const Full sample = MakeSampleConfig();
+  InitWith(sample);
+  const std::size_t before = UsedEntries();
 
   // rf parses, then estop fails: the call must be all-or-nothing.
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"rf":{"txPin":13,"keepAliveEnabled":true},"estop":{"enabled":"yes"}})"));
-  TEST_ASSERT_EQUAL_INT(0, HostConfigFs::writeCount);
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
 
   // Sections parsed before the failing one (rf) must not be applied either.
-  AssertConfigEqual(sample, Snapshot());
-}
-
-TEST_CASE("jsonconfig set that cannot be stored leaves the running config unchanged", "[config][corrupt][json]")
-{
-  const Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
-  const std::vector<uint8_t> before = StoredFile();
-
-  HostConfigFs::failWrites = true;
-  TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"rf":{"txPin":13,"keepAliveEnabled":true}})"));
-  HostConfigFs::failWrites = false;
-
-  AssertConfigEqual(sample, Snapshot());
-  TEST_ASSERT_TRUE(before == StoredFile());
-}
-
-TEST_CASE("Adding WiFi credentials that cannot be stored changes nothing", "[config][corrupt]")
-{
-  const Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
-
-  HostConfigFs::failWrites = true;
-  TEST_ASSERT_EQUAL_UINT8(0, Config::AddWiFiCredentials("NewNet", "password1", WIFI_AUTH_WPA2_PSK));  // new SSID
-  TEST_ASSERT_EQUAL_UINT8(0, Config::AddWiFiCredentials("HomeNet", "changed!", WIFI_AUTH_WPA3_PSK));  // existing SSID
-  HostConfigFs::failWrites = false;
-
-  AssertConfigEqual(sample, Snapshot());
-}
-
-TEST_CASE("Setters that cannot be stored leave the running config unchanged", "[config][corrupt]")
-{
-  const Config::RootConfig sample = MakeSampleConfig();
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
-  TEST_ASSERT_FALSE(sample.wifi.credentialsList.empty());
-
-  HostConfigFs::failWrites = true;
-  TEST_ASSERT_FALSE(Config::SetBackendAuthToken("replaced-token"));
-  TEST_ASSERT_FALSE(Config::ClearBackendAuthToken());
-  TEST_ASSERT_FALSE(Config::SetWiFiHostname("other-host"));
-  TEST_ASSERT_FALSE(Config::SetRFConfigKeepAliveEnabled(!sample.rf.keepAliveEnabled));
-  TEST_ASSERT_FALSE(Config::SetEStopEnabled(!sample.estop.enabled));
-  TEST_ASSERT_FALSE(Config::ClearWiFiCredentials());
-  TEST_ASSERT_FALSE(Config::RemoveWiFiCredentials(sample.wifi.credentialsList.front().id));
-  HostConfigFs::failWrites = false;
-
   AssertConfigEqual(sample, Snapshot());
 }
 
@@ -233,69 +151,85 @@ TEST_CASE("A malformed JSON bssid does not pin a partial address", "[config][cor
   InitDefault();
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"wifi":{"credentials":[{"id":1,"ssid":"net","bssid":"123456789aZZ"}]}})"));
 
-  const Config::RootConfig loaded = Snapshot();
+  const Full loaded = Snapshot();
   TEST_ASSERT_EQUAL_size_t(1, loaded.wifi.credentialsList.size());
   TEST_ASSERT_FALSE(loaded.wifi.credentialsList[0].HasPinnedBSSID());
 }
 
 TEST_CASE("An unknown OTA channel in JSON falls back to the default, not the running value", "[config][corrupt][json]")
 {
-  Config::RootConfig sample      = MakeSampleConfig();
+  Full sample                    = MakeSampleConfig();
   sample.otaUpdate.updateChannel = OtaUpdateChannel::Develop;
-  TEST_ASSERT_TRUE(InitFrom(Serialize(sample)));
+  InitWith(sample);
 
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"otaUpdate":{"updateChannel":"nightly","updateStep":42}})"));
 
-  const Config::RootConfig loaded = Snapshot();
+  const Full loaded = Snapshot();
   TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateChannel::Stable), std::to_underlying(loaded.otaUpdate.updateChannel));
   TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateStep::None), std::to_underlying(loaded.otaUpdate.updateStep));
 }
 
-TEST_CASE("Schema fields the firmware does not model are dropped on save", "[config][corrupt]")
+TEST_CASE("A boolean field of the wrong type rejects the document instead of storing the default", "[config][corrupt][json]")
 {
-  // estop.active / estop.latching (and wifi AP/LAN fields) exist in the schema but nothing in the firmware reads
-  // them, so they are intentionally not round-tripped. This pins that behaviour.
-  namespace Fbs = Serialization::Configuration;
-  flatbuffers::FlatBufferBuilder builder;
-  auto estop = Fbs::CreateEStopConfig(builder, false, -1, /*active=*/true, /*latching=*/true);
-  Fbs::FinishHubConfigBuffer(builder, Fbs::CreateHubConfig(builder, 0, 0, 0, 0, 0, 0, estop));
-  TEST_ASSERT_TRUE(InitFrom(builder.GetBufferPointer(), builder.GetSize()));
+  Full sample                        = MakeSampleConfig();
+  sample.captivePortal.alwaysEnabled = true;
+  sample.serialInput.echoEnabled     = false;
+  InitWith(sample);
+  const std::size_t before = UsedEntries();
 
-  TEST_ASSERT_TRUE(Config::SetSerialInputConfigEchoEnabled(false));  // any save rewrites the file
+  TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"captivePortal":{"alwaysEnabled":"false"}})"));
+  TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"serialInput":{"echoEnabled":1}})"));
+  TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
+  AssertConfigEqual(sample, Snapshot());
 
-  const std::vector<uint8_t> stored = StoredFile();
-  const auto* root                  = Fbs::GetHubConfig(stored.data());
-  TEST_ASSERT_NOT_NULL(root->estop());
-  TEST_ASSERT_FALSE(root->estop()->active());
-  TEST_ASSERT_FALSE(root->estop()->latching());
+  // A missing field is still its default
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"captivePortal":{},"serialInput":{}})"));
+  TEST_ASSERT_FALSE(Snapshot().captivePortal.alwaysEnabled);
+  TEST_ASSERT_TRUE(Snapshot().serialInput.echoEnabled);
+}
+
+TEST_CASE("A zero OTA check interval is normalized to the default on every path", "[config][corrupt][json]")
+{
+  InitDefault();
+  TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"otaUpdate":{"checkPeriodically":true,"checkInterval":0}})"));
+  TEST_ASSERT_EQUAL_UINT16(30, Snapshot().otaUpdate.checkInterval);
+
+  TEST_ASSERT_TRUE(Config::UpdateOtaUpdateConfig([](Config::OtaUpdateConfig& cfg) {
+    cfg.checkInterval = 0;
+    return true;
+  }));
+  TEST_ASSERT_EQUAL_UINT16(30, Snapshot().otaUpdate.checkInterval);
+  Reload();
+  TEST_ASSERT_EQUAL_UINT16(30, Snapshot().otaUpdate.checkInterval);
+}
+
+TEST_CASE("An invalid hostname is normalized to the default on every path", "[config][corrupt][json]")
+{
+  InitDefault();
+  for (const char* doc :
+       {
+         R"({"wifi":{"hostname":"","credentials":[]}})",
+         R"({"wifi":{"hostname":"-hub","credentials":[]}})",
+         R"({"wifi":{"hostname":"my hub","credentials":[]}})",
+         R"({"wifi":{"hostname":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","credentials":[]}})",
+       })
+  {
+    TEST_ASSERT_TRUE_MESSAGE(Config::SaveFromJSON(doc), doc);
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(CONFIG_OPENSHOCK_FW_HOSTNAME, Snapshot().wifi.hostname.c_str(), doc);
+  }
+
+  TEST_ASSERT_TRUE(Config::SetWiFiHostname("hub_1"));
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_HOSTNAME, Snapshot().wifi.hostname.c_str());
+  TEST_ASSERT_TRUE(Config::SetWiFiHostname("hub-1"));
+  TEST_ASSERT_EQUAL_STRING("hub-1", Snapshot().wifi.hostname.c_str());
+  Reload();
+  TEST_ASSERT_EQUAL_STRING("hub-1", Snapshot().wifi.hostname.c_str());
 }
 
 TEST_CASE("RemoveWiFiCredentials reports unknown IDs", "[config]")
 {
   InitDefault();
   TEST_ASSERT_FALSE(Config::RemoveWiFiCredentials(42));
-}
-
-TEST_CASE("Out-of-range E-Stop GPIO in a stored config falls back to the default", "[config][corrupt]")
-{
-  // gpio_pin is an int8 on flash; values outside gpio_num_t must not be cast to it
-  // (undefined behaviour, flagged by UBSan) and mean a corrupt section.
-  namespace Fbs = Serialization::Configuration;
-  for (int8_t pin : {static_cast<int8_t>(-128), static_cast<int8_t>(-2), static_cast<int8_t>(GPIO_NUM_MAX), static_cast<int8_t>(127)}) {
-    flatbuffers::FlatBufferBuilder builder;
-    auto estop = Fbs::CreateEStopConfig(builder, true, pin);
-    auto root  = Fbs::CreateHubConfig(builder, 0, 0, 0, 0, 0, 0, estop);
-    Fbs::FinishHubConfigBuffer(builder, root);
-
-    char msg[32];
-    snprintf(msg, sizeof(msg), "gpio_pin %d", pin);
-    TEST_ASSERT_TRUE_MESSAGE(InitFrom(builder.GetBufferPointer(), builder.GetSize()), msg);
-
-    auto estopConfig = Config::GetEStopConfig();
-    TEST_ASSERT_TRUE(estopConfig.has_value());
-    TEST_ASSERT_EQUAL_INT_MESSAGE(Config::EStopConfig().gpioPin, estopConfig->gpioPin, msg);
-    TEST_ASSERT_EQUAL_MESSAGE(Config::EStopConfig().enabled, estopConfig->enabled, msg);
-  }
 }
 
 TEST_CASE("jsonconfig set survives deeply nested and huge input", "[config][corrupt][json]")
@@ -323,7 +257,7 @@ TEST_CASE("Out-of-range JSON values are not stored", "[config][corrupt][json]")
   // txPin outside uint8 / not a real GPIO -> board default; id outside uint8 -> credentials rejected.
   TEST_ASSERT_TRUE(Config::SaveFromJSON(R"({"rf":{"txPin":300},"wifi":{"credentials":[{"id":1,"ssid":"ok"},{"id":"x","ssid":""}]},"otaUpdate":{"checkInterval":70000,"updateChannel":"nightly"}})"));
 
-  const Config::RootConfig loaded = Snapshot();
+  const Full loaded = Snapshot();
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, loaded.rf.txPin);
   TEST_ASSERT_EQUAL_size_t(1, loaded.wifi.credentialsList.size());
   TEST_ASSERT_EQUAL_STRING("ok", loaded.wifi.credentialsList[0].ssid.c_str());

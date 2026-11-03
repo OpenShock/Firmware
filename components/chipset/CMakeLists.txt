@@ -13,6 +13,6 @@ idf_component_register(
   SRCS          "src/BoardChecks.cpp"
   INCLUDE_DIRS  "include"
   REQUIRES      common          # Common.h, BoardDescriptor.h
-                esp_driver_gpio # driver/gpio.h
+                esp_hal_gpio    # hal/gpio_types.h (gpio_num_t, GPIO_IS_VALID_*)
   PRIV_REQUIRES logging         # OS_LOG* in BoardChecks.cpp
 )

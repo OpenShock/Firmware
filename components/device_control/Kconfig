@@ -1,0 +1,61 @@
+menu "OpenShock radio"
+
+    config OPENSHOCK_RF_QUEUE_SIZE
+        int "RF command queue length"
+        range 8 256
+        default 64
+        help
+            Commands waiting for the transmitter task. A full queue drops the command.
+
+    config OPENSHOCK_RF_TERMINATOR_DURATION_MS
+        int "Stop terminator duration (ms)"
+        range 100 2000
+        default 300
+        help
+            How long a finished command keeps sending its zero-intensity terminator, so
+            the shocker stops even if it missed the last frames.
+
+endmenu
+
+menu "OpenShock keep-alive"
+
+    config OPENSHOCK_KEEPALIVE_INTERVAL_MS
+        int "Keep-alive interval (ms)"
+        range 10000 600000
+        default 60000
+        help
+            A shocker that saw no command for this long gets a short zero-intensity
+            vibrate, so it doesn't go to sleep and miss the next command.
+
+    config OPENSHOCK_KEEPALIVE_DURATION_MS
+        int "Keep-alive command duration (ms)"
+        range 100 2000
+        default 300
+
+    config OPENSHOCK_KEEPALIVE_MAX_SHOCKERS
+        int "Shockers kept alive"
+        range 1 64
+        default 16
+        help
+            Shocker IDs come from the network, so the set is capped: past this, the least
+            recently used shocker is dropped from it.
+
+    config OPENSHOCK_KEEPALIVE_QUEUE_SIZE
+        int "Keep-alive queue length"
+        range 4 128
+        default 32
+
+endmenu
+
+menu "OpenShock emergency stop"
+
+    config OPENSHOCK_ESTOP_POLL_INTERVAL_MS
+        int "Button poll interval (ms)"
+        range 5 20
+        default 5
+        help
+            How often the E-Stop task samples the button. The debounce time is fixed in
+            code (65 ms); the number of samples it takes follows from this interval.
+            At most 16 samples fit the debounce history, hence the 5 ms floor.
+
+endmenu

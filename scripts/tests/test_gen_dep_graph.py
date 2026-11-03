@@ -23,6 +23,11 @@ def test_parse_requires_reads_public_and_private_lists():
     assert gen_dep_graph.parse_requires(CMAKE, include_priv=False) == ['fs', '$<IF:$<BOOL:x>,y,z>', 'util']
 
 
+def test_parse_requires_unquotes_arguments():
+    text = 'idf_component_register(SRCS "a.cpp" REQUIRES "common" PRIV_REQUIRES "fs" util)'
+    assert gen_dep_graph.parse_requires(text, include_priv=True) == ['common', 'fs', 'util']
+
+
 def test_parse_requires_without_a_register_call_is_empty():
     assert gen_dep_graph.parse_requires('project(x)\n', include_priv=True) == []
 
@@ -61,12 +66,15 @@ def test_render_mermaid_labels_and_orders_nodes():
 
 
 def test_main_writes_the_graph_of_a_components_dir(tmp_path, capsys):
-    for name, body in {'fs': 'idf_component_register(SRCS "x")', 'rf': 'idf_component_register(REQUIRES fs)'}.items():
+    for name, body in {
+        'http': 'idf_component_register(SRCS "x")',
+        'rf': 'idf_component_register(REQUIRES http)',
+    }.items():
         (tmp_path / name).mkdir()
         (tmp_path / name / 'CMakeLists.txt').write_text(body, encoding='utf-8')
     out = tmp_path / 'graph.mmd'
     assert gen_dep_graph.main(['--components-dir', str(tmp_path), '-o', str(out)]) == 0
-    assert out.read_text(encoding='utf-8') == 'flowchart TD\n    A(FS)\n    B(Rf)\n    A --> B\n'
+    assert out.read_text(encoding='utf-8') == 'flowchart TD\n    A(HTTP)\n    B(Rf)\n    A --> B\n'
     assert 'wrote' in capsys.readouterr().err
 
 

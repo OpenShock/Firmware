@@ -446,12 +446,12 @@ void OpenShock::TaskUtils::StopTask(TaskHandle_t taskHandle, TaskExitFlag& exite
 
 // --- Config ---
 
-std::optional<OpenShock::Config::RFConfig> OpenShock::Config::GetRFConfig()
+OpenShock::Config::RFConfig OpenShock::Config::GetRFConfig()
 {
   return RfConfig;
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetRFConfigTxPin()
+gpio_num_t OpenShock::Config::GetRFConfigTxPin()
 {
   return RfConfig.txPin;
 }
@@ -462,7 +462,7 @@ bool OpenShock::Config::SetRFConfigTxPin(gpio_num_t txPin)
   return true;
 }
 
-std::optional<bool> OpenShock::Config::GetRFConfigKeepAliveEnabled()
+bool OpenShock::Config::GetRFConfigKeepAliveEnabled()
 {
   return RfConfig.keepAliveEnabled;
 }
@@ -473,12 +473,12 @@ bool OpenShock::Config::SetRFConfigKeepAliveEnabled(bool enabled)
   return true;
 }
 
-std::optional<OpenShock::Config::EStopConfig> OpenShock::Config::GetEStopConfig()
+OpenShock::Config::EStopConfig OpenShock::Config::GetEStopConfig()
 {
   return EStopCfg;
 }
 
-std::optional<gpio_num_t> OpenShock::Config::GetEStopGpioPin()
+gpio_num_t OpenShock::Config::GetEStopGpioPin()
 {
   return EStopCfg.gpioPin;
 }

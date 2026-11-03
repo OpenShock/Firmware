@@ -1,12 +1,11 @@
+#include <freertos/FreeRTOS.h>
+
 #include "serial_console/SerialInputHandler.h"
 
 const char* const TAG = "SerialInputHandler";
 
-#include "Base64.h"
 #include "Chipset.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
-#include "config/SerialInputConfig.h"
 #include "Convert.h"
 #include "estop/EStopManager.h"
 #include "FormatHelpers.h"
@@ -17,6 +16,7 @@ const char* const TAG = "SerialInputHandler";
 #include "serial_console/command_handlers/CommandEntry.h"
 #include "serial_console/command_handlers/common.h"
 #include "serial_console/command_handlers/index.h"
+#include "serial_console/SerialInputConfig.h"
 #include "serialization/JsonAPI.h"
 #include "serialization/JsonSerial.h"
 #include "StringHelpers.h"
@@ -24,6 +24,7 @@ const char* const TAG = "SerialInputHandler";
 #include "util/TaskUtils.h"
 #include "wifi/WiFiManager.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -55,10 +56,8 @@ using namespace std::string_view_literals;
 
 using namespace OpenShock;
 
-const int64_t PASTE_INTERVAL_THRESHOLD_MS    = 20;
-const std::size_t SERIAL_BUFFER_MAX_CAPACITY = 4096;
+const int64_t PASTE_INTERVAL_THRESHOLD_MS = 20;
 
-static bool s_echoEnabled = true;
 static std::vector<OpenShock::SerialCmds::CommandGroup> s_commandGroups;
 static std::unordered_map<std::string_view, OpenShock::SerialCmds::CommandGroup, hash_ci, equals_ci> s_commandHandlers;
 
@@ -305,7 +304,7 @@ public:
   constexpr std::size_t capacity() const noexcept { return m_capacity; }
   constexpr bool empty() const noexcept { return m_size == 0; }
 
-  // Set when a line outgrew SERIAL_BUFFER_MAX_CAPACITY; the rest of that line is discarded and it is never executed.
+  // Set when a line outgrew CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE; the rest of that line is discarded and it is never executed.
   constexpr bool overflowed() const noexcept { return m_overflowed; }
 
   constexpr void clear() noexcept
@@ -316,14 +315,15 @@ public:
 
   inline void reserve(std::size_t size)
   {
-    size = (size + 31) & ~31;  // Align to 32 bytes
-
-    if (size > SERIAL_BUFFER_MAX_CAPACITY) {
-      OS_LOGE(TAG, "Line exceeds %zu bytes, discarding it", SERIAL_BUFFER_MAX_CAPACITY);
+    if (size > CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE) {
+      OS_LOGE(TAG, "Line exceeds %d bytes, discarding it", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
       m_size       = 0;
       m_overflowed = true;
       return;
     }
+
+    size = (size + 31) & ~31;  // Align to 32 bytes
+
     if (size <= m_capacity) {
       return;
     }
@@ -342,6 +342,13 @@ public:
   inline void append(const char* data, std::size_t len)
   {
     if (len == 0 || m_overflowed) {
+      return;
+    }
+
+    if (m_size + len > CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE) {
+      OS_LOGE(TAG, "Line exceeds %d bytes, discarding it", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
+      m_size       = 0;
+      m_overflowed = true;
       return;
     }
 
@@ -505,7 +512,7 @@ static void echoHandleSerialInput(std::string_view buffer, bool hasData)
   static bool hasChanges      = false;
 
   // If serial echo is disabled, don't do anything past this point
-  if (!s_echoEnabled) {
+  if (!Config::GetSerialInputConfigEchoEnabled()) {
     return;
   }
 
@@ -541,7 +548,7 @@ static void processSerialLine(std::string_view line)
   // If it's not automated, we can echo the command if echo is enabled
   if (isAutomated) {
     line = line.substr(1);
-  } else if (s_echoEnabled) {
+  } else if (Config::GetSerialInputConfigEchoEnabled()) {
     echoBuffer(line);
     OS_SERIAL_PRINTLN();
   }
@@ -631,7 +638,7 @@ static void serialRxTask(void*)
     switch (tryReadSerialLine(buffer)) {
       case SerialReadResult::LineEnd:
         if (buffer.overflowed()) {
-          SERPR_ERROR("Line too long (max %zu bytes), ignored", SERIAL_BUFFER_MAX_CAPACITY);
+          SERPR_ERROR("Line too long (max %d bytes), ignored", CONFIG_OPENSHOCK_SERIAL_LINE_MAX_SIZE);
         } else {
           processSerialLine(buffer);
         }
@@ -682,28 +689,12 @@ bool SerialInputHandler::Init()
   SerialInputHandler::PrintVersionInfo();
   OS_SERIAL_PRINTLN();
 
-  auto echoEnabled = Config::GetSerialInputConfigEchoEnabled();
-  if (!echoEnabled) {
-    OS_LOGE(TAG, "Failed to get serial echo status from config");
-    return false;
-  }
-  s_echoEnabled = *echoEnabled;
-
-  if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", 10'000, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
+  if (TaskUtils::TaskCreateExpensive(serialRxTask, "SerialRX", CONFIG_OPENSHOCK_SERIAL_RX_TASK_STACK_SIZE, nullptr, 1, nullptr) != pdPASS) {  // TODO: Profile stack size
     OS_LOGE(TAG, "Failed to create serial RX task");
     return false;
   }
 
   return true;
-}
-bool SerialInputHandler::SerialEchoEnabled()
-{
-  return s_echoEnabled;
-}
-
-void SerialInputHandler::SetSerialEchoEnabled(bool enabled)
-{
-  s_echoEnabled = enabled;
 }
 
 void SerialInputHandler::Print(std::string_view str)

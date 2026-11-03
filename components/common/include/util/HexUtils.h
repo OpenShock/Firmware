@@ -60,6 +60,36 @@ namespace OpenShock::HexUtils {
     return output;
   }
 
+  /// @brief Converts a fixed-extent byte span to a hex string.
+  /// @param data The bytes to convert; the extent is deduced from the span.
+  /// @param output The output buffer to write to.
+  /// @param upper Whether to use uppercase hex characters.
+  template<std::size_t N>
+    requires(N != std::dynamic_extent)
+  constexpr void ToHex(std::span<const uint8_t, N> data, char (&output)[(N * 2) + 1], bool upper = true) noexcept
+  {
+    for (std::size_t i = 0; i < N; ++i) {
+      ToHex(data[i], &output[i * 2], upper);
+    }
+    output[N * 2] = '\0';
+  }
+
+  /// @brief Converts a fixed-extent byte span to a hex string.
+  /// @param data The bytes to convert; the extent is deduced from the span.
+  /// @param upper Whether to use uppercase hex characters.
+  /// @return The hex string.
+  template<std::size_t N>
+    requires(N != std::dynamic_extent)
+  constexpr std::array<char, (N * 2) + 1> ToHex(std::span<const uint8_t, N> data, bool upper = true) noexcept
+  {
+    std::array<char, (N * 2) + 1> output {};
+    for (std::size_t i = 0; i < N; ++i) {
+      ToHex(data[i], &output[i * 2], upper);
+    }
+    output[N * 2] = '\0';
+    return output;
+  }
+
   /// @brief Converts a byte array to a MAC address string. (hex pairs separated by colons)
   /// @param data The byte array to convert.
   /// @param output The output buffer to write to.

@@ -1,0 +1,10 @@
+menu "OpenShock captive portal detection"
+
+    config OPENSHOCK_PORTAL_VENUE_INFO_URL
+        string "Venue info URL"
+        default "https://openshock.org"
+        help
+            The venue-info-url the RFC 8908 captive portal API reports; some phones offer
+            it as a link next to the portal. Leave empty to leave it out.
+
+endmenu

@@ -6,10 +6,11 @@ const char* const TAG = "CommandHandler";
 
 #include "BoardDescriptor.h"
 #include "Chipset.h"
-#include "config/Config.h"
+#include "estop/EStopConfig.h"
 #include "estop/EStopManager.h"
 #include "events/Events.h"
 #include "Logging.h"
+#include "radio/RFConfig.h"
 
 #include "OpenShock.h"
 #include "radio/RFTransmitter.h"
@@ -25,10 +26,6 @@ const char* const TAG = "CommandHandler";
 #include <memory>
 #include <unordered_map>
 
-const int64_t KEEP_ALIVE_INTERVAL  = 60'000;
-const uint16_t KEEP_ALIVE_DURATION = 300;
-// Shocker IDs come from the network, so the set is capped; past it the least recently used shocker is dropped
-const size_t KEEP_ALIVE_MAX_SHOCKERS = 16;
 // WiFiManager keeps the radio out of power save for an hour after the last activity event, so a session only needs
 // refreshing now and then, not a broadcast per command.
 const int64_t ACTIVITY_POST_INTERVAL = 60'000;
@@ -36,7 +33,7 @@ const int64_t ACTIVITY_POST_INTERVAL = 60'000;
 static uint32_t calculateEepyTime(int64_t timeToKeepAlive)
 {
   int64_t now = OpenShock::millis();
-  return static_cast<uint32_t>(std::clamp<int64_t>(timeToKeepAlive - now, 0, KEEP_ALIVE_INTERVAL));
+  return static_cast<uint32_t>(std::clamp<int64_t>(timeToKeepAlive - now, 0, CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS));
 }
 
 struct KnownShocker {
@@ -100,7 +97,7 @@ using namespace OpenShock;
 
 static void commandhandler_keepalivetask()
 {
-  int64_t timeToKeepAlive = KEEP_ALIVE_INTERVAL;
+  int64_t timeToKeepAlive = CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS;
 
   // Map of (model, shocker ID) to its last activity; IDs are only unique per model
   std::unordered_map<uint32_t, KnownShocker> activityMap;
@@ -117,14 +114,14 @@ static void commandhandler_keepalivetask()
       }
 
       uint32_t key = (static_cast<uint32_t>(cmd.model) << 16) | cmd.shockerId;
-      if (activityMap.size() >= KEEP_ALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
+      if (activityMap.size() >= CONFIG_OPENSHOCK_KEEPALIVE_MAX_SHOCKERS && !activityMap.contains(key)) {
         auto oldest = std::min_element(activityMap.begin(), activityMap.end(), [](const auto& a, const auto& b) { return a.second.lastActivityTimestamp < b.second.lastActivityTimestamp; });
-        OS_LOGW(TAG, "Keeping more than %zu shockers alive, dropping shocker %u", KEEP_ALIVE_MAX_SHOCKERS, oldest->second.shockerId);
+        OS_LOGW(TAG, "Keeping more than %d shockers alive, dropping shocker %u", CONFIG_OPENSHOCK_KEEPALIVE_MAX_SHOCKERS, oldest->second.shockerId);
         activityMap.erase(oldest);
       }
       activityMap[key] = cmd;
 
-      eepyTime = calculateEepyTime(std::min(timeToKeepAlive, cmd.lastActivityTimestamp + KEEP_ALIVE_INTERVAL));
+      eepyTime = calculateEepyTime(std::min(timeToKeepAlive, cmd.lastActivityTimestamp + CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS));
     }
 
     // Update the time to now
@@ -134,18 +131,18 @@ static void commandhandler_keepalivetask()
     // nothing. Shockers seen before the E-Stop are forgotten; only commands accepted after it count again.
     if (EStopManager::IsEStopped()) {
       activityMap.clear();
-      timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
+      timeToKeepAlive = now + CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS;
       continue;
     }
 
     // Keep track of the minimum activity time, so we know when to wake up
-    timeToKeepAlive = now + KEEP_ALIVE_INTERVAL;
+    timeToKeepAlive = now + CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS;
 
     // For every entry that has a keep-alive time less than now, send a keep-alive
     for (auto it = activityMap.begin(); it != activityMap.end(); ++it) {
       auto& cmdRef = it->second;
 
-      if (cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL < now) {
+      if (cmdRef.lastActivityTimestamp + CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS < now) {
         OS_LOGV(TAG, "Sending keep-alive for shocker %u", cmdRef.shockerId);
 
         auto transmitter = GetTransmitter();
@@ -154,14 +151,14 @@ static void commandhandler_keepalivetask()
           break;
         }
 
-        if (!transmitter->SendCommand(cmdRef.model, cmdRef.shockerId, ShockerCommandType::Vibrate, 0, KEEP_ALIVE_DURATION, false)) {
+        if (!transmitter->SendCommand(cmdRef.model, cmdRef.shockerId, ShockerCommandType::Vibrate, 0, CONFIG_OPENSHOCK_KEEPALIVE_DURATION_MS, false)) {
           OS_LOGW(TAG, "Failed to send keep-alive for shocker %u", cmdRef.shockerId);
         }
 
         cmdRef.lastActivityTimestamp = now;
       }
 
-      timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + KEEP_ALIVE_INTERVAL);
+      timeToKeepAlive = std::min(timeToKeepAlive, cmdRef.lastActivityTimestamp + CONFIG_OPENSHOCK_KEEPALIVE_INTERVAL_MS);
     }
   }
 }
@@ -197,13 +194,13 @@ static bool internalSetKeepAliveEnabled(bool enabled)
   if (enabled) {
     OS_LOGV(TAG, "Enabling keep-alive task");
 
-    s_keepAliveQueue = xQueueCreate(32, sizeof(KnownShocker));
+    s_keepAliveQueue = xQueueCreate(CONFIG_OPENSHOCK_KEEPALIVE_QUEUE_SIZE, sizeof(KnownShocker));
     if (s_keepAliveQueue == nullptr) {
       OS_LOGE(TAG, "Failed to create keep-alive task");
       return false;
     }
 
-    if (!s_keepAliveTask.startExpensive("KeepAliveTask", 4096, 1, commandhandler_keepalivetask)) {  // PROFILED: 1.5KB stack usage
+    if (!s_keepAliveTask.startExpensive("KeepAliveTask", CONFIG_OPENSHOCK_KEEPALIVE_TASK_STACK_SIZE, CONFIG_OPENSHOCK_KEEPALIVE_TASK_PRIORITY, commandhandler_keepalivetask)) {
       OS_LOGE(TAG, "Failed to create keep-alive task");
 
       vQueueDelete(s_keepAliveQueue);
@@ -244,18 +241,14 @@ bool CommandHandler::Init()
   }
   initialized = true;
 
-  auto rfConfig = Config::GetRFConfig();
-  if (!rfConfig) {
-    OS_LOGE(TAG, "Failed to get RF config");
-    return false;
-  }
+  const Config::RFConfig rfConfig = Config::GetRFConfig();
 
   // Runs through E-Stops too; the task itself sends nothing while e-stopped
-  if (rfConfig->keepAliveEnabled) {
+  if (rfConfig.keepAliveEnabled) {
     internalSetKeepAliveEnabled(true);
   }
 
-  gpio_num_t txPin = rfConfig->txPin;
+  gpio_num_t txPin = rfConfig.txPin;
   if (!OpenShock::IsValidOutputPin(txPin)) {
     const int8_t boardTxPin = Board::Get().rfTxGpio;
     if (!OpenShock::IsValidOutputPin(boardTxPin)) {
@@ -295,11 +288,8 @@ SetGPIOResultCode CommandHandler::SetRfTxPin(gpio_num_t txPin)
 
   // Driving the E-Stop input as the RF output would defeat the kill switch. Checked against the configured pin even
   // while the E-Stop is disabled, so enabling it later can't collide either.
-  auto estopPin = Config::GetEStopGpioPin();
-  if (!estopPin) {
-    return SetGPIOResultCode::InternalError;
-  }
-  if (*estopPin != GPIO_NUM_NC && txPin == *estopPin) {
+  const gpio_num_t estopPin = Config::GetEStopGpioPin();
+  if (estopPin != GPIO_NUM_NC && txPin == estopPin) {
     return SetGPIOResultCode::PinInUse;
   }
 
@@ -357,13 +347,7 @@ gpio_num_t CommandHandler::GetRfTxPin()
     return transmitter->GetTxPin();
   }
 
-  auto txPin = Config::GetRFConfigTxPin();
-  if (!txPin) {
-    OS_LOGE(TAG, "Failed to get RF TX pin from config");
-    return static_cast<gpio_num_t>(OPENSHOCK_GPIO_INVALID);
-  }
-
-  return *txPin;
+  return Config::GetRFConfigTxPin();
 }
 
 bool CommandHandler::HandleCommand(ShockerModelType model, uint16_t shockerId, ShockerCommandType type, uint8_t intensity, uint16_t durationMs)

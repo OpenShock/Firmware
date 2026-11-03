@@ -39,9 +39,9 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_serverHandlers = []() 
 
 void MessageHandlers::WebSocket::HandleGatewayBinary(GatewayClient& client, std::span<const uint8_t> data)
 {
-  auto msg = Serialization::GetVerifiedRoot<Schemas::GatewayToHubMessage>(data, MaxGatewayMessageSize);
+  auto msg = Serialization::GetVerifiedRoot<Schemas::GatewayToHubMessage>(data, CONFIG_OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE);
   if (msg == nullptr) {
-    OS_LOGE(TAG, "Invalid message (%zu bytes, max %zu)", data.size(), MaxGatewayMessageSize);
+    OS_LOGE(TAG, "Invalid message (%zu bytes, max %d)", data.size(), CONFIG_OPENSHOCK_GATEWAY_MAX_MESSAGE_SIZE);
     return;
   }
 

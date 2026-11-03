@@ -41,6 +41,7 @@ class FakeSession:
 @pytest.fixture(autouse=True)
 def upload_env(monkeypatch):
     monkeypatch.setenv('RELEASE_ID', 'rel-1')
+    monkeypatch.setenv('VERSION', '1.5.0')
     monkeypatch.setenv('BOARDS', 'BoardA\nBoardB')
     monkeypatch.setattr(repo_server_publish, 'upload_board', lambda *args, **kwargs: None)
     monkeypatch.setattr(repo_server_publish, 'show_response', lambda resp: None)
@@ -85,7 +86,7 @@ def write_board_artifacts(artifacts, board, version='1.5.0'):
     for filename in repo_server_publish.BUILD_ARTIFACTS.values():
         (build / filename).write_bytes(filename.encode())
     (artifacts / 'firmware_staticfs').mkdir(exist_ok=True)
-    (artifacts / 'firmware_staticfs' / 'staticfs.bin').write_bytes(b'fs')
+    (artifacts / 'firmware_staticfs' / 'www.bin').write_bytes(b'www')
     (artifacts / 'firmware_merged').mkdir(exist_ok=True)
     (artifacts / 'firmware_merged' / f'OpenShock_{board}_{version}.bin').write_bytes(b'merged')
 
@@ -98,7 +99,7 @@ def test_resolve_artifacts_reads_the_package_layout(tmp_path):
 
     for field, filename in repo_server_publish.BUILD_ARTIFACTS.items():
         assert found[field] == tmp_path / 'firmware_boards' / 'BoardA' / filename
-    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'staticfs.bin'
+    assert found[repo_server_publish.STATICFS_FIELD] == tmp_path / 'firmware_staticfs' / 'www.bin'
     # A board whose name extends another's does not pick up the other's merged image.
     assert found[repo_server_publish.MERGED_FIELD] == tmp_path / 'firmware_merged' / 'OpenShock_BoardA_1.5.0.bin'
 
@@ -302,6 +303,7 @@ def test_init_stages_the_release_and_outputs_its_id(in_checkout, monkeypatch):
     ],
 )
 def test_init_refuses_what_the_server_would(in_checkout, monkeypatch, capsys, env, error):
+    monkeypatch.delenv('VERSION', raising=False)  # upload_env sets it for the publish mode
     for name, value in env.items():
         monkeypatch.setenv(name, value)
     with fails_with(capsys, error):

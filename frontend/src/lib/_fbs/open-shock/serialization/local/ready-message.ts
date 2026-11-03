@@ -4,7 +4,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { HubConfig } from '../../../open-shock/serialization/configuration/hub-config';
+import { OtaSettings } from '../../../open-shock/serialization/local/ota-settings';
 import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network';
 
 
@@ -41,48 +41,78 @@ accountLinked():boolean {
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
-config(obj?:HubConfig):HubConfig|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? (obj || new HubConfig()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
-}
-
 gpioValidInputs(index: number):number|null {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.readInt8(this.bb!.__vector(this.bb_pos + offset) + index) : 0;
 }
 
 gpioValidInputsLength():number {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
 gpioValidInputsArray():Int8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? new Int8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
 gpioValidOutputs(index: number):number|null {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? this.bb!.readInt8(this.bb!.__vector(this.bb_pos + offset) + index) : 0;
 }
 
 gpioValidOutputsLength():number {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
 }
 
 gpioValidOutputsArray():Int8Array|null {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? new Int8Array(this.bb!.bytes().buffer, this.bb!.bytes().byteOffset + this.bb!.__vector(this.bb_pos + offset), this.bb!.__vector_len(this.bb_pos + offset)) : null;
 }
 
 hasStandardizedPins():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
+  const offset = this.bb!.__offset(this.bb_pos, 14);
   return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
 }
 
+rfTxPin():number {
+  const offset = this.bb!.__offset(this.bb_pos, 16);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : -1;
+}
+
+estopEnabled():boolean {
+  const offset = this.bb!.__offset(this.bb_pos, 18);
+  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
+}
+
+estopGpioPin():number {
+  const offset = this.bb!.__offset(this.bb_pos, 20);
+  return offset ? this.bb!.readInt8(this.bb_pos + offset) : -1;
+}
+
+/**
+ * SSIDs of the saved networks. Passwords never leave the hub.
+ */
+savedSsids(index: number):string
+savedSsids(index: number,optionalEncoding:flatbuffers.Encoding):string|Uint8Array
+savedSsids(index: number,optionalEncoding?:any):string|Uint8Array|null {
+  const offset = this.bb!.__offset(this.bb_pos, 22);
+  return offset ? this.bb!.__string(this.bb!.__vector(this.bb_pos + offset) + index * 4, optionalEncoding) : null;
+}
+
+savedSsidsLength():number {
+  const offset = this.bb!.__offset(this.bb_pos, 22);
+  return offset ? this.bb!.__vector_len(this.bb_pos + offset) : 0;
+}
+
+ota(obj?:OtaSettings):OtaSettings|null {
+  const offset = this.bb!.__offset(this.bb_pos, 24);
+  return offset ? (obj || new OtaSettings()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
 static startReadyMessage(builder:flatbuffers.Builder) {
-  builder.startObject(7);
+  builder.startObject(11);
 }
 
 static addPoggies(builder:flatbuffers.Builder, poggies:boolean) {
@@ -97,12 +127,8 @@ static addAccountLinked(builder:flatbuffers.Builder, accountLinked:boolean) {
   builder.addFieldInt8(2, +accountLinked, +false);
 }
 
-static addConfig(builder:flatbuffers.Builder, configOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, configOffset, 0);
-}
-
 static addGpioValidInputs(builder:flatbuffers.Builder, gpioValidInputsOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(4, gpioValidInputsOffset, 0);
+  builder.addFieldOffset(3, gpioValidInputsOffset, 0);
 }
 
 static createGpioValidInputsVector(builder:flatbuffers.Builder, data:number[]|Int8Array):flatbuffers.Offset;
@@ -123,7 +149,7 @@ static startGpioValidInputsVector(builder:flatbuffers.Builder, numElems:number) 
 }
 
 static addGpioValidOutputs(builder:flatbuffers.Builder, gpioValidOutputsOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(5, gpioValidOutputsOffset, 0);
+  builder.addFieldOffset(4, gpioValidOutputsOffset, 0);
 }
 
 static createGpioValidOutputsVector(builder:flatbuffers.Builder, data:number[]|Int8Array):flatbuffers.Offset;
@@ -144,7 +170,39 @@ static startGpioValidOutputsVector(builder:flatbuffers.Builder, numElems:number)
 }
 
 static addHasStandardizedPins(builder:flatbuffers.Builder, hasStandardizedPins:boolean) {
-  builder.addFieldInt8(6, +hasStandardizedPins, +false);
+  builder.addFieldInt8(5, +hasStandardizedPins, +false);
+}
+
+static addRfTxPin(builder:flatbuffers.Builder, rfTxPin:number) {
+  builder.addFieldInt8(6, rfTxPin, -1);
+}
+
+static addEstopEnabled(builder:flatbuffers.Builder, estopEnabled:boolean) {
+  builder.addFieldInt8(7, +estopEnabled, +false);
+}
+
+static addEstopGpioPin(builder:flatbuffers.Builder, estopGpioPin:number) {
+  builder.addFieldInt8(8, estopGpioPin, -1);
+}
+
+static addSavedSsids(builder:flatbuffers.Builder, savedSsidsOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(9, savedSsidsOffset, 0);
+}
+
+static createSavedSsidsVector(builder:flatbuffers.Builder, data:flatbuffers.Offset[]):flatbuffers.Offset {
+  builder.startVector(4, data.length, 4);
+  for (let i = data.length - 1; i >= 0; i--) {
+    builder.addOffset(data[i]!);
+  }
+  return builder.endVector();
+}
+
+static startSavedSsidsVector(builder:flatbuffers.Builder, numElems:number) {
+  builder.startVector(4, numElems, 4);
+}
+
+static addOta(builder:flatbuffers.Builder, otaOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(10, otaOffset, 0);
 }
 
 static endReadyMessage(builder:flatbuffers.Builder):flatbuffers.Offset {

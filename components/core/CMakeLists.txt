@@ -1,9 +1,8 @@
 # OpenShock application core.
 #
-# The tightly-interconnected heart of the firmware: wifi, the gateway link and the
-# websocket message handlers, plus the JSON/flatbuffer codecs they share. These form a
-# single dependency cycle (wifi <-> gateway <-> message handlers) and therefore live
-# here together.
+# The heart of the firmware: wifi, the gateway link and the websocket message handlers,
+# plus the JSON/flatbuffer codecs they share. The gateway uses wifi one way; wifi reaches
+# up only through AppHooks and the portal messages it builds.
 #
 # The captive portal and the OTA update manager were split out into captive_portal and
 # ota, which sit above core. core calls back into them only through AppHooks.h.

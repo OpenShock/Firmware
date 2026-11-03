@@ -3,6 +3,7 @@
 const char* const TAG = "WSGateway";
 
 #include <esp_wifi.h>
+#include <utility>
 
 #include "Logging.h"
 #include "OpenShock.h"
@@ -42,6 +43,11 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
 
   return finishMessage(builder, Gateway::HubToGatewayMessagePayload::Pong, pong, callback);
 }
+
+// SerializeBootStatusMessage casts between these by value, and the gateway protocol must stay compatible
+static_assert(std::to_underlying(OpenShock::FirmwareBootType::Normal) == std::to_underlying(Types::FirmwareBootType::Normal));
+static_assert(std::to_underlying(OpenShock::FirmwareBootType::NewFirmware) == std::to_underlying(Types::FirmwareBootType::NewFirmware));
+static_assert(std::to_underlying(OpenShock::FirmwareBootType::Rollback) == std::to_underlying(Types::FirmwareBootType::Rollback));
 
 bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBootType bootType, Common::SerializationCallbackFn callback)
 {
