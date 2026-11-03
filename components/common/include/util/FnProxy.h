@@ -41,5 +41,5 @@ namespace OpenShock::Util {
   /// the resulting function pointer. A noexcept method yields a noexcept function
   /// pointer, which still converts to a plain one for C APIs.
   template<auto MF>
-  constexpr auto FnProxy = &detail::Deduce<MF>::call;
+  inline constexpr auto FnProxy = &detail::Deduce<MF>::call;
 }  // namespace OpenShock::Util

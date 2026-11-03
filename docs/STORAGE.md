@@ -65,10 +65,102 @@ console prints where the config is.
 
 The captive portal's assets are one flat read-only image in the `www` partition (type 0x40, so no ESP-IDF component
 tries to mount it), mapped once and served by pointer. `scripts/utils/wwwimage.py` writes it and
-`components/www/include/www/WwwImage.h` documents the format: a directory tree with sorted children, 4-byte aligned
-gzipped bodies and a SHA-256 over the whole image (header included, its own field zeroed), checked before anything is
-served.
+`components/www/include/www/WwwImage.h` parses it: a directory tree with sorted children, 4-byte aligned gzipped
+bodies and a SHA-256 over the whole image (header included, its own field zeroed), checked before anything is served.
 The same image serves every board. The OTA update skips flashing it when the hash on flash already matches the
 release's.
 
 Releases publish the image as `www.bin` under the repository server's `staticfs` artifact.
+
+### www image format
+
+All fields are little-endian and everything is 4-byte aligned. The layout, as an
+[ImHex](https://github.com/WerWolv/ImHex) pattern (paste it into the Pattern Editor, or save it as `www.hexpat`; it
+needs ImHex's standard library, which ships with ImHex and lives in
+[ImHex-Patterns](https://github.com/WerWolv/ImHex-Patterns/tree/master/includes)):
+
+```rust
+#pragma description OpenShock www image (captive portal assets)
+#pragma magic [ 4F 53 57 57 ] @ 0x00
+#pragma endian little
+
+import std.mem;
+import std.sys;
+import std.string;
+import type.magic;
+
+bitfield NodeFlags {
+    directory : 1;
+    immutable : 1;  // files only: content-hashed name, long browser cache
+    padding   : 14; // must be zero
+};
+
+struct Header {
+    type::Magic<"OSWW"> magic;
+    u16 version;
+    u16 node_count;  // root and directories included
+    u32 dir_len;     // nodes + string table + padding to 4
+    u32 image_len;   // header to the end of the last body's padding
+    u8  image_hash[32] [[sealed, comment("SHA-256 of the first image_len bytes, this field zeroed")]];
+    padding[16];     // reserved, zero
+};
+
+Header header @ 0x00;
+std::assert(header.version == 1, "unsupported version");
+std::assert(header.image_len <= std::mem::size(), "image_len past the end of the data");
+
+u32 strings_start = 0x40 + 0x10 * header.node_count;
+u32 body_start    = 0x40 + header.dir_len;
+std::assert_warn(header.dir_len % 4 == 0 && strings_start <= body_start, "bad dir_len");
+std::assert_warn(header.image_len % 4 == 0, "image_len not 4-byte aligned");
+
+fn node_label(ref auto node) {
+    if (node.flags.directory) {
+        if (std::string::length(node.name) == 0) return "/";
+        return std::format("{}/  [{} children @ node {}]", node.name, node.size, node.offset);
+    }
+    return std::format("{}  [{} bytes{}]", node.name, node.size, node.flags.immutable ? ", immutable" : "");
+};
+
+struct Node {
+    u16       name_off;  // into the string table
+    NodeFlags flags;
+    u32       offset;    // directory: index of its first child; file: absolute body offset
+    u32       size;      // directory: number of children; file: body bytes
+    u32       reserved;  // zero
+    std::string::NullString name @ strings_start + name_off;
+
+    if (flags.directory) {
+        std::assert_warn(!flags.immutable, "immutable directory");
+    } else {
+        std::assert_warn(offset >= body_start && offset % 4 == 0 && offset + size <= header.image_len, "body out of range");
+        u8 body[size] @ offset [[sealed, comment("gzip")]];
+    }
+} [[format("node_label")]];
+
+Node nodes[header.node_count] @ 0x40;
+char strings[body_start - strings_start] @ strings_start [[sealed]];
+u8   trailing[std::mem::size() - header.image_len] @ header.image_len [[sealed, comment("partition space after the image")]];
+```
+
+The rules a valid image follows. The pattern warns on a few; the firmware (`Www::Image::Parse`) enforces rules 1-5 and
+the part of rule 6 marked as checked, in this order:
+
+1. `image_len` is 4-aligned, at least the 64-byte header and within the partition.
+2. `image_hash` is the SHA-256 of the first `image_len` bytes with `image_hash` zeroed. Nothing past the version and
+   `image_len` is read before this matches.
+3. Reserved bytes (header and nodes) and unknown flag bits are zero.
+4. Node 0 is the root: a directory with an empty name. Every other name is one non-empty path component, no `/`, no
+   `.` or `..`, no ASCII uppercase (the packer folds names to lowercase; lookups fold the request path the same way).
+5. A directory's children are one contiguous run of nodes, strictly sorted by name (bytewise), so lookups binary search
+   each level. The runs are laid out breadth-first: walking the nodes in order, each directory's run starts where the
+   previous one ended, the first at node 1, and together they cover every node.
+6. Bodies lie between the end of the directory and `image_len`, 4-aligned, in node order, each padded to 4 bytes;
+   `image_len` is exactly the end of the last one's padding. Every body is gzipped (there is no flag for it).
+   *Checked:* each body is 4-aligned and within that range, and `image_len` is the furthest padded body end.
+   *Producer guarantee only* (the packer writes them; the parser does not check): bodies are in node order and do not
+   overlap, and their contents are gzip. The image hash already rules out a body changed after packing.
+
+The packer's output is a pure function of the assets (sorted, no timestamps), so an unchanged frontend gives a
+byte-identical image. `scripts/utils/wwwimage.py`, `WwwImage.h` and this section describe the same format: change them
+together.

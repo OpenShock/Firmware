@@ -46,14 +46,16 @@ def test_round_trip_keeps_every_entry():
 
 def test_layout_is_what_the_firmware_header_describes():
     image = wwwimage.pack(ASSETS)
-    magic, version, count, dir_len, body_hash, reserved = struct.unpack_from(wwwimage.HEADER_FORMAT, image, 0)
-    assert (magic, version, count, reserved) == (wwwimage.MAGIC, 1, NODE_COUNT, b'\0' * 20)
+    magic, version, count, dir_len, image_len, image_hash, reserved = struct.unpack_from(
+        wwwimage.HEADER_FORMAT, image, 0
+    )
+    assert (magic, version, count, reserved) == (wwwimage.MAGIC, 1, NODE_COUNT, b'\0' * 16)
     assert image[:4] == b'OSWW'
     assert dir_len % 4 == 0
+    assert image_len == len(image) and image_len % 4 == 0
     # The hash is a full SHA-256 over the whole image, its own field zeroed
-    assert len(body_hash) == 32
-    assert body_hash == hashlib.sha256(image[:12] + b'\0' * 32 + image[44:]).digest()
-    assert len(image) % 4 == 0
+    assert len(image_hash) == 32
+    assert image_hash == hashlib.sha256(image[:16] + b'\0' * 32 + image[48:]).digest()
 
     nodes = [struct.unpack_from(wwwimage.NODE_FORMAT, image, node(i)) for i in range(count)]
     strings = image[node(count) : wwwimage.HEADER_LEN + dir_len]
@@ -152,9 +154,14 @@ def test_a_name_cannot_be_both_a_file_and_a_directory(order):
         wwwimage.pack([entries[i] for i in order])
 
 
-def corrupt(image: bytes, offset: int, value: bytes) -> bytes:
+def corrupt(image: bytes, offset: int, value: bytes, rehash: bool = True) -> bytes:
+    """`image` with `value` written at `offset`, re-signed by default so the field check (not the hash) must catch it."""
     data = bytearray(image)
     data[offset : offset + len(value)] = value
+    if rehash:
+        image_len = struct.unpack_from('<I', data, wwwimage.IMAGE_LEN_OFFSET)[0]
+        if wwwimage.HEADER_LEN <= image_len <= len(data):
+            data[16:48] = wwwimage.compute_hash(bytes(data[:image_len]))
     return bytes(data)
 
 
@@ -167,8 +174,10 @@ def corrupt(image: bytes, offset: int, value: bytes) -> bytes:
         (6, struct.pack('<H', 0), 'no root node'),
         (8, struct.pack('<I', 2), 'directory length out of range'),
         (8, struct.pack('<I', 0x100000), 'directory length out of range'),
-        (12, b'\0' * 32, 'image hash mismatch'),
-        (44, b'\1\0\0\0', 'reserved header field not zero'),
+        (12, struct.pack('<I', 2), 'image length out of range'),  # unaligned
+        (12, struct.pack('<I', 32), 'image length out of range'),  # shorter than the header
+        (12, struct.pack('<I', 0x100000), 'image length out of range'),  # past the end
+        (48, b'\1', 'reserved header field not zero'),
         (63, b'\1', 'reserved header field not zero'),
         (node(0) + 2, struct.pack('<H', 0), 'not the root directory'),
         (node(0) + 4, struct.pack('<I', 2), 'bad child run'),  # the root's children start at 1
@@ -188,9 +197,25 @@ def test_every_corrupted_field_is_rejected(offset, value, error):
         wwwimage.parse(corrupt(wwwimage.pack(ASSETS), offset, value))
 
 
+@pytest.mark.parametrize(
+    'offset, value',
+    [
+        (6, struct.pack('<H', 200)),
+        (16, b'\0' * 32),
+        (48, b'\1'),
+        (node(2) + 4, struct.pack('<I', 0x10)),
+        (-1, b'\1'),  # a body byte
+    ],
+)
+def test_any_unsigned_change_is_a_hash_mismatch_before_anything_else_is_parsed(offset, value):
+    image = wwwimage.pack(ASSETS)
+    with pytest.raises(wwwimage.WwwImageError, match='image hash mismatch'):
+        wwwimage.parse(corrupt(image, offset % len(image), value, rehash=False))
+
+
 def test_an_uppercase_name_in_the_image_is_rejected():
     image = wwwimage.pack(ASSETS)
-    image = corrupt(image, image.index(b'index.html\0'), b'I')
+    image = corrupt(image, image.index(b'index.html\0'), b'I')  # re-signed
     with pytest.raises(wwwimage.WwwImageError, match='bad name'):
         wwwimage.parse(image)
 
@@ -203,13 +228,13 @@ def test_children_out_of_order_are_rejected():
     image[node(2) : node(2) + 2] = third
     image[node(3) : node(3) + 2] = second
     with pytest.raises(wwwimage.WwwImageError, match='not strictly increasing'):
-        wwwimage.parse(bytes(image))
+        wwwimage.parse(corrupt(bytes(image), 0, b''))  # re-signed
 
 
 def test_a_hash_over_the_bodies_alone_is_refused():
     # What the first draft of the format hashed: everything after the header
     image = wwwimage.pack(ASSETS)
-    image = corrupt(image, 12, hashlib.sha256(image[wwwimage.HEADER_LEN :]).digest())
+    image = corrupt(image, 16, hashlib.sha256(image[wwwimage.HEADER_LEN :]).digest(), rehash=False)
     with pytest.raises(wwwimage.WwwImageError, match='image hash mismatch'):
         wwwimage.parse(image)
 
@@ -221,12 +246,32 @@ def test_a_truncated_image_is_rejected():
             wwwimage.parse(image[:length])
 
 
-def test_a_body_whose_padding_runs_past_the_image_is_rejected_explicitly():
-    # chunk.js is the last body (6 bytes, padded to 8): cutting its padding keeps offset + size within the image,
-    # but the padded end is not, which the firmware reports as a bad body rather than a hash mismatch.
+def test_a_truncated_image_is_caught_by_its_length_before_hashing():
     image = wwwimage.pack(ASSETS)
-    with pytest.raises(wwwimage.WwwImageError, match='body padding out of range'):
+    with pytest.raises(wwwimage.WwwImageError, match='image length out of range'):
         wwwimage.parse(image[:-1])
+
+
+@pytest.mark.parametrize(
+    'delta, error',
+    [
+        (-4, 'body out of range'),  # chunk.js (6 bytes, padded to 8) now runs past the image
+        (4, 'does not match the bodies'),  # trailing bytes the signature covers but no node accounts for
+    ],
+)
+def test_an_image_length_that_is_not_where_the_bodies_end_is_rejected(delta, error):
+    image = wwwimage.pack(ASSETS) + b'\0' * 4
+    image_len = len(image) - 4 + delta
+    image = corrupt(image, wwwimage.IMAGE_LEN_OFFSET, struct.pack('<I', image_len))
+    with pytest.raises(wwwimage.WwwImageError, match=error):
+        wwwimage.parse(image)
+
+
+def test_the_bytes_after_the_image_are_ignored():
+    image = wwwimage.pack(ASSETS)
+    parsed = wwwimage.parse(image + b'\xff' * 4096)
+    assert parsed.size == len(image)
+    assert parsed.find('index.html').data == ASSETS[0].data
 
 
 @pytest.mark.parametrize(
