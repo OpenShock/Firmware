@@ -94,6 +94,11 @@ CONFIG_LWIP_MAX_SOCKETS=16
 CONFIG_LWIP_TCP_WND_DEFAULT=16384
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=16
 
+# Resume TLS sessions: a reconnect then skips certificate chain verification and the key exchange, about a second
+# of CPU each. GatewayClient and HTTP::Client keep the session of their last connection and only offer it to the host
+# that issued it.
+CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS=y
+
 # The gateway websocket and the kept-alive HTTP client each hold a TLS session. With static
 # buffers every session keeps a 16 KB input + 4 KB output record buffer for its whole life;
 # dynamic buffers allocate them per record and shrink while idle, lowering the heap peak
