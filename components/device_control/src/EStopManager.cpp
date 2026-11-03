@@ -5,7 +5,7 @@
 const char* const TAG = "EStopManager";
 
 #include "Chipset.h"
-#include "config/Config.h"
+#include "estop/EStopConfig.h"
 #include "estop/EStopStateMachine.h"
 #include "events/Events.h"
 #include "Logging.h"
@@ -22,13 +22,6 @@ const char* const TAG = "EStopManager";
 #include <cstdint>
 
 using namespace OpenShock;
-
-const uint32_t k_estopUpdateRate = 5;        // 200 Hz (debounce/hold timings live in EStopStateMachine)
-
-const uint32_t k_estopTaskStackSize = 4096;  // TODO: profile and tune
-// Above the network tasks (5) and the RF task: it is blocked almost all the time, and a sample that waits behind TLS
-// work delays the E-Stop by that long.
-const UBaseType_t k_estopTaskPriority = 10;
 
 static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
@@ -86,8 +79,9 @@ static void estopmgr_managerTask(gpio_num_t estopPin)
   TickType_t lastWake = xTaskGetTickCount();
   while (!s_estopTask.stopRequested()) {
     watchdog.feed();
-    // Fixed rate: the debounce and hold timings assume samples k_estopUpdateRate apart, whatever the loop body costs
-    xTaskDelayUntil(&lastWake, pdMS_TO_TICKS(k_estopUpdateRate));
+    // Fixed rate: the debounce and hold timings (EStopStateMachine) assume samples this far apart, whatever the loop
+    // body costs
+    xTaskDelayUntil(&lastWake, pdMS_TO_TICKS(CONFIG_OPENSHOCK_ESTOP_POLL_INTERVAL_MS));
 
     // Get current time
     int64_t now = OpenShock::millis();
@@ -168,13 +162,7 @@ static bool estopmgr_taskStart()
   }
 
   if (s_estopPin == GPIO_NUM_NC) {
-    auto configPin = OpenShock::Config::GetEStopGpioPin();
-    if (!configPin) {
-      OS_LOGE(TAG, "Failed to get EStop pin from config");
-      return false;
-    }
-
-    gpio_num_t pin = *configPin;
+    gpio_num_t pin = OpenShock::Config::GetEStopGpioPin();
     if (pin == GPIO_NUM_NC) {
       OS_LOGW(TAG, "No valid pin is defined, refusing to start task");
       return false;
@@ -189,7 +177,7 @@ static bool estopmgr_taskStart()
 
   // The pin is captured by value, so the task keeps sampling the pin it was started with even if s_estopPin changes.
   gpio_num_t pin = s_estopPin;
-  if (!s_estopTask.start(TAG, k_estopTaskStackSize, k_estopTaskPriority, 1, [pin] { estopmgr_managerTask(pin); })) {
+  if (!s_estopTask.start(TAG, CONFIG_OPENSHOCK_ESTOP_TASK_STACK_SIZE, CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, 1, [pin] { estopmgr_managerTask(pin); })) {
     OS_LOGE(TAG, "Failed to create EStop event handler task");
     return false;
   }
@@ -222,23 +210,18 @@ bool EStopManager::Init()
   }
   s_estopInitialized = true;
 
-  auto cfg = OpenShock::Config::GetEStopConfig();
-  if (!cfg) {
-    OS_LOGE(TAG, "Failed to get EStop pin from config");
-    return false;
-  }
-
-  if (!cfg->enabled) {
+  const Config::EStopConfig cfg = OpenShock::Config::GetEStopConfig();
+  if (!cfg.enabled) {
     return true;
   }
 
   OpenShock::ScopedLock lock__(&s_estopMutex);
 
-  if (!estopmgr_configurePin(cfg->gpioPin)) {
+  if (!estopmgr_configurePin(cfg.gpioPin)) {
     return false;
   }
 
-  s_estopPin = cfg->gpioPin;
+  s_estopPin = cfg.gpioPin;
 
   return estopmgr_taskStart();
 }

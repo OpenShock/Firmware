@@ -1,13 +1,14 @@
-# Compile crypto's PURE sources directly. Base64 pulls in common headers
-# (TinyVec.h -> OpenShock.h, Logging.h), included by path below; Logging.h and the
-# generated openshock_board.h come from test/host_support.
+# Compile crypto's PURE sources directly. Hashing.h pulls in common's OpenShock.h,
+# included by path below; Logging.h and the generated openshock_board.h come from
+# test/host_support.
 idf_component_register(
   SRCS         "test_main.cpp"
                "test_base64.cpp"
+               "test_hashing.cpp"
                "../../src/Base64.cpp"
   INCLUDE_DIRS "."
                "../../include"             # crypto headers (Hashing.h, Base64.h)
-               "../../../common/include"   # TinyVec.h, OpenShock.h
+               "../../../common/include"   # OpenShock.h
   REQUIRES     unity
                host_support                # Logging.h, openshock_board.h (test/host_support)
                mbedtls                     # Base64.cpp -> mbedtls/base64.h

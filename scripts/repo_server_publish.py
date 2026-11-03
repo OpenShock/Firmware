@@ -29,7 +29,9 @@ BUILD_ARTIFACTS = {
     'partitions': 'partition-table.bin',
 }
 STATICFS_FIELD = 'staticfs'
+STATICFS_FILE = 'www.bin'
 MERGED_FIELD = 'merged'
+
 
 UPLOAD_RETRIES = 3
 UPLOAD_BACKOFF_SECONDS = 5
@@ -94,7 +96,7 @@ def resolve_artifacts(artifacts: Path, board: str) -> dict[str, Path]:
         fail(f'{board} is missing its {MERGED_FIELD} artifact (expected {artifacts}/firmware_merged/{merged_glob})')
 
     found = {field: build / filename for field, filename in BUILD_ARTIFACTS.items()}
-    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / 'staticfs.bin'
+    found[STATICFS_FIELD] = artifacts / 'firmware_staticfs' / STATICFS_FILE
     found[MERGED_FIELD] = merged[0]
     for field, path in found.items():
         if not path.is_file():

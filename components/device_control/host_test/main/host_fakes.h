@@ -13,8 +13,9 @@
 // A timed receive on an empty queue advances the fake clock by its timeout (inside a
 // task, a zero-timeout poll by 1 ms), and every RMT frame advances it by RmtFrameMs, so
 // task loops replay deterministically.
-#include "config/Config.h"
+#include "estop/EStopConfig.h"
 #include "events/Events.h"
+#include "radio/RFConfig.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>

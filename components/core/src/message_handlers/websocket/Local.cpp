@@ -33,9 +33,9 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
 
 void MessageHandlers::WebSocket::HandleLocalBinary(uint8_t socketId, std::span<const uint8_t> data)
 {
-  auto msg = Serialization::GetVerifiedRoot<Schemas::LocalToHubMessage>(data, MaxLocalMessageSize);
+  auto msg = Serialization::GetVerifiedRoot<Schemas::LocalToHubMessage>(data, CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE);
   if (msg == nullptr) {
-    OS_LOGE(TAG, "Invalid message (%zu bytes, max %zu)", data.size(), MaxLocalMessageSize);
+    OS_LOGE(TAG, "Invalid message (%zu bytes, max %d)", data.size(), CONFIG_OPENSHOCK_LOCAL_MAX_MESSAGE_SIZE);
     return;
   }
 

@@ -8,7 +8,7 @@
 idf_component_register(
   SRCS          "src/Base64.cpp"
   INCLUDE_DIRS  "include"
-  REQUIRES      common       # OpenShock.h (Hashing.h), TinyVec.h (Base64.h) in public headers
+  REQUIRES      common       # OpenShock.h (Hashing.h) in public headers
                 mbedtls       # mbedtls/md.h in Hashing.h public header
   PRIV_REQUIRES logging       # Logging.h (Base64.cpp)
 )

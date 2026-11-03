@@ -80,6 +80,17 @@ TEST_CASE("OtaUpdateChannel: stable/beta/develop/dev + case", "[common][enums]")
   TEST_ASSERT_FALSE(TryParseOtaUpdateChannel("stabl").has_value());  // prefix, not full
 }
 
+TEST_CASE("OtaUpdateChannel: every name parses back", "[common][enums]")
+{
+  TEST_ASSERT_EQUAL_STRING("stable", OtaUpdateChannelName(OtaUpdateChannel::Stable));
+  TEST_ASSERT_EQUAL_STRING("beta", OtaUpdateChannelName(OtaUpdateChannel::Beta));
+  TEST_ASSERT_EQUAL_STRING("develop", OtaUpdateChannelName(OtaUpdateChannel::Develop));
+
+  for (OtaUpdateChannel channel : {OtaUpdateChannel::Stable, OtaUpdateChannel::Beta, OtaUpdateChannel::Develop}) {
+    TEST_ASSERT_TRUE(TryParseOtaUpdateChannel(OtaUpdateChannelName(channel)) == channel);
+  }
+}
+
 // ---- OtaUpdateStep ---------------------------------------------------------
 
 TEST_CASE("OtaUpdateStep: every step + rejects unknown", "[common][enums]")
@@ -93,6 +104,15 @@ TEST_CASE("OtaUpdateStep: every step + rejects unknown", "[common][enums]")
 
   TEST_ASSERT_FALSE(TryParseOtaUpdateStep("").has_value());
   TEST_ASSERT_FALSE(TryParseOtaUpdateStep("done").has_value());
+}
+
+TEST_CASE("OtaUpdateStep: every name parses back", "[common][enums]")
+{
+  TEST_ASSERT_EQUAL_STRING("RollingBack", OtaUpdateStepName(OtaUpdateStep::RollingBack));
+
+  for (OtaUpdateStep step : {OtaUpdateStep::None, OtaUpdateStep::Updating, OtaUpdateStep::Updated, OtaUpdateStep::Validating, OtaUpdateStep::Validated, OtaUpdateStep::RollingBack}) {
+    TEST_ASSERT_TRUE(TryParseOtaUpdateStep(OtaUpdateStepName(step)) == step);
+  }
 }
 
 // ---- FirmwareBootType (string_view API) ------------------------------------

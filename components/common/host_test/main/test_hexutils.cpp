@@ -30,6 +30,26 @@ TEST_CASE("ToHex array -> array", "[util][hex]")
   TEST_ASSERT_EQUAL_STRING("DEADBEEF0123", out.data());
 }
 
+TEST_CASE("ToHex fixed-extent span -> buffer and array", "[util][hex]")
+{
+  const std::array<uint8_t, 4> bytes = {0xDE, 0xAD, 0x00, 0x7F};
+  const std::span<const uint8_t, 4> view(bytes);
+
+  char buf[9] = {'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'};
+  HexUtils::ToHex(view, buf, false);
+  TEST_ASSERT_EQUAL_STRING("dead007f", buf);  // NUL-terminated by the call
+
+  auto out = HexUtils::ToHex(view);
+  TEST_ASSERT_EQUAL_STRING("DEAD007F", out.data());
+
+  // A subspan with a static extent works the same way
+  TEST_ASSERT_EQUAL_STRING("ad00", HexUtils::ToHex(view.subspan<1, 2>(), false).data());
+
+  // The array overloads are still the ones picked for a plain array
+  const uint8_t raw[2] = {0x01, 0x23};
+  TEST_ASSERT_EQUAL_STRING("0123", HexUtils::ToHex<2>(raw).data());
+}
+
 TEST_CASE("TryParseHex round-trips", "[util][hex]")
 {
   uint8_t out[3] = {0};

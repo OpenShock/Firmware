@@ -1,11 +1,11 @@
+#include <freertos/FreeRTOS.h>
+
 #include "GatewayConnectionManager.h"
 
 const char* const TAG = "GatewayConnectionManager";
 
-#include "visual/VisualStateManager.h"
-
 #include "AppHooks.h"
-#include "config/Config.h"
+#include "BackendConfig.h"
 #include "events/Events.h"
 #include "GatewayClient.h"
 #include "http/JsonAPI.h"
@@ -26,9 +26,6 @@ const char* const TAG = "GatewayConnectionManager";
 #include <utility>
 #include <vector>
 
-const char* const AUTH_TOKEN_FILE = "/authToken";
-
-const uint8_t FLAG_NONE   = 0;
 const uint8_t FLAG_HAS_IP = 1 << 0;
 const uint8_t FLAG_LINKED = 1 << 1;
 
@@ -37,9 +34,12 @@ const uint8_t LINK_CODE_LENGTH = 6;
 static std::atomic<uint8_t> s_flags = 0;
 
 // Retry timing, owned by the main task (Update()). Other tasks ask for a reset through s_retryResetRequested.
-static OpenShock::Backoff s_authBackoff(300'000, 300'000);   // After the backend rejects the token: 5 minutes
-static OpenShock::Backoff s_connectBackoff(20'000, 20'000);  // Between LCG connection attempts: 20 seconds
-static OpenShock::Backoff s_hubInfoBackoff(5'000, 300'000);  // After a failed hub info fetch: 5 s doubling up to 5 min
+// After the backend rejects the token
+static OpenShock::Backoff s_authBackoff(CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS);
+// Between LCG connection attempts
+static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
+// After a failed hub info fetch: doubling from the first value up to the cap
+static OpenShock::Backoff s_hubInfoBackoff(CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS);
 static std::atomic<bool> s_retryResetRequested = false;
 static OpenShock::SimpleMutex s_clientMutex;
 static std::shared_ptr<OpenShock::GatewayClient> s_wsClient = nullptr;
@@ -298,13 +298,7 @@ static bool StartConnectingToLCG()
     return false;
   }
 
-  auto authToken = Config::GetBackendAuthToken();
-  if (!authToken) {
-    OS_LOGE(TAG, "Failed to get auth token");
-    return false;
-  }
-
-  auto response = HTTP::JsonAPI::AssignLcg(*authToken);
+  auto response = HTTP::JsonAPI::AssignLcg(Config::GetBackendAuthToken());
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before retrying");
@@ -346,13 +340,8 @@ static void InitializeClient()
     return;  // Checked here so an auth hold-off doesn't also count as a hub info failure and stack the two backoffs
   }
 
-  auto authToken = Config::GetBackendAuthToken();
-  if (!authToken) {
-    OS_LOGE(TAG, "Failed to get auth token");
-    return;
-  }
-
-  if (!FetchHubInfo(*authToken)) {
+  const std::string authToken = Config::GetBackendAuthToken();
+  if (!FetchHubInfo(authToken)) {
     // Back off on failure so an unreachable backend isn't polled on every update tick.
     s_hubInfoBackoff.backOff(OpenShock::millis());
     return;
@@ -370,7 +359,7 @@ static void InitializeClient()
     }
 
     s_flags.fetch_or(FLAG_LINKED, std::memory_order_relaxed);
-    s_wsClient = std::make_shared<OpenShock::GatewayClient>(*authToken);
+    s_wsClient = std::make_shared<OpenShock::GatewayClient>(authToken);
   }
   OS_LOGD(TAG, "Successfully verified auth token");
 

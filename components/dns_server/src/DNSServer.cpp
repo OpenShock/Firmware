@@ -77,11 +77,7 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
     return false;
   }
 
-  // Above the other application tasks (priority 1): a phone joining the AP sends a burst of DNS queries, and the
-  // small UDP receive mailbox drops them if this task is starved, which delays captive-portal detection by seconds.
-  // Still below httpd and the E-Stop task (5).
-  constexpr UBaseType_t kTaskPriority = 4;
-  if (!m_task.startExpensive("DNSServer", 3072, kTaskPriority, [this] { task(); })) {
+  if (!m_task.startExpensive("DNSServer", CONFIG_OPENSHOCK_DNS_TASK_STACK_SIZE, CONFIG_OPENSHOCK_DNS_TASK_PRIORITY, [this] { task(); })) {
     OS_LOGE(TAG, "Failed to create DNS task");
     close(m_socket);
     m_socket = -1;

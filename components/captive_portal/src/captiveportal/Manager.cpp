@@ -7,13 +7,15 @@
 const char* const TAG = "CaptivePortal";
 
 #include "AppHooks.h"
+#include "BackendConfig.h"
+#include "captiveportal/CaptivePortalConfig.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "config/Config.h"
 #include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "Temporal.h"
+#include "wifi/WiFiConfig.h"
 
 #include <esp_mac.h>
 #include <esp_netif.h>
@@ -22,6 +24,7 @@ const char* const TAG = "CaptivePortal";
 #include <esp_wifi_default.h>
 
 #include "SimpleMutex.h"
+#include "util/IPv4Utils.h"
 #include "util/RetiredList.h"
 #include "util/TaskUtils.h"
 
@@ -47,14 +50,14 @@ enum : uint32_t {
 struct ManagerState {
   bool alwaysEnabled      = false;
   bool closeWhenOnline    = false;  // Setup finished or the backend disabled the portal: close it once online
-  bool forceClosed        = false;  // OTA is flashing the static filesystem; cleared by ReleaseForceClose()
+  bool forceClosed        = false;  // OTA is flashing the www image; cleared by ReleaseForceClose()
   bool forceCloseAckOwed  = false;  // ForceClose() is waiting for s_forceCloseDone
   int64_t startupGraceEnd = 0;      // esp_timer time until which the portal must not open; 0 = no grace period
   int64_t autoCloseAt     = 0;      // esp_timer time at which an idle portal closes; 0 = not armed
 };
 
-static constexpr int64_t STARTUP_GRACE_PERIOD_US = 30LL * 1'000'000;      // 30 seconds
-static constexpr int64_t AUTO_CLOSE_DELAY_US     = 5LL * 60 * 1'000'000;  // 5 minutes
+static constexpr int64_t kStartupGracePeriodUs = CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_MS * 1000LL;
+static constexpr int64_t kAutoCloseDelayUs     = CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_MS * 1000LL;
 
 // The requested always-enabled setting, and what IsAlwaysEnabled() reports. Written by SetAlwaysEnabled().
 static std::atomic<bool> s_alwaysEnabled = false;
@@ -72,9 +75,7 @@ static std::atomic<bool> s_instanceLive = false;
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
 
-// The captive portal AP always serves from this fixed address; the DNS server and
-// RFC8908 handler reference it too (see CaptivePortal::ApIPv4String()).
-static const char* const CAPTIVE_PORTAL_AP_IP = "4.3.2.1";
+static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
 static void sendCommand(uint32_t command)
 {
@@ -85,11 +86,7 @@ static void sendCommand(uint32_t command)
 
 static bool isDeviceFullyConfigured()
 {
-  auto credentialsList = Config::GetWiFiCredentials();
-  if (!credentialsList || credentialsList->empty()) {
-    return false;
-  }
-  return Config::HasBackendAuthToken();
+  return Config::HasWiFiCredentials() && Config::HasBackendAuthToken();
 }
 
 static std::shared_ptr<CaptivePortalInstance> GetInstance()
@@ -161,8 +158,8 @@ static bool captiveportal_start()
     }
 
     esp_netif_ip_info_t ipInfo = {};
-    esp_netif_str_to_ip4(CAPTIVE_PORTAL_AP_IP, &ipInfo.ip);
-    esp_netif_str_to_ip4(CAPTIVE_PORTAL_AP_IP, &ipInfo.gw);
+    esp_netif_str_to_ip4(CONFIG_OPENSHOCK_PORTAL_AP_IP, &ipInfo.ip);
+    esp_netif_str_to_ip4(CONFIG_OPENSHOCK_PORTAL_AP_IP, &ipInfo.gw);
     esp_netif_str_to_ip4("255.255.255.0", &ipInfo.netmask);
 
     esp_netif_dhcps_stop(s_apNetif);
@@ -172,7 +169,7 @@ static bool captiveportal_start()
     // can open the portal without waiting for their connectivity probes to be redirected. esp_netif keeps the
     // pointer, so the string must outlive the netif.
     static char captivePortalUri[64];
-    snprintf(captivePortalUri, sizeof(captivePortalUri), "http://%s/captive-portal/api", CAPTIVE_PORTAL_AP_IP);  // RFC8908Handler's API path
+    snprintf(captivePortalUri, sizeof(captivePortalUri), "http://%s/captive-portal/api", CONFIG_OPENSHOCK_PORTAL_AP_IP);  // RFC8908Handler's API path
     esp_err_t uriErr = esp_netif_dhcps_option(s_apNetif, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, captivePortalUri, strlen(captivePortalUri));
     if (uriErr != ESP_OK) {
       OS_LOGW(TAG, "Failed to set DHCP captive portal URI: %s", esp_err_to_name(uriErr));
@@ -190,7 +187,7 @@ static bool captiveportal_start()
   apConfig.ap.ssid_len        = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
   apConfig.ap.channel         = 1;
   apConfig.ap.authmode        = WIFI_AUTH_OPEN;
-  apConfig.ap.max_connection  = 4;
+  apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
   apConfig.ap.beacon_interval = 100;
 
   esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
@@ -260,7 +257,7 @@ static void applyCommands(ManagerState& state, uint32_t commands)
 }
 
 // Runs the captive-portal state machine once. This does heavy work (starting the portal constructs
-// CaptivePortalInstance, which mounts LittleFS and spins up the HTTP/WS/DNS servers), so it runs on the dedicated
+// CaptivePortalInstance, which maps the www image and spins up the HTTP/WS/DNS servers), so it runs on the dedicated
 // manager task, never on the esp_timer task, whose 3.5KB stack would overflow.
 static void captiveportal_tick(ManagerState& state)
 {
@@ -313,12 +310,12 @@ static void captiveportal_tick(ManagerState& state)
     return;
   }
 
-  // Auto-close: no clients connected, WiFi + gateway are up, 5 minutes elapsed
+  // Auto-close: no clients connected, WiFi + gateway are up, kAutoCloseDelayUs elapsed
   if (running && !state.alwaysEnabled && connected && !hasClients) {
     if (state.autoCloseAt == 0) {
-      state.autoCloseAt = now + AUTO_CLOSE_DELAY_US;
+      state.autoCloseAt = now + kAutoCloseDelayUs;
     } else if (now >= state.autoCloseAt) {
-      OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for 5 minutes)");
+      OS_LOGI(TAG, "Auto-closing captive portal AP (no clients for %d ms)", CONFIG_OPENSHOCK_PORTAL_AUTO_CLOSE_MS);
       captiveportal_stop(state);
       return;
     }
@@ -326,8 +323,8 @@ static void captiveportal_tick(ManagerState& state)
     state.autoCloseAt = 0;
   }
 
-  // Open portal if not running and device needs setup. Not while a retired instance still holds the static
-  // filesystem and ports 80/53: the new one would fail to start and flap the AP on every tick.
+  // Open portal if not running and device needs setup. Not while a retired instance still holds the www
+  // image and ports 80/53: the new one would fail to start and flap the AP on every tick.
   if (!running && allDestroyed && (state.alwaysEnabled || !CommandHandler::Ok() || !isDeviceFullyConfigured())) {
     captiveportal_start();
   }
@@ -359,17 +356,14 @@ bool CaptivePortal::Init()
   auto* initialState = new ManagerState();
 
   // Restore the persisted always-enabled setting before the hook can change it, so it survives a reboot.
-  if (auto config = Config::GetCaptivePortalConfig()) {
-    initialState->alwaysEnabled = config->alwaysEnabled;
-    s_alwaysEnabled             = config->alwaysEnabled;
-  } else {
-    OS_LOGE(TAG, "Failed to get captive portal config");
-  }
+  const bool alwaysEnabled    = Config::GetCaptivePortalConfig().alwaysEnabled;
+  initialState->alwaysEnabled = alwaysEnabled;
+  s_alwaysEnabled             = alwaysEnabled;
 
   // If device is already fully configured, set a startup grace period before opening portal
   if (isDeviceFullyConfigured()) {
-    initialState->startupGraceEnd = esp_timer_get_time() + STARTUP_GRACE_PERIOD_US;
-    OS_LOGI(TAG, "Device fully configured, startup grace period of 30s before opening portal");
+    initialState->startupGraceEnd = esp_timer_get_time() + kStartupGracePeriodUs;
+    OS_LOGI(TAG, "Device fully configured, startup grace period of %d ms before opening portal", CONFIG_OPENSHOCK_PORTAL_STARTUP_GRACE_MS);
   }
 
   s_forceCloseDone = xSemaphoreCreateBinary();
@@ -379,7 +373,7 @@ bool CaptivePortal::Init()
     return false;
   }
 
-  if (TaskUtils::TaskCreateExpensive(captiveportal_managertask, "CaptivePortalManager", 6144, initialState, 1, &s_managerTask) != pdPASS) {
+  if (TaskUtils::TaskCreateExpensive(captiveportal_managertask, "CaptivePortalManager", CONFIG_OPENSHOCK_PORTAL_MANAGER_TASK_STACK_SIZE, initialState, 1, &s_managerTask) != pdPASS) {
     OS_LOGE(TAG, "Failed to create captive portal manager task");
     delete initialState;
     return false;
@@ -441,7 +435,7 @@ bool CaptivePortal::ForceClose(uint32_t timeoutMs)
   xSemaphoreTake(s_forceCloseDone, 0);  // Drop an acknowledgement left over from an earlier, timed-out call
   sendCommand(kCmdForceClose);
 
-  // The manager task stops the portal and answers once it is fully torn down (filesystem unmounted). It stays
+  // The manager task stops the portal and answers once it is fully torn down (www image unmounted). It stays
   // force-closed even if this times out.
   return xSemaphoreTake(s_forceCloseDone, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
 }
@@ -458,7 +452,7 @@ bool CaptivePortal::IsRunning()
 
 const char* CaptivePortal::ApIPv4String()
 {
-  return CAPTIVE_PORTAL_AP_IP;
+  return CONFIG_OPENSHOCK_PORTAL_AP_IP;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)
