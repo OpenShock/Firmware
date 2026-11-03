@@ -34,7 +34,8 @@ void CaptivePortal::registerHandler(httpd_handle_t server, const char* uri, http
   }
 }
 
-// Fails with ParamError::Invalid for an encoded NUL ("%00"), which would silently truncate the value at every c_str() use.
+// Fails with ParamError::Invalid for a NUL, encoded ("%00") or literal (a raw body can carry one): either would silently
+// truncate the value at every c_str() use, e.g. save a password WiFi then only sees part of.
 [[nodiscard]] static std::expected<std::string, ParamError> urlDecode(std::string_view s)
 {
   std::string out;
@@ -44,6 +45,9 @@ void CaptivePortal::registerHandler(httpd_handle_t server, const char* uri, http
     if (c == '+') {
       out += ' ';
       continue;
+    }
+    if (c == '\0') {
+      return std::unexpected(ParamError::Invalid);
     }
     // A '%' without two characters after it is kept as-is.
     if (c == '%' && i + 2 < s.size()) {
