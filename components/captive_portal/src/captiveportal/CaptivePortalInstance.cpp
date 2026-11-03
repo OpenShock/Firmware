@@ -78,8 +78,9 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     return;
   }
 
-  // Start the wildcard DNS responder (all A queries -> the portal AP IP).
-  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String());
+  // Start the wildcard DNS responder (all A queries -> the portal AP IP), on the AP address only: the hub's LAN
+  // address must not answer DNS.
+  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String(), CaptivePortal::ApIPv4String());
   if (!m_dnsStarted) {
     OS_LOGE(TAG, "Failed to start DNS server");
   }

@@ -26,10 +26,12 @@ namespace OpenShock {
     DNSServer();
     ~DNSServer();
 
-    /// Start answering A queries with responseIpv4 (dotted-decimal, e.g. "4.3.2.1").
+    /// Start answering A queries with responseIpv4 (dotted-decimal, e.g. "4.3.2.1"), listening only on bindIpv4: the
+    /// address of the interface whose clients should be captured. Queries sent to the hub's other addresses (its LAN
+    /// address while connected to WiFi) never reach the server.
     /// Idempotent, first call wins: if the server is already running this returns
-    /// true and keeps the address and port it was originally started with.
-    bool start(const char* responseIpv4, uint16_t port = 53);
+    /// true and keeps the addresses and port it was originally started with.
+    bool start(const char* responseIpv4, const char* bindIpv4, uint16_t port = 53);
     void stop();
 
     bool isRunning() const { return m_task.running(); }
