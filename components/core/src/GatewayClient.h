@@ -5,6 +5,7 @@
 #include "SimpleMutex.h"
 
 #include <esp_event.h>
+#include <esp_transport.h>
 #include <esp_websocket_client.h>
 
 #include <atomic>
@@ -53,6 +54,8 @@ namespace OpenShock {
 
     esp_websocket_client_handle_t _takeHandle();
     void _destroyHandle();
+    esp_transport_handle_t _prepareTransport(const std::string& host, const std::string& path);
+    void _destroyTransport();
 
     std::string m_headers;
     SimpleMutex m_handleMutex;                            // Held across sends from other tasks so the handle can't be destroyed mid-send
@@ -61,6 +64,12 @@ namespace OpenShock {
     std::atomic<GatewayClientState> m_state;              // Written from both the owning task and the websocket task
     std::atomic<int64_t> m_lastPingTimestamp;
     std::atomic<bool> m_retired;
+
+    // The TLS and websocket transports, kept across connections so the TLS session saved on each connect resumes the
+    // next handshake. Only touched while no websocket task runs, except the session save on CONNECTED (on that task).
+    esp_transport_handle_t m_tls;
+    esp_transport_handle_t m_wss;  // Websocket framing over m_tls; handed to the client as ext_transport
+    std::string m_tlsHost;         // The host m_tls's saved session belongs to
 
     // Reassembly of fragmented/chunked binary messages, only touched from the websocket task
     std::vector<uint8_t> m_binReasm;

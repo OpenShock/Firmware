@@ -127,6 +127,7 @@ namespace OpenShock::HTTP {
     void drop();
 
     esp_http_client_handle_t m_handle;
+    std::string m_host;                     // host m_handle was created for; its saved TLS session belongs to it
     std::vector<std::string> m_headerKeys;  // headers set on the last request, cleared before reuse
     std::string m_retryAfter;               // "Retry-After" response header, captured by eventHandler
     bool m_connectionClose;                 // server sent "Connection: close"

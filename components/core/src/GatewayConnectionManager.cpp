@@ -38,8 +38,11 @@ static std::atomic<uint8_t> s_flags = 0;
 // Retry timing, owned by the main task (Update()). Other tasks ask for a reset through s_retryResetRequested.
 // After the backend rejects the token
 static OpenShock::Backoff s_authBackoff(CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_AUTH_RETRY_MS);
-// Between LCG connection attempts
-static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
+// Between LCG connection attempts: doubling from the first value up to the cap, so a brief drop reconnects in seconds
+static OpenShock::Backoff s_connectBackoff(CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS);
+// When the current connection came up (0 while not connected). Only a connection that stayed up for the whole cap
+// resets s_connectBackoff, so a gateway that drops every connection right away still gets the capped delay.
+static int64_t s_connectedSinceMs = 0;
 // After a failed hub info fetch: doubling from the first value up to the cap
 static OpenShock::Backoff s_hubInfoBackoff(CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MIN_MS, CONFIG_OPENSHOCK_GATEWAY_HUB_INFO_RETRY_MAX_MS);
 static std::atomic<bool> s_retryResetRequested = false;
@@ -437,8 +440,21 @@ void GatewayConnectionManager::Update()
   if (client != nullptr) {
     // Client exists; run its loop and optionally reconnect
     if (client->loop()) {
+      // loop() is also true while connecting: only time spent connected may reset the backoff, or a handshake that
+      // runs long and then fails would reset it too
+      if (client->state() != GatewayClientState::Connected) {
+        s_connectedSinceMs = 0;
+        return;
+      }
+      int64_t now = OpenShock::millis();
+      if (s_connectedSinceMs == 0) {
+        s_connectedSinceMs = now;
+      } else if (now - s_connectedSinceMs >= CONFIG_OPENSHOCK_GATEWAY_CONNECT_RETRY_MS) {
+        s_connectBackoff.reset();
+      }
       return;
     }
+    s_connectedSinceMs = 0;
 
     StartConnectingToLCG();
     return;

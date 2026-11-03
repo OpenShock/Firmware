@@ -15,6 +15,8 @@ const char* const TAG = "GatewayClient";
 #include "Temporal.h"
 
 #include <esp_crt_bundle.h>
+#include <esp_transport_ssl.h>
+#include <esp_transport_ws.h>
 
 #include <cstring>
 
@@ -42,6 +44,9 @@ GatewayClient::GatewayClient(const std::string& authToken)
   , m_state(GatewayClientState::Disconnected)
   , m_lastPingTimestamp(0)
   , m_retired(false)
+  , m_tls(nullptr)
+  , m_wss(nullptr)
+  , m_tlsHost()
   , m_binReasm()
   , m_binReasmActive(false)
   , m_binReasmDiscard(false)
@@ -65,6 +70,8 @@ GatewayClient::~GatewayClient()
     }
     esp_websocket_client_destroy(handle);
   }
+
+  _destroyTransport();  // After the client: it doesn't own an ext_transport, but its task uses it until destroyed
 }
 
 void GatewayClient::retire()
@@ -112,6 +119,67 @@ void GatewayClient::_destroyHandle()
   esp_websocket_client_destroy(handle);
 }
 
+void GatewayClient::_destroyTransport()
+{
+  // ws_destroy leaves its parent alone, so both go
+  if (m_wss != nullptr) {
+    esp_transport_destroy(m_wss);
+    m_wss = nullptr;
+  }
+  if (m_tls != nullptr) {
+    esp_transport_destroy(m_tls);  // Also frees the saved session
+    m_tls = nullptr;
+  }
+  m_tlsHost.clear();
+}
+
+// A full TLS handshake (certificate chain verification and the key exchange) costs on the order of a second of CPU;
+// resuming the previous connection's session skips both. esp_websocket_client builds a fresh transport for every
+// handle and the handle is recreated per connection, so the session would die with it: the transports live here
+// instead and go to the client as ext_transport. The client never creates or destroys an ext_transport. If the server
+// declines the session the handshake falls back to a full one.
+esp_transport_handle_t GatewayClient::_prepareTransport(const std::string& host, const std::string& path)
+{
+  // A session is only offered to the host that issued it. And when no session was saved, USE leaves the TLS config
+  // pointing at the session the last SAVE freed, so the transports are rebuilt rather than reused without one.
+  if (m_tls != nullptr && (m_tlsHost != host || esp_transport_ssl_session_ticket_operation(m_tls, ESP_TRANSPORT_SESSION_TICKET_USE) != ESP_OK)) {
+    _destroyTransport();
+  }
+
+  if (m_tls == nullptr) {
+    m_tls = esp_transport_ssl_init();
+    if (m_tls == nullptr) {
+      return nullptr;
+    }
+    esp_transport_set_default_port(m_tls, 443);
+    esp_transport_ssl_crt_bundle_attach(m_tls, esp_crt_bundle_attach);  // verify server against the compiled-in CA bundle
+
+    m_wss = esp_transport_ws_init(m_tls);
+    if (m_wss == nullptr) {
+      _destroyTransport();
+      return nullptr;
+    }
+    esp_transport_set_default_port(m_wss, 443);
+    m_tlsHost = host;
+  }
+
+  // What esp_websocket_client applies to the transports it creates itself. The strings are copied.
+  const esp_transport_ws_config_t wsConfig = {
+    .ws_path                  = path.c_str(),
+    .sub_protocol             = nullptr,
+    .user_agent               = OpenShock::Constants::UserAgent(),
+    .headers                  = m_headers.c_str(),
+    .auth                     = nullptr,
+    .propagate_control_frames = true,
+  };
+  if (esp_transport_ws_set_config(m_wss, &wsConfig) != ESP_OK) {
+    _destroyTransport();
+    return nullptr;
+  }
+
+  return m_wss;
+}
+
 void GatewayClient::connect(const std::string& host, uint16_t port, const std::string& path)
 {
   // A retired client may still be connected by a caller that fetched it before it was retired (the LCG lookup is slow)
@@ -124,6 +192,14 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
 
   _setState(GatewayClientState::Connecting);
 
+  // After _destroyHandle(): no websocket task is left using the transports
+  esp_transport_handle_t transport = _prepareTransport(host, path);
+  if (transport == nullptr) {
+    OS_LOGE(TAG, "Failed to create the WebSocket transport");
+    _setState(GatewayClientState::Disconnected);
+    return;
+  }
+
   esp_websocket_client_config_t config = {};
   config.host                          = host.c_str();
   config.port                          = port;
@@ -132,7 +208,8 @@ void GatewayClient::connect(const std::string& host, uint16_t port, const std::s
   config.user_agent                    = OpenShock::Constants::UserAgent();
   config.headers                       = m_headers.c_str();
   config.disable_auto_reconnect        = true;                                      // GatewayConnectionManager owns reconnection
-  config.crt_bundle_attach             = esp_crt_bundle_attach;                     // verify server against the compiled-in CA bundle
+  config.ext_transport                 = transport;                                 // Verifies the server, see _prepareTransport()
+  config.buffer_size                   = CONFIG_OPENSHOCK_GATEWAY_WS_BUFFER_SIZE;
   config.task_stack                    = CONFIG_OPENSHOCK_GATEWAY_TASK_STACK_SIZE;  // Message handlers (config reads, flash writes, FlatBuffers verification) run on it
   // TLS work stays on core 0 with the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.task_core_id_set = true;
@@ -287,6 +364,8 @@ void GatewayClient::_eventHandler(void* arg, esp_event_base_t /*base*/, int32_t 
 
   switch (eventId) {
     case WEBSOCKET_EVENT_CONNECTED:
+      // On the websocket task, the only one using the transport now. Freed with the transport, or replaced next time.
+      esp_transport_ssl_session_ticket_operation(self->m_tls, ESP_TRANSPORT_SESSION_TICKET_SAVE);
       self->m_lastPingTimestamp = OpenShock::millis();
       self->_setState(GatewayClientState::Connected);
       self->_sendBootStatus();

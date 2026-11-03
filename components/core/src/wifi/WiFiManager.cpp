@@ -568,10 +568,60 @@ static void wakeUpdateTask()
   }
 }
 
+// Modem sleep (IDF's default WIFI_PS_MIN_MODEM) has the AP hold frames for us until the next DTIM beacon, delaying each
+// one by up to a beacon interval (typically 100-300 ms). The radio stays awake from the first command until there has
+// been no activity for CONFIG_OPENSHOCK_WIFI_POWERSAVE_IDLE_MS, so a session's commands arrive at once while an idle hub
+// still saves power. The first command of a session still waits for the beacon. CommandHandler reports activity at most
+// once per OPENSHOCK_EVENT_DEVICE_ACTIVITY_INTERVAL_MS, so the last report can trail the last command by that much: add
+// it, so the radio never sleeps before the full idle period after the last command. Computed in 64 bits:
+// pdMS_TO_TICKS multiplies in TickType_t, which wraps above about 4.3 million ms at a 1 kHz tick.
+static constexpr TickType_t kPowerSaveIdleTicks = static_cast<TickType_t>((static_cast<uint64_t>(CONFIG_OPENSHOCK_WIFI_POWERSAVE_IDLE_MS) + OPENSHOCK_EVENT_DEVICE_ACTIVITY_INTERVAL_MS) * configTICK_RATE_HZ / 1000);
+
+// Set by the event loop on each activity event, consumed by the update task, which alone switches power save so the
+// switches can't reorder.
+static std::atomic<bool> s_deviceActivity = false;
+
+static void deviceActivityHandler(void*, esp_event_base_t, int32_t, void*)
+{
+  if (!s_deviceActivity.exchange(true, std::memory_order_relaxed)) {
+    wakeUpdateTask();
+  }
+}
+
+static void setPowerSave(wifi_ps_type_t type)
+{
+  esp_err_t err = esp_wifi_set_ps(type);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "esp_wifi_set_ps(%d) failed: %s", static_cast<int>(type), esp_err_to_name(err));
+  } else {
+    OS_LOGD(TAG, "WiFi power save %s", type == WIFI_PS_NONE ? "off (device active)" : "on (device idle)");
+  }
+}
+
+// Called by the update task, which owns `lastActivity` and `awake` (true while power save is off).
+static void updatePowerSave(TickType_t& lastActivity, bool& awake)
+{
+  TickType_t now = xTaskGetTickCount();
+  if (s_deviceActivity.exchange(false, std::memory_order_relaxed)) {
+    lastActivity = now;
+    if (!awake) {
+      awake = true;
+      setPowerSave(WIFI_PS_NONE);
+    }
+  } else if (awake && now - lastActivity >= kPowerSaveIdleTicks) {
+    awake = false;
+    setPowerSave(WIFI_PS_MIN_MODEM);
+  }
+}
+
 static void wifimanagerUpdateTask(void*)
 {
   int64_t lastScanRequest = 0;
+  TickType_t lastActivity = 0;
+  bool awake              = false;
   while (true) {
+    updatePowerSave(lastActivity, awake);
+
     WiFiScanManager::ProcessEvents();
 
     if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected && !WiFiScanManager::IsScanning()) {
@@ -625,6 +675,11 @@ bool WiFiManager::Init()
   err = esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, ipEventHandler, nullptr);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to register IP_EVENT handler: %s", esp_err_to_name(err));
+    return false;
+  }
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_DEVICE_ACTIVITY, deviceActivityHandler, nullptr);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to register device activity handler: %s", esp_err_to_name(err));
     return false;
   }
 
