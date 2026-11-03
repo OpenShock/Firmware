@@ -15,6 +15,10 @@ enum {
   OPENSHOCK_EVENT_DEVICE_ACTIVITY,               // A shocker command was accepted (no payload)
 };
 
+// OPENSHOCK_EVENT_DEVICE_ACTIVITY is posted at most this often, so a listener's view of the last activity can be this
+// far behind the last command.
+#define OPENSHOCK_EVENT_DEVICE_ACTIVITY_INTERVAL_MS 60000
+
 // Coarse WiFi station connectivity, posted as the OPENSHOCK_EVENT_WIFI_STATE_CHANGED payload.
 typedef enum {
   OPENSHOCK_WIFI_STATE_DISCONNECTED = 0,  // Not associated to an AP

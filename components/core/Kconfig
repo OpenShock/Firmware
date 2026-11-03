@@ -35,7 +35,8 @@ menu "OpenShock WiFi"
             Modem sleep has the AP hold frames until the next DTIM beacon, delaying each one
             by up to a beacon interval (typically 100-300 ms). Power save is switched off on
             the first shocker command and back on after this long without one. The command
-            handler reports activity at most once a minute, so this stays well above that.
+            handler reports activity at most once a minute; that minute is added on top, so the
+            radio stays awake at least this long after the last command.
 
 endmenu
 
