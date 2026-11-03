@@ -90,7 +90,8 @@ bool WiFiCredentials::FromJSON(JSON::JsonView json)
   authMode = fromBlobAuthMode(json["authMode"].tryGetU8().value_or(kBlobAuthUnknown));
 
   bssid.fill(0);
-  if (auto bssidStr = json["bssid"].tryGetStr(); bssidStr && bssidStr->size() == 12) {
+  char bssidScratch[12];
+  if (auto bssidStr = json["bssid"].tryGetStrView(bssidScratch); bssidStr && bssidStr->size() == 12) {
     // Parse into a temporary: TryParseHex writes byte by byte and stops at the first bad pair, and a partial
     // BSSID would pin the network to an AP that doesn't exist.
     std::array<uint8_t, 6> parsed {};

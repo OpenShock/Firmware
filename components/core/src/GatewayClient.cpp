@@ -34,7 +34,7 @@ static std::atomic<bool> s_bootStatusSent = false;
 static std::atomic<bool> s_otaStepResetPending                 = false;
 static std::atomic<OpenShock::OtaUpdateStep> s_reportedOtaStep = OpenShock::OtaUpdateStep::None;  // The step it reported
 
-GatewayClient::GatewayClient(const std::string& authToken)
+GatewayClient::GatewayClient(std::string_view authToken)
   : m_headers()
   , m_handleMutex()
   , m_client(nullptr)
@@ -48,7 +48,14 @@ GatewayClient::GatewayClient(const std::string& authToken)
 {
   OS_LOGD(TAG, "Creating GatewayClient");
 
-  m_headers = std::string("Firmware-Version: ") + OpenShock::Constants::FW_VERSION + "\r\nDevice-Token: " + authToken + "\r\n";
+  // One allocation; esp_websocket_client copies the C string at init
+  constexpr std::string_view kVersionHeader = "Firmware-Version: ";
+  constexpr std::string_view kTokenHeader   = "\r\nDevice-Token: ";
+  constexpr std::string_view kEnd           = "\r\n";
+  const std::string_view version            = OpenShock::Constants::FW_VERSION;
+
+  m_headers.reserve(kVersionHeader.size() + version.size() + kTokenHeader.size() + authToken.size() + kEnd.size());
+  m_headers.append(kVersionHeader).append(version).append(kTokenHeader).append(authToken).append(kEnd);
 }
 GatewayClient::~GatewayClient()
 {

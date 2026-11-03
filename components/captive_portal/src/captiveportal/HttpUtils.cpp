@@ -6,6 +6,7 @@ const char* const TAG = "CaptivePortalHttp";
 
 #include "Convert.h"
 #include "Logging.h"
+#include "StringHelpers.h"
 #include "util/HexUtils.h"
 
 using namespace OpenShock;
@@ -60,25 +61,35 @@ void CaptivePortal::registerHandler(httpd_handle_t server, const char* uri, http
   return out;
 }
 
-std::expected<std::string, ParamError> CaptivePortal::getQueryParam(httpd_req_t* req, const char* key)
+// The raw (still URL-encoded) value of `key` in "k1=v1&k2=v2", keys compared case-insensitively. A pair without '='
+// has an empty value.
+[[nodiscard]] static std::optional<std::string_view> findParam(std::string_view params, std::string_view key)
 {
-  size_t qlen = httpd_req_get_url_query_len(req);
-  if (qlen == 0) {
+  while (!params.empty()) {
+    auto [pair, rest]  = StringSplitByFirst(params, '&');
+    auto [name, value] = StringSplitByFirst(pair, '=');
+    if (StringIEquals(name, key)) {
+      return value;
+    }
+    params = rest;
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] static std::expected<std::string, ParamError> getParam(std::string_view params, std::string_view key)
+{
+  auto raw = findParam(params, key);
+  if (!raw) {
     return std::unexpected(ParamError::Missing);
   }
+  return urlDecode(*raw);
+}
 
-  std::string query;
-  query.resize(qlen + 1);
-  if (httpd_req_get_url_query_str(req, query.data(), query.size()) != ESP_OK) {
-    return std::unexpected(ParamError::Missing);
-  }
-
-  char val[256];
-  if (httpd_query_key_value(query.c_str(), key, val, sizeof(val)) != ESP_OK) {
-    return std::unexpected(ParamError::Missing);
-  }
-
-  return urlDecode(val);
+std::expected<std::string, ParamError> CaptivePortal::getQueryParam(httpd_req_t* req, std::string_view key)
+{
+  // req->uri is the request target as received, NUL-terminated and valid for the whole handler
+  auto [path, query] = StringSplitByFirst(std::string_view(req->uri), '?');
+  return getParam(query, key);
 }
 
 std::optional<bool> CaptivePortal::parseBool(std::string_view str)
@@ -92,7 +103,7 @@ std::optional<bool> CaptivePortal::parseBool(std::string_view str)
   return Convert::ToBool(str);
 }
 
-std::expected<bool, ParamError> CaptivePortal::getBoolQueryParam(httpd_req_t* req, const char* key)
+std::expected<bool, ParamError> CaptivePortal::getBoolQueryParam(httpd_req_t* req, std::string_view key)
 {
   auto str = getQueryParam(req, key);
   if (!str) {
@@ -135,11 +146,7 @@ std::optional<std::string> CaptivePortal::recvBody(httpd_req_t* req)
   return out;
 }
 
-std::expected<std::string, ParamError> CaptivePortal::getFormParam(const std::string& body, const char* key)
+std::expected<std::string, ParamError> CaptivePortal::getFormParam(std::string_view body, std::string_view key)
 {
-  char val[256];
-  if (httpd_query_key_value(body.c_str(), key, val, sizeof(val)) != ESP_OK) {
-    return std::unexpected(ParamError::Missing);
-  }
-  return urlDecode(val);
+  return getParam(body, key);
 }

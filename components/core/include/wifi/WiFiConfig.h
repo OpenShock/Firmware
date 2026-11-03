@@ -40,6 +40,9 @@ namespace OpenShock::Config {
   bool SetWiFiConfig(const WiFiConfig& config);
 
   [[nodiscard]] std::vector<WiFiCredentials> GetWiFiCredentials();
+  /// @brief Calls `visit` with each saved SSID, in place: no copy of the list, and no password leaves the config.
+  ///        Runs under the config's read lock, so `visit` must not call back into Config.
+  void ForEachWiFiSsid(Util::FunctionRef<void(std::string_view ssid)> visit);
   // Emits each stored credential as an object into an already-open JSON array
   // (the caller opens/closes it with json_gen_{start,end}_array).
   void GetWiFiCredentials(json_gen_str_t* gen, bool withSensitiveData);
@@ -48,12 +51,11 @@ namespace OpenShock::Config {
   ///        length is refused.
   bool SetWiFiCredentials(const std::vector<WiFiCredentials>& credentials);
 
-  bool AnyWiFiCredentials(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate);
   /// @return The id of the stored credential (new, or the existing one for that SSID updated), or 0 on failure.
   uint8_t AddWiFiCredentials(std::string_view ssid, std::string_view password, wifi_auth_mode_t authMode = WIFI_AUTH_MAX);
   [[nodiscard]] std::optional<WiFiCredentials> TryGetWiFiCredentialsByID(uint8_t id);
-  [[nodiscard]] std::optional<WiFiCredentials> TryGetWiFiCredentialsBySSID(const char* ssid);
-  uint8_t GetWiFiCredentialsIDbySSID(const char* ssid);
+  /// @return The id of the credentials saved for this SSID, or 0 if there are none. Copies nothing.
+  uint8_t GetWiFiCredentialsIDbySSID(std::string_view ssid);
   bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();

@@ -5,8 +5,6 @@
 
 #include <esp_http_server.h>
 
-#include <string>
-
 namespace OpenShock::CaptivePortal {
   /// @brief Serves the portal UI from the flat www image (mapped, served by pointer), mounted for this object's lifetime.
   class StaticFileServer {
@@ -24,6 +22,6 @@ namespace OpenShock::CaptivePortal {
     static esp_err_t staticFileHandler(httpd_req_t* req);
 
     Www::Partition m_www;
-    std::string m_etag;  // the www image's hash, quoted
+    char m_etag[1 + (Www::kBodyHashSize * 2) + 1 + 1] = {};  // the www image's hash, quoted; httpd keeps the pointer
   };
 }  // namespace OpenShock::CaptivePortal

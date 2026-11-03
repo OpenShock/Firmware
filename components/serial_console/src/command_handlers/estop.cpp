@@ -50,15 +50,15 @@ static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EStopHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("estop"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("estop");
 
-  group.addCommand("enabled"sv, "Get the E-Stop enabled state."sv, handleEStopEnabledCommand);
-  auto& setEnabledCommand = group.addCommand("enabled"sv, "Set the E-Stop enabled state."sv, handleEStopEnabledCommand);
-  setEnabledCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+  group.addCommand("enabled", "Get the E-Stop enabled state.", handleEStopEnabledCommand);
+  auto& setEnabledCommand = group.addCommand("enabled", "Set the E-Stop enabled state.", handleEStopEnabledCommand);
+  setEnabledCommand.addArgument("enabled", "must be a boolean", "true");
 
-  group.addCommand("pin"sv, "Get the GPIO pin used for the E-Stop."sv, handleEStopPinCommand);
-  auto& setPinCommand = group.addCommand("pin"sv, "Set the GPIO pin used for the E-Stop."sv, handleEStopPinCommand);
-  setPinCommand.addArgument("pin"sv, "must be a number"sv, "4"sv);
+  group.addCommand("pin", "Get the GPIO pin used for the E-Stop.", handleEStopPinCommand);
+  auto& setPinCommand = group.addCommand("pin", "Set the GPIO pin used for the E-Stop.", handleEStopPinCommand);
+  setPinCommand.addArgument("pin", "must be a number", "4");
 
   return group;
 }

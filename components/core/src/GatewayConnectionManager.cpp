@@ -14,6 +14,7 @@ const char* const TAG = "GatewayConnectionManager";
 #include "Temporal.h"
 
 #include "SimpleMutex.h"
+#include "StringHelpers.h"
 #include "util/Backoff.h"
 #include "util/RetiredList.h"
 #include "wifi/WiFiManager.h"
@@ -140,6 +141,12 @@ AccountLinkResultCode GatewayConnectionManager::Link(std::string_view linkCode)
     return AccountLinkResultCode::InvalidCodeLength;
   }
 
+  // The code becomes a URL path segment: anything but [0-9A-Za-z] could rewrite the request path or query
+  if (!std::ranges::all_of(linkCode, CharIsAlnum)) {
+    OS_LOGE(TAG, "Invalid link code: not alphanumeric");
+    return AccountLinkResultCode::InvalidCode;
+  }
+
   auto response = HTTP::JsonAPI::LinkAccount(linkCode);
 
   if (response.code == 404) {
@@ -233,7 +240,7 @@ bool GatewayConnectionManager::SendMessageBIN(std::span<const uint8_t> data)
   return client->sendMessageBIN(data);
 }
 
-static bool FetchHubInfo(std::string authToken)
+static bool FetchHubInfo(std::string_view authToken)
 {
   // TODO: this function is very slow, should be optimized!
   if ((s_flags.load(std::memory_order_relaxed) & FLAG_HAS_IP) == 0) {
@@ -244,7 +251,7 @@ static bool FetchHubInfo(std::string authToken)
     return false;
   }
 
-  auto response = HTTP::JsonAPI::GetHubInfo(std::move(authToken));
+  auto response = HTTP::JsonAPI::GetHubInfo(authToken);
 
   if (response.code == 401) {
     OS_LOGD(TAG, "Auth token is invalid, waiting 5 minutes before checking again");

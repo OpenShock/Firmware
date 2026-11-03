@@ -8,8 +8,7 @@ namespace OpenShock::RFC8908 {
   //   - the RFC 8908 endpoint /captive-portal/api -> application/captive+json
   //   - a 404 fallback that redirects any other unknown request to the portal
   //
-  // `apIpv4` is the portal AP address (e.g. "4.3.2.1"); the pointer must remain valid
-  // for the lifetime of the server (pass a string literal or long-lived buffer).
+  // `apIpv4` is the portal AP address (e.g. "4.3.2.1"); the portal URL is built from it once, here.
   //
   // The server must be configured with httpd_uri_match_wildcard for the prefix probe
   // paths to match.

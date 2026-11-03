@@ -3,6 +3,7 @@
 const char* const TAG = "PartitionUtils";
 
 #include "Hashing.h"
+#include "http/ContentTypes.h"
 #include "http/HTTPRequestManager.h"
 #include "Logging.h"
 
@@ -18,7 +19,7 @@ static constexpr std::size_t kEraseStep = 64 * 1024;
 bool OpenShock::FlashPartitionFromUrl(
   HTTP::Client& client,
   const esp_partition_t* partition,
-  std::string_view remoteUrl,
+  const char* remoteUrl,
   const uint8_t (&remoteHash)[32],
   Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback,
   std::optional<Util::FunctionRef<bool(std::span<const uint8_t>)>> firstChunkCheck
@@ -91,7 +92,7 @@ bool OpenShock::FlashPartitionFromUrl(
   auto appBinaryResponse = client.Download(
     remoteUrl,
     {
-      {"Accept", "application/octet-stream"}
+      {"Accept", OpenShock::HTTP::ContentType::OctetStream}
   },
     sizeValidator,
     dataWriter,
@@ -99,7 +100,7 @@ bool OpenShock::FlashPartitionFromUrl(
     180'000
   );  // 3 minutes
   if (appBinaryResponse.result != OpenShock::HTTP::RequestResult::Success) {
-    OS_LOGE(TAG, "Failed to download remote partition binary: [%u]", appBinaryResponse.code);
+    OS_LOGE(TAG, "Failed to download remote partition binary: [%d]", appBinaryResponse.code);
     return false;
   }
 

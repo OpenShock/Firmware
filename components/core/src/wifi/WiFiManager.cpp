@@ -153,10 +153,6 @@ static bool isConnectRateLimited(const WiFiNetwork& net)
   return diff < backoff;
 }
 
-static bool isSaved(Util::FunctionRef<bool(const Config::WiFiCredentials&)> predicate)
-{
-  return Config::AnyWiFiCredentials(predicate);
-}
 // All s_wifiNetworks helpers require s_networksMutex. The list is kept ordered by RSSI (strongest first), so lookups
 // return the strongest matching BSSID; nothing else may reorder it.
 static std::vector<WiFiNetwork>::iterator findNetwork(Util::FunctionRef<bool(WiFiNetwork&)> predicate)
@@ -472,17 +468,20 @@ static void evWiFiNetworksDiscovery(const std::vector<const wifi_ap_record_t*>& 
   std::vector<WiFiNetwork> discoveredNetworks;
 
   for (const wifi_ap_record_t* record : records) {
-    uint8_t credsId = Config::GetWiFiCredentialsIDbySSID(reinterpret_cast<const char*>(record->ssid));
+    // The driver's SSID field is 33 bytes; never trust it to be terminated
+    const char* recordSsid = reinterpret_cast<const char*>(record->ssid);
+    uint8_t credsId        = Config::GetWiFiCredentialsIDbySSID(std::string_view(recordSsid, strnlen(recordSsid, sizeof(record->ssid) - 1)));
 
     auto it = findNetworkByBSSID(record->bssid);
     if (it != s_wifiNetworks.end()) {
       // Update the network
-      memcpy(it->ssid, record->ssid, sizeof(it->ssid));
-      it->channel       = record->primary;
-      it->rssi          = record->rssi;
-      it->authMode      = record->authmode;
-      it->credentialsID = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
-      it->scansMissed   = 0;
+      memcpy(it->ssid, record->ssid, sizeof(it->ssid) - 1);
+      it->ssid[sizeof(it->ssid) - 1] = '\0';
+      it->channel                    = record->primary;
+      it->rssi                       = record->rssi;
+      it->authMode                   = record->authmode;
+      it->credentialsID              = credsId;  // TODO: I don't understand why I need to set this here, but it seems to fix a bug where the credentials ID is not set correctly
+      it->scansMissed                = 0;
 
       updatedNetworks.push_back(*it);
       OS_LOGV(TAG, "Updated network %s (" BSSID_FMT ") with new scan info", it->ssid, BSSID_ARG(it->bssid));
@@ -715,15 +714,15 @@ bool WiFiManager::Forget(const char* ssid)
 {
   OS_LOGV(TAG, "Forgetting network %s", ssid);
 
-  auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
-  if (!creds) {
+  const uint8_t credentialsId = Config::GetWiFiCredentialsIDbySSID(ssid);
+  if (credentialsId == 0) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
   // Remove first: a connect already under way then finds no credentials when it lands and drops the link itself
   // (see evWiFiConnected), so there is no window to connect to the forgotten network.
-  if (!Config::RemoveWiFiCredentials(creds->id)) {
+  if (!Config::RemoveWiFiCredentials(credentialsId)) {
     OS_LOGE(TAG, "Failed to remove credentials for network %s", ssid);
     return false;
   }
@@ -734,14 +733,14 @@ bool WiFiManager::Forget(const char* ssid)
     // evWiFiConnected sets s_connectedCredentialsID under this lock, so this sees either its id or its disconnect
     ScopedLock lock__(&s_networksMutex);
     for (auto& net : s_wifiNetworks) {
-      if (net.credentialsID == creds->id) {
+      if (net.credentialsID == credentialsId) {
         net.credentialsID = 0;
         if (!removed) {
           removed = net;
         }
       }
     }
-    connected = s_connectedCredentialsID.load(std::memory_order_relaxed) == creds->id;
+    connected = s_connectedCredentialsID.load(std::memory_order_relaxed) == credentialsId;
   }
 
   if (connected) {
@@ -776,28 +775,23 @@ bool WiFiManager::RefreshNetworkCredentials()
   return true;
 }
 
-bool WiFiManager::IsSaved(const char* ssid)
-{
-  return isSaved([ssid](const Config::WiFiCredentials& creds) { return creds.ssid == ssid; });
-}
-
 bool WiFiManager::Connect(const char* ssid)
 {
-  auto creds = Config::TryGetWiFiCredentialsBySSID(ssid);
-  if (!creds) {
+  const uint8_t credentialsId = Config::GetWiFiCredentialsIDbySSID(ssid);
+  if (credentialsId == 0) {
     OS_LOGE(TAG, "Failed to find credentials for network %s", ssid);
     return false;
   }
 
-  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != creds->id) {
+  if (s_connectedCredentialsID.load(std::memory_order_relaxed) != credentialsId) {
     // Preference first: the update task may reconnect as soon as the DISCONNECTED event lands
-    s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
+    s_preferredCredentialsID.store(credentialsId, std::memory_order_relaxed);
     Disconnect();
     return true;
   }
 
   if (s_wifiState.load(std::memory_order_relaxed) == WiFiState::Disconnected) {
-    s_preferredCredentialsID.store(creds->id, std::memory_order_relaxed);
+    s_preferredCredentialsID.store(credentialsId, std::memory_order_relaxed);
   }
 
   // Already connected to this network, or reconnecting; either way, success
@@ -842,7 +836,7 @@ bool WiFiManager::GetConnectedNetwork(OpenShock::WiFiNetwork& network)
   return true;
 }
 
-bool WiFiManager::GetIPAddress(char* ipAddress)
+bool WiFiManager::GetIPAddress(std::span<char, 16> ipAddress)
 {
   if (!IsConnected()) {
     return false;
@@ -855,7 +849,7 @@ bool WiFiManager::GetIPAddress(char* ipAddress)
 
   uint8_t ip[4];
   memcpy(ip, &ipInfo.ip.addr, sizeof(ip));
-  snprintf(ipAddress, 16, IPV4ADDR_FMT, IPV4ADDR_ARG(ip));  // "255.255.255.255" + NUL
+  snprintf(ipAddress.data(), ipAddress.size(), IPV4ADDR_FMT, IPV4ADDR_ARG(ip));
 
   return true;
 }

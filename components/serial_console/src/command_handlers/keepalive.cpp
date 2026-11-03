@@ -25,12 +25,12 @@ static void handleKeepAliveCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::KeepAliveHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("keepalive"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("keepalive");
 
-  group.addCommand("Get the shocker keep-alive status"sv, handleKeepAliveCommand);
+  group.addCommand("Get the shocker keep-alive status", handleKeepAliveCommand);
 
-  auto& setCommand = group.addCommand("Enable/disable shocker keep-alive"sv, handleKeepAliveCommand);
-  setCommand.addArgument("enabled"sv, "must be a boolean"sv, "true"sv);
+  auto& setCommand = group.addCommand("Enable/disable shocker keep-alive", handleKeepAliveCommand);
+  setCommand.addArgument("enabled", "must be a boolean", "true");
 
   return group;
 }

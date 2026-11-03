@@ -73,15 +73,6 @@ TEST_CASE("TryStringSplit into a fixed array", "[common][strhelpers]")
   static_assert(!TryStringSplit<2>("kv", '=').has_value());
 }
 
-TEST_CASE("StringSplit into a vector", "[common][strhelpers]")
-{
-  auto v = StringSplit("a,b,,c", ',');
-  TEST_ASSERT_EQUAL_size_t(4, v.size());
-  TEST_ASSERT_TRUE(v[0] == "a");
-  TEST_ASSERT_TRUE(v[2] == "");  // empty field preserved
-  TEST_ASSERT_TRUE(v[3] == "c");
-}
-
 TEST_CASE("StringIContains / StringHasPrefixIC", "[common][strhelpers]")
 {
   TEST_ASSERT_TRUE(StringIContains("Hello World", "LO WO"));
@@ -110,17 +101,6 @@ TEST_CASE("Last-delimiter helpers treat a string delimiter as a substring", "[ut
   auto [head, tail] = StringSplitByLast("a=>b>c", std::string_view("=>"));
   TEST_ASSERT_TRUE(head == "a");
   TEST_ASSERT_TRUE(tail == "b>c");
-}
-
-TEST_CASE("StringSplit edge cases", "[util][string]")
-{
-  TEST_ASSERT_TRUE(StringSplit("", ',').empty());
-
-  auto parts = StringSplitWhiteSpace("a  b c d", 2);
-  TEST_ASSERT_EQUAL_size_t(3, parts.size());
-  TEST_ASSERT_TRUE(parts[0] == "a");
-  TEST_ASSERT_TRUE(parts[1] == "b");
-  TEST_ASSERT_TRUE(parts[2] == "c d");
 }
 
 TEST_CASE("Case-insensitive helpers are safe on non-ASCII bytes", "[util][string]")

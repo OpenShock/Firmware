@@ -2,7 +2,7 @@
 
 #include "Chipset.h"
 
-#include <string>
+#include <charconv>
 
 static void handleValidGpiosCommand(std::string_view arg, bool isAutomated)
 {
@@ -13,28 +13,27 @@ static void handleValidGpiosCommand(std::string_view arg, bool isAutomated)
 
   auto pins = OpenShock::GetValidGPIOPins();
 
-  std::string buffer;
-  buffer.reserve(pins.count() * 4);
+  // At most 3 digits and a comma per pin
+  char buffer[decltype(pins) {}.size() * 4];
+  char* end = buffer;
 
   for (std::size_t i = 0; i < pins.size(); i++) {
     if (pins[i]) {
-      buffer.append(std::to_string(i));
-      buffer.append(",");
+      if (end != buffer) {
+        *end++ = ',';
+      }
+      end = std::to_chars(end, buffer + sizeof(buffer), i).ptr;
     }
   }
 
-  if (!buffer.empty()) {
-    buffer.pop_back();
-  }
-
-  SERPR_RESPONSE("ValidGPIOs|%s", buffer.c_str());
+  SERPR_RESPONSE("ValidGPIOs|%.*s", static_cast<int>(end - buffer), buffer);
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::ValidGpiosHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("validgpios"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("validgpios");
 
-  group.addCommand("List all valid GPIO pins"sv, handleValidGpiosCommand);
+  group.addCommand("List all valid GPIO pins", handleValidGpiosCommand);
 
   return group;
 }

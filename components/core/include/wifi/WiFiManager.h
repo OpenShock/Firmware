@@ -3,6 +3,7 @@
 #include "wifi/WiFiNetwork.h"
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -28,11 +29,6 @@ namespace OpenShock::WiFiManager {
   /// @return True if the networks were refreshed successfully
   bool RefreshNetworkCredentials();
 
-  /// @brief Checks if a network is saved in the config by it's SSID
-  /// @param ssid SSID of the network
-  /// @return True if a saved network matches the given SSID
-  bool IsSaved(const char* ssid);
-
   /// @brief Connects to a saved network by it's SSID
   /// @param ssid SSID of the network
   /// @return True if the saved network was found and the connection process was started successfully
@@ -51,9 +47,10 @@ namespace OpenShock::WiFiManager {
   bool GetConnectedNetwork(OpenShock::WiFiNetwork& network);
 
   /// @brief Gets the hubs IP address if it's connected to a network (IPv4)
-  /// @param ipAddress Variable to store the IP address in
+  /// @param ipAddress Receives the dotted-quad address, NUL-terminated ("255.255.255.255" + NUL fits); left
+  ///                  untouched when this returns false
   /// @return True if the hub is connected to a network
-  bool GetIPAddress(char* ipAddress);
+  bool GetIPAddress(std::span<char, 16> ipAddress);
 
   /// @brief Gets a copy of the vector of discovered WiFi networks
   /// @return Vector of discovered WiFiNetworks

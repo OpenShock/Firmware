@@ -8,13 +8,19 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...)
 {
   va_list args;
 
-  // Measure, then format straight into the string (C++11 guarantees the trailing NUL slot).
+  // One formatting pass for the common short result: format onto the stack, copy into `out` once. Only a longer
+  // result formats a second time, straight into the string (C++11 guarantees the trailing NUL slot).
+  char stack[128];
   va_start(args, format);
-  int length = vsnprintf(nullptr, 0, format, args);
+  int length = vsnprintf(stack, sizeof(stack), format, args);
   va_end(args);
 
   if (length < 0) {
     return false;
+  }
+  if (static_cast<std::size_t>(length) < sizeof(stack)) {
+    out.assign(stack, static_cast<std::size_t>(length));
+    return true;
   }
 
   out.resize(static_cast<std::size_t>(length));
@@ -24,74 +30,6 @@ bool OpenShock::FormatToString(std::string& out, const char* format, ...)
   va_end(args);
 
   return written == length;
-}
-
-std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, char delimiter, std::size_t maxSplits)
-{
-  if (view.empty()) {
-    return {};
-  }
-
-  std::vector<std::string_view> result = {};
-
-  std::size_t pos    = 0;
-  std::size_t splits = 0;
-  while (pos < view.size() && splits < maxSplits) {
-    std::size_t nextPos = view.find(delimiter, pos);
-    if (nextPos == std::string_view::npos) {
-      nextPos = view.size();
-    }
-
-    result.push_back(view.substr(pos, nextPos - pos));
-    pos = nextPos + 1;
-    ++splits;
-  }
-
-  if (pos < view.size()) {
-    result.push_back(view.substr(pos));
-  }
-
-  return result;
-}
-
-std::vector<std::string_view> OpenShock::StringSplit(std::string_view view, bool (*predicate)(char delimiter), std::size_t maxSplits)
-{
-  if (view.empty()) {
-    return {};
-  }
-
-  std::vector<std::string_view> result = {};
-
-  const char* start = nullptr;
-  for (const char* ptr = view.begin(); ptr < view.end(); ++ptr) {
-    if (predicate(*ptr)) {
-      if (start != nullptr) {
-        result.emplace_back(start, ptr - start);
-        start = nullptr;
-      }
-    } else if (start == nullptr) {
-      start = ptr;
-      if (result.size() >= maxSplits) {
-        break;  // Remainder becomes the final part below
-      }
-    }
-  }
-
-  if (start != nullptr) {
-    result.emplace_back(start, view.end() - start);
-  }
-
-  return result;
-}
-
-std::vector<std::string_view> OpenShock::StringSplitNewLines(std::string_view view, std::size_t maxSplits)
-{
-  return StringSplit(view, [](char c) { return c == '\r' || c == '\n'; }, maxSplits);
-}
-
-std::vector<std::string_view> OpenShock::StringSplitWhiteSpace(std::string_view view, std::size_t maxSplits)
-{
-  return StringSplit(view, [](char c) { return CharIsSpace(c); }, maxSplits);
 }
 
 static bool lowercaseEqual(char a, char b)

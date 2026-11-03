@@ -20,25 +20,25 @@ constexpr std::size_t CalculateDecodedSize(std::size_t size) noexcept
 
 bool Base64::Encode(std::span<const uint8_t> data, std::string& output)
 {
+  // Encode straight into the string: one allocation. requiredLen counts mbedtls's NUL, which lands in the string's
+  // own terminator slot once the size is trimmed to `written`.
   std::size_t requiredLen = CalculateEncodedSize(data.size());
-
-  // Allocate buffer for base64 string
-  std::vector<uint8_t> buffer(requiredLen);
+  output.resize(requiredLen - 1);
 
   std::size_t written = 0;
 
-  int retval = mbedtls_base64_encode(buffer.data(), buffer.size(), &written, data.data(), data.size());
+  int retval = mbedtls_base64_encode(reinterpret_cast<uint8_t*>(output.data()), requiredLen, &written, data.data(), data.size());
 
   if (retval != 0) {
     if (retval == MBEDTLS_ERR_BASE64_BUFFER_TOO_SMALL)
-      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, static_cast<std::size_t>(buffer.size()));
+      OS_LOGW(TAG, "Output buffer too small (expected %zu, got %zu)", written, requiredLen);
     else
       OS_LOGW(TAG, "Failed to encode data, error: %d", retval);
     output.clear();
     return false;
   }
 
-  output.assign(reinterpret_cast<char*>(buffer.data()), written);
+  output.resize(written);
   return true;
 }
 

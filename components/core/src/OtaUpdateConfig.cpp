@@ -37,8 +37,6 @@ static constexpr std::string_view kLegacyCdnDomains[] = {"firmware.openshock.org
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<OtaUpdateConfig> s_section({.name = "otaUpdate", .order = 5, .namespaces = kNamespaces});
 
-using namespace std::string_view_literals;
-
 OtaUpdateConfig::OtaUpdateConfig()
   : isEnabled(true)
   , cdnDomain(CONFIG_OPENSHOCK_FW_CDN_DOMAIN)
@@ -83,10 +81,10 @@ bool OtaUpdateConfig::FromJSON(JSON::JsonView json)
   }
 
   cdnDomain = json["cdnDomain"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_CDN_DOMAIN);
-  Parse::JsonStrParsed(updateChannel, json, "updateChannel"sv, OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
+  Parse::JsonStrParsed(updateChannel, json, "updateChannel", OpenShock::TryParseOtaUpdateChannel, OpenShock::OtaUpdateChannel::Stable);
   checkInterval = json["checkInterval"].tryGetU16().value_or(kDefaultCheckInterval);
   updateId      = json["updateId"].tryGetI32().value_or(0);
-  Parse::JsonStrParsed(updateStep, json, "updateStep"sv, OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
+  Parse::JsonStrParsed(updateStep, json, "updateStep", OpenShock::TryParseOtaUpdateStep, OpenShock::OtaUpdateStep::None);
 
   return true;
 }

@@ -16,9 +16,9 @@ static void handleSerialLedTestCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::LedTestHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("ledtest"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("ledtest");
 
-  group.addCommand("Cycle through all LED patterns for visual verification"sv, handleSerialLedTestCommand);
+  group.addCommand("Cycle through all LED patterns for visual verification", handleSerialLedTestCommand);
 
   return group;
 }

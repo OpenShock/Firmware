@@ -37,7 +37,7 @@ static void resetCommandHandler()
 
 static TaskHandle_t transmitTask()
 {
-  TaskHandle_t task = HostFake::FindTask("RFTransmitter-4");
+  TaskHandle_t task = HostFake::FindTask("RFTx-4");
   TEST_ASSERT_NOT_NULL(task);
   return task;
 }

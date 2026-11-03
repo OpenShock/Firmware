@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,6 +52,10 @@ namespace OpenShock::JSON {
     // tryGetStr decodes the string's escapes (\uXXXX and surrogate pairs to UTF-8)
     // and returns std::nullopt for a malformed escape.
     [[nodiscard]] std::optional<std::string> tryGetStr() const;
+    // tryGetStr without the copy, for a value that is only parsed or compared: a view into the source when the
+    // string has no escapes, else decoded into `scratch`. std::nullopt also when the decoded text does not fit.
+    // The view lives as long as the source buffer, or `scratch` (whichever it points into).
+    [[nodiscard]] std::optional<std::string_view> tryGetStrView(std::span<char> scratch) const noexcept;
     [[nodiscard]] std::optional<bool> tryGetBool() const noexcept;
     [[nodiscard]] std::optional<uint8_t> tryGetU8() const noexcept;
     [[nodiscard]] std::optional<uint16_t> tryGetU16() const noexcept;

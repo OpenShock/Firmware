@@ -20,7 +20,7 @@ namespace OpenShock {
     DISABLE_MOVE(GatewayClient);
 
   public:
-    GatewayClient(const std::string& authToken);
+    explicit GatewayClient(std::string_view authToken);
     ~GatewayClient();
 
     inline GatewayClientState state() const { return m_state; }

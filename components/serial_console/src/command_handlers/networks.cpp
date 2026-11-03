@@ -60,21 +60,18 @@ static void handleNetworksCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::NetworksHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("networks"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("networks");
 
-  group.addCommand("Get all saved networks."sv, handleNetworksCommand);
+  group.addCommand("Get all saved networks.", handleNetworksCommand);
 
-  auto& setCommand = group.addCommand("Set all saved networks."sv, handleNetworksCommand);
-  setCommand.addArgument(
-    "json"sv,
-    "must be a array of objects with the following fields:"sv,
-    "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]"sv,
-    {
-      "ssid     (string)  SSID of the network"sv,
-      "password (string)  Password of the network"sv,
-      "id       (number)  ID of the network (optional)"sv,
-    }
-  );
+  static constexpr std::string_view kJsonFields[] = {
+    "ssid     (string)  SSID of the network",
+    "password (string)  Password of the network",
+    "id       (number)  ID of the network (optional)",
+  };
+
+  auto& setCommand = group.addCommand("Set all saved networks.", handleNetworksCommand);
+  setCommand.addArgument("json", "must be a array of objects with the following fields:", "[{\"ssid\":\"myssid\",\"password\":\"mypassword\"}]", kJsonFields);
 
   return group;
 }

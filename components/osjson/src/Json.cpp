@@ -52,23 +52,43 @@ static bool readHex4(std::string_view in, std::size_t pos, uint32_t& out)
   return true;
 }
 
-static void appendUtf8(std::string& out, uint32_t cp)
+namespace {
+  // Where jsonUnescape writes: a growing std::string, or a fixed caller-owned buffer that refuses to overflow.
+  struct StringSink {
+    std::string& out;
+    bool put(char c)
+    {
+      out += c;
+      return true;
+    }
+  };
+  struct SpanSink {
+    std::span<char> out;
+    std::size_t len = 0;
+    bool put(char c)
+    {
+      if (len == out.size()) {
+        return false;
+      }
+      out[len++] = c;
+      return true;
+    }
+  };
+}  // namespace
+
+template<typename Sink>
+static bool appendUtf8(Sink& out, uint32_t cp)
 {
   if (cp < 0x80) {
-    out += static_cast<char>(cp);
-  } else if (cp < 0x800) {
-    out += static_cast<char>(0xC0 | (cp >> 6));
-    out += static_cast<char>(0x80 | (cp & 0x3F));
-  } else if (cp < 0x10000) {
-    out += static_cast<char>(0xE0 | (cp >> 12));
-    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
-    out += static_cast<char>(0x80 | (cp & 0x3F));
-  } else {
-    out += static_cast<char>(0xF0 | (cp >> 18));
-    out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
-    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
-    out += static_cast<char>(0x80 | (cp & 0x3F));
+    return out.put(static_cast<char>(cp));
   }
+  if (cp < 0x800) {
+    return out.put(static_cast<char>(0xC0 | (cp >> 6))) && out.put(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+  if (cp < 0x10000) {
+    return out.put(static_cast<char>(0xE0 | (cp >> 12))) && out.put(static_cast<char>(0x80 | ((cp >> 6) & 0x3F))) && out.put(static_cast<char>(0x80 | (cp & 0x3F)));
+  }
+  return out.put(static_cast<char>(0xF0 | (cp >> 18))) && out.put(static_cast<char>(0x80 | ((cp >> 12) & 0x3F))) && out.put(static_cast<char>(0x80 | ((cp >> 6) & 0x3F))) && out.put(static_cast<char>(0x80 | (cp & 0x3F)));
 }
 
 // Decodes the body of a JSON string token (RFC 8259 section 7) to UTF-8:
@@ -80,17 +100,17 @@ static void appendUtf8(std::string& out, uint32_t cp)
 //
 // All other bytes are copied unchanged. Returns false on a malformed escape (unknown
 // escape character, truncated or non-hex \u), which jsmn's default (non-strict)
-// mode does not reject.
-static bool jsonUnescape(std::string_view in, std::string& out)
+// mode does not reject, and when the sink is full.
+template<typename Sink>
+static bool jsonUnescape(std::string_view in, Sink& out)
 {
-  out.clear();
-  out.reserve(in.size());
-
   std::size_t i = 0;
   while (i < in.size()) {
     char c = in[i++];
     if (c != '\\') {
-      out += c;
+      if (!out.put(c)) {
+        return false;
+      }
       continue;
     }
 
@@ -103,22 +123,34 @@ static bool jsonUnescape(std::string_view in, std::string& out)
       case '"':
       case '\\':
       case '/':
-        out += c;
+        if (!out.put(c)) {
+          return false;
+        }
         break;
       case 'b':
-        out += '\b';
+        if (!out.put('\b')) {
+          return false;
+        }
         break;
       case 'f':
-        out += '\f';
+        if (!out.put('\f')) {
+          return false;
+        }
         break;
       case 'n':
-        out += '\n';
+        if (!out.put('\n')) {
+          return false;
+        }
         break;
       case 'r':
-        out += '\r';
+        if (!out.put('\r')) {
+          return false;
+        }
         break;
       case 't':
-        out += '\t';
+        if (!out.put('\t')) {
+          return false;
+        }
         break;
       case 'u':
       {
@@ -141,7 +173,9 @@ static bool jsonUnescape(std::string_view in, std::string& out)
           cp = 0xFFFD;
         }
 
-        appendUtf8(out, cp);
+        if (!appendUtf8(out, cp)) {
+          return false;
+        }
         break;
       }
       default:
@@ -228,10 +262,30 @@ std::optional<std::string> JSON::JsonView::tryGetStr() const
   }
 
   std::string decoded;
-  if (!jsonUnescape(s, decoded)) {
+  decoded.reserve(s.size());  // decoding never grows the text
+  StringSink sink {decoded};
+  if (!jsonUnescape(s, sink)) {
     return std::nullopt;
   }
   return decoded;
+}
+
+std::optional<std::string_view> JSON::JsonView::tryGetStrView(std::span<char> scratch) const noexcept
+{
+  if (!isString()) {
+    return std::nullopt;
+  }
+
+  std::string_view s = raw();
+  if (s.find('\\') == std::string_view::npos) {
+    return s;  // nothing to decode: a view straight into the source
+  }
+
+  SpanSink sink {scratch};
+  if (!jsonUnescape(s, sink)) {
+    return std::nullopt;
+  }
+  return std::string_view(scratch.data(), sink.len);
 }
 
 std::optional<bool> JSON::JsonView::tryGetBool() const noexcept
@@ -324,10 +378,20 @@ JSON::JsonView JSON::JsonView::operator[](std::string_view key) const
         return JsonView(m_json, m_tokens, m_count, valIdx);
       }
 
-      // A key written with escapes ("id" for "id") is still the same key.
-      std::string decodedKey;
-      if (keyView.find('\\') != std::string_view::npos && jsonUnescape(keyView, decodedKey) && decodedKey == key) {
-        return JsonView(m_json, m_tokens, m_count, valIdx);
+      // A key written with escapes ("\u0069d" for "id") is still the same key. Decoded, it can only match if it
+      // fits in key.size() bytes, so a sink that refuses to grow past that (on the stack for any real key) is enough.
+      if (keyView.find('\\') != std::string_view::npos) {
+        char stackKey[64];
+        std::string heapKey;
+        std::span<char> buffer(stackKey);
+        if (key.size() > sizeof(stackKey)) {
+          heapKey.resize(key.size());
+          buffer = heapKey;
+        }
+        SpanSink sink {buffer.first(key.size())};
+        if (jsonUnescape(keyView, sink) && std::string_view(buffer.data(), sink.len) == key) {
+          return JsonView(m_json, m_tokens, m_count, valIdx);
+        }
       }
     }
 
@@ -403,12 +467,14 @@ JSON::JsonView JSON::JsonDocument::root() const noexcept
 
 void JSON::StringWriter::flushCb(char* buf, void* priv)
 {
-  static_cast<std::string*>(priv)->append(buf);
+  // json_generator flushes with free_ptr on the terminator it just wrote: the chunk's length, without a strlen
+  auto* self = static_cast<StringWriter*>(priv);
+  self->m_out.append(buf, static_cast<std::size_t>(self->m_gen.free_ptr - buf));
 }
 
 JSON::StringWriter::StringWriter()
 {
-  json_gen_str_start(&m_gen, m_buf, sizeof(m_buf), &StringWriter::flushCb, &m_out);
+  json_gen_str_start(&m_gen, m_buf, sizeof(m_buf), &StringWriter::flushCb, this);
 }
 
 std::string JSON::StringWriter::finish()

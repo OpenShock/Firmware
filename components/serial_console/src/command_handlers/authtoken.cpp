@@ -28,12 +28,12 @@ static void handleAuthtokenCommand(std::string_view arg, bool isAutomated)
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::AuthTokenHandler()
 {
-  auto group = OpenShock::SerialCmds::CommandGroup("authtoken"sv);
+  auto group = OpenShock::SerialCmds::CommandGroup("authtoken");
 
-  group.addCommand("Get the backend auth token"sv, handleAuthtokenCommand);
+  group.addCommand("Get the backend auth token", handleAuthtokenCommand);
 
-  auto& setCommand = group.addCommand("Set the auth token"sv, handleAuthtokenCommand);
-  setCommand.addArgument("token"sv, "must be a string"sv, "mytoken"sv);
+  auto& setCommand = group.addCommand("Set the auth token", handleAuthtokenCommand);
+  setCommand.addArgument("token", "must be a string", "mytoken");
 
   return group;
 }
