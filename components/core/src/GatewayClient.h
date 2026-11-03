@@ -37,6 +37,10 @@ namespace OpenShock {
     // other tasks wait on: it posts an event.
     void retire();
 
+    // Sends the gateway a close frame, waiting up to a second. Used by the shutdown handler so the gateway sees a
+    // clean close before esp_restart() stops WiFi. Leaves the handle alive; the destructor still destroys it.
+    void close();
+
     bool loop();
 
   private:
