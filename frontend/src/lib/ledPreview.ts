@@ -5,7 +5,7 @@ import { LedPreviewStopMessage } from '#lib/_fbs/open-shock/serialization/local/
 import { LedTarget } from '#lib/_fbs/open-shock/serialization/local/led-target.js';
 import { LocalToHubMessagePayload } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload.js';
 import { LocalToHubMessage } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message.js';
-import { packRgb10, type Rgb } from '#lib/utils/color.js';
+import type { Rgb } from '#lib/utils/color.js';
 import { ConnectionState, WebSocketClient } from '#lib/WebSocketClient.js';
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
 
@@ -48,11 +48,16 @@ export interface LedColorPreview {
   brightness?: number; // 0-65535 for this preview only; default: each LED's saved normal brightness
 }
 
+// A 0-1 channel as the 16 bits the hub takes
+const toUint16 = (v: number) => Math.min(65535, Math.max(0, Math.round(v * 65535)));
+
 function sendColor({ color, target = LedTarget.All, brightness }: LedColorPreview): boolean {
   return send(LocalToHubMessagePayload.LedPreviewColorMessage, (fbb) =>
     LedPreviewColorMessage.createLedPreviewColorMessage(
       fbb,
-      packRgb10(color),
+      toUint16(color.r),
+      toUint16(color.g),
+      toUint16(color.b),
       target,
       brightness ?? null
     )

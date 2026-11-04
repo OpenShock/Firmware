@@ -3,7 +3,6 @@
 const char* const TAG = "LocalMessageHandlers";
 
 #include "Logging.h"
-#include "util/ColorUtils.h"
 #include "visual/VisualStateManager.h"
 
 #include <optional>
@@ -67,12 +66,8 @@ void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewColorMessage(u
       return;
   }
 
-  // RGB10 on the wire, widened to the 16 bits per channel the driver dithers
-  using namespace OpenShock::ColorUtils;
-  const uint32_t packed = preview->color_rgb10();
-
   auto brightness = preview->brightness();
-  Vsm::PreviewColor(Widen10To16(Rgb10Red(packed)), Widen10To16(Rgb10Green(packed)), Widen10To16(Rgb10Blue(packed)), only, brightness.has_value() ? std::optional<uint16_t>(*brightness) : std::nullopt);
+  Vsm::PreviewColor(preview->red(), preview->green(), preview->blue(), only, brightness.has_value() ? std::optional<uint16_t>(*brightness) : std::nullopt);
 }
 
 void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewStopMessage(uint8_t socketId, const Schemas::LocalToHubMessage* msg)

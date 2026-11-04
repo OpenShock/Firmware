@@ -30,19 +30,28 @@ static getSizePrefixedRootAsLedPreviewColorMessage(bb:flatbuffers.ByteBuffer, ob
 }
 
 /**
- * RGB10 packed: red in bits 20-29, green in bits 10-19, blue in bits 0-9 (0-1023 each), bits 30-31 zero. The hub
- * dithers the RGB LED, so it shows more than the LED's 8 bits.
+ * 16 bits per channel (0-65535); the hub reduces them to what the RGB LED shows.
  */
-colorRgb10():number {
+red():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
+}
+
+green():number {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
+}
+
+blue():number {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 /**
  * The LED to light; the other stays dark. A target the board doesn't have lights nothing.
  */
 target():LedTarget {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : LedTarget.All;
 }
 
@@ -50,24 +59,32 @@ target():LedTarget {
  * 16-bit brightness (0-65535) for this preview only; null is each LED's saved normal brightness.
  */
 brightness():number|null {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : null;
 }
 
 static startLedPreviewColorMessage(builder:flatbuffers.Builder) {
-  builder.startObject(3);
+  builder.startObject(5);
 }
 
-static addColorRgb10(builder:flatbuffers.Builder, colorRgb10:number) {
-  builder.addFieldInt32(0, colorRgb10, 0);
+static addRed(builder:flatbuffers.Builder, red:number) {
+  builder.addFieldInt16(0, red, 0);
+}
+
+static addGreen(builder:flatbuffers.Builder, green:number) {
+  builder.addFieldInt16(1, green, 0);
+}
+
+static addBlue(builder:flatbuffers.Builder, blue:number) {
+  builder.addFieldInt16(2, blue, 0);
 }
 
 static addTarget(builder:flatbuffers.Builder, target:LedTarget) {
-  builder.addFieldInt8(1, target, LedTarget.All);
+  builder.addFieldInt8(3, target, LedTarget.All);
 }
 
 static addBrightness(builder:flatbuffers.Builder, brightness:number) {
-  builder.addFieldInt16(2, brightness, null);
+  builder.addFieldInt16(4, brightness, null);
 }
 
 static endLedPreviewColorMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -75,9 +92,11 @@ static endLedPreviewColorMessage(builder:flatbuffers.Builder):flatbuffers.Offset
   return offset;
 }
 
-static createLedPreviewColorMessage(builder:flatbuffers.Builder, colorRgb10:number, target:LedTarget, brightness:number|null):flatbuffers.Offset {
+static createLedPreviewColorMessage(builder:flatbuffers.Builder, red:number, green:number, blue:number, target:LedTarget, brightness:number|null):flatbuffers.Offset {
   LedPreviewColorMessage.startLedPreviewColorMessage(builder);
-  LedPreviewColorMessage.addColorRgb10(builder, colorRgb10);
+  LedPreviewColorMessage.addRed(builder, red);
+  LedPreviewColorMessage.addGreen(builder, green);
+  LedPreviewColorMessage.addBlue(builder, blue);
   LedPreviewColorMessage.addTarget(builder, target);
   if (brightness !== null)
     LedPreviewColorMessage.addBrightness(builder, brightness);
