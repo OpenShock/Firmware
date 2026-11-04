@@ -41,38 +41,40 @@ export function stopLedPreview(): boolean {
   });
 }
 
-/** 16 bits per channel, 0-65535. The hub dithers the RGB LED, so it shows more than 8 bits. */
-export interface Rgb16 {
+/** A color with each channel 0-1. Packed as RGB10 on the wire; the hub dithers the RGB LED beyond its 8 bits. */
+export interface Rgb {
   r: number;
   g: number;
   b: number;
 }
 
-/** An 8-bit RRGGBB hex color widened to 16 bits per channel (ff -> 65535). */
-export function hexToRgb16(hex: string): Rgb16 {
+/** An RRGGBB hex color. */
+export function hexToRgb(hex: string): Rgb {
   const value = parseInt(hex, 16);
   return {
-    r: ((value >> 16) & 0xff) * 257,
-    g: ((value >> 8) & 0xff) * 257,
-    b: (value & 0xff) * 257,
+    r: ((value >> 16) & 0xff) / 255,
+    g: ((value >> 8) & 0xff) / 255,
+    b: (value & 0xff) / 255,
   };
 }
 
+// RGB10 packed: red in bits 20-29, green 10-19, blue 0-9. `>>> 0` keeps it an unsigned 32-bit number.
+function packRgb10({ r, g, b }: Rgb): number {
+  const ch = (v: number) => Math.min(1023, Math.max(0, Math.round(v * 1023)));
+  return ((ch(r) << 20) | (ch(g) << 10) | ch(b)) >>> 0;
+}
+
 export interface LedColorPreview {
-  color: Rgb16;
+  color: Rgb;
   target?: LedTarget; // Default: every LED
   brightness?: number; // Percent for this preview only; default: each LED's saved normal brightness
 }
-
-const toUint16 = (v: number) => Math.min(65535, Math.max(0, Math.round(v)));
 
 function sendColor({ color, target = LedTarget.All, brightness }: LedColorPreview): boolean {
   return send(LocalToHubMessagePayload.LedPreviewColorMessage, (fbb) =>
     LedPreviewColorMessage.createLedPreviewColorMessage(
       fbb,
-      toUint16(color.r),
-      toUint16(color.g),
-      toUint16(color.b),
+      packRgb10(color),
       target,
       brightness ?? null
     )

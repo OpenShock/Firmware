@@ -1,13 +1,13 @@
 <script lang="ts">
   // Hue around the ring, saturation from the center out; value is always full (brightness is set separately).
-  import type { Rgb16 } from '#lib/ledPreview.js';
+  import type { Rgb } from '#lib/ledPreview.js';
 
   interface Props {
     color?: string; // RRGGBB, for showing the pick
     size?: number;
     disabled?: boolean;
-    /** The pick at 16 bits per channel, computed from the hue and saturation without rounding to 8 bits first. */
-    onchange?: (color: Rgb16) => void;
+    /** The pick, each channel 0-1, straight from the hue and saturation without rounding to 8 bits first. */
+    onchange?: (color: Rgb) => void;
   }
 
   let { color = $bindable('ff0000'), size = 200, disabled = false, onchange }: Props = $props();
@@ -38,7 +38,7 @@
           .padStart(2, '0')
       )
       .join('');
-    const [r, g, b] = channels.map((v) => Math.round(v * 65535));
+    const [r, g, b] = channels;
     onchange?.({ r, g, b });
   }
 

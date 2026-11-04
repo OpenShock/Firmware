@@ -237,21 +237,14 @@ struct LedPreviewColorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
     return "OpenShock.Serialization.Local.LedPreviewColorMessage";
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_RED = 4,
-    VT_GREEN = 6,
-    VT_BLUE = 8,
-    VT_TARGET = 10,
-    VT_BRIGHTNESS = 12
+    VT_COLOR_RGB10 = 4,
+    VT_TARGET = 6,
+    VT_BRIGHTNESS = 8
   };
-  /// 16 bits per channel (0-65535): the hub dithers the RGB LED, so it shows more than 8 bits.
-  uint16_t red() const {
-    return GetField<uint16_t>(VT_RED, 0);
-  }
-  uint16_t green() const {
-    return GetField<uint16_t>(VT_GREEN, 0);
-  }
-  uint16_t blue() const {
-    return GetField<uint16_t>(VT_BLUE, 0);
+  /// RGB10 packed: red in bits 20-29, green in bits 10-19, blue in bits 0-9 (0-1023 each), bits 30-31 zero. The hub
+  /// dithers the RGB LED, so it shows more than the LED's 8 bits.
+  uint32_t color_rgb10() const {
+    return GetField<uint32_t>(VT_COLOR_RGB10, 0);
   }
   /// The LED to light; the other stays dark. A target the board doesn't have lights nothing.
   OpenShock::Serialization::Local::LedTarget target() const {
@@ -264,9 +257,7 @@ struct LedPreviewColorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint16_t>(verifier, VT_RED, 2) &&
-           VerifyField<uint16_t>(verifier, VT_GREEN, 2) &&
-           VerifyField<uint16_t>(verifier, VT_BLUE, 2) &&
+           VerifyField<uint32_t>(verifier, VT_COLOR_RGB10, 4) &&
            VerifyField<uint8_t>(verifier, VT_TARGET, 1) &&
            VerifyField<uint8_t>(verifier, VT_BRIGHTNESS, 1) &&
            verifier.EndTable();
@@ -277,14 +268,8 @@ struct LedPreviewColorMessageBuilder {
   typedef LedPreviewColorMessage Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_red(uint16_t red) {
-    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_RED, red, 0);
-  }
-  void add_green(uint16_t green) {
-    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_GREEN, green, 0);
-  }
-  void add_blue(uint16_t blue) {
-    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_BLUE, blue, 0);
+  void add_color_rgb10(uint32_t color_rgb10) {
+    fbb_.AddElement<uint32_t>(LedPreviewColorMessage::VT_COLOR_RGB10, color_rgb10, 0);
   }
   void add_target(OpenShock::Serialization::Local::LedTarget target) {
     fbb_.AddElement<uint8_t>(LedPreviewColorMessage::VT_TARGET, static_cast<uint8_t>(target), 0);
@@ -305,15 +290,11 @@ struct LedPreviewColorMessageBuilder {
 
 inline ::flatbuffers::Offset<LedPreviewColorMessage> CreateLedPreviewColorMessage(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint16_t red = 0,
-    uint16_t green = 0,
-    uint16_t blue = 0,
+    uint32_t color_rgb10 = 0,
     OpenShock::Serialization::Local::LedTarget target = OpenShock::Serialization::Local::LedTarget::All,
     ::flatbuffers::Optional<uint8_t> brightness = ::flatbuffers::nullopt) {
   LedPreviewColorMessageBuilder builder_(_fbb);
-  builder_.add_blue(blue);
-  builder_.add_green(green);
-  builder_.add_red(red);
+  builder_.add_color_rgb10(color_rgb10);
   if(brightness) { builder_.add_brightness(*brightness); }
   builder_.add_target(target);
   return builder_.Finish();

@@ -6,11 +6,11 @@
   import {
     LedPreviewPattern,
     LedTarget,
-    hexToRgb16,
+    hexToRgb,
     previewLedColor,
     previewLedPattern,
     stopLedPreview,
-    type Rgb16,
+    type Rgb,
   } from '#lib/ledPreview.js';
   import type { LedMode } from '#lib/mappers/ConfigMapper.js';
   import { hubState } from '#lib/stores/index.js';
@@ -97,7 +97,7 @@
     dragging = { type, signal, value };
     const target = ledTypes.find((t) => t.type === type)!.target;
     const signalColor = signals.find((s) => s.signal === signal)!.color;
-    if (previewLedColor({ color: hexToRgb16(signalColor), target, brightness: value }))
+    if (previewLedColor({ color: hexToRgb(signalColor), target, brightness: value }))
       previewing = true;
   }
 
@@ -133,7 +133,7 @@
     previewing = true;
   }
 
-  function onColorChange(value: Rgb16) {
+  function onColorChange(value: Rgb) {
     if (!previewLedColor({ color: value })) return notConnected();
     previewing = true;
   }

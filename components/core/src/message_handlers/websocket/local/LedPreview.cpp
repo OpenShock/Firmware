@@ -66,8 +66,13 @@ void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewColorMessage(u
       return;
   }
 
+  // RGB10 packed (red in bits 20-29, green 10-19, blue 0-9), widened to the 16 bits per channel the driver takes:
+  // repeating the top bits in the bottom ones maps 1023 to 65535 and 0 to 0
+  const uint32_t packed = preview->color_rgb10();
+  auto widen            = [](uint32_t v10) { return static_cast<uint16_t>((v10 << 6) | (v10 >> 4)); };
+
   auto brightness = preview->brightness();
-  Vsm::PreviewColor(preview->red(), preview->green(), preview->blue(), only, brightness.has_value() ? std::optional<uint8_t>(*brightness) : std::nullopt);
+  Vsm::PreviewColor(widen((packed >> 20) & 0x3FF), widen((packed >> 10) & 0x3FF), widen(packed & 0x3FF), only, brightness.has_value() ? std::optional<uint8_t>(*brightness) : std::nullopt);
 }
 
 void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewStopMessage(uint8_t socketId, const Schemas::LocalToHubMessage* msg)
