@@ -1,5 +1,6 @@
 // Round trips: a config written by this firmware must read back unchanged after a reboot, through the NVS store
 // and through the jsonconfig (GetAsJSON / SaveFromJSON) path.
+#include <utility>
 #include <freertos/FreeRTOS.h>
 
 #include "unity.h"
@@ -83,6 +84,23 @@ TEST_CASE("Whole-section setters round trip through the store", "[config][roundt
 
   Reload();
   AssertConfigEqual(sample, Snapshot());
+}
+
+TEST_CASE("An unknown LED mode from a caller is reset to the default", "[config][roundtrip]")
+{
+  InitDefault();
+
+  // Not one of the LedMode values: a caller can hand the section anything
+  Config::LedConfig led = Config::GetLedConfig();
+  led.mode              = static_cast<LedMode>(7);
+  TEST_ASSERT_TRUE(Config::SetLedConfig(led));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(LedMode::All), std::to_underlying(Config::GetLedConfig().mode));
+
+  TEST_ASSERT_TRUE(Config::UpdateLedConfig([](Config::LedConfig& l) {
+    l.mode = static_cast<LedMode>(200);
+    return true;
+  }));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(LedMode::All), std::to_underlying(Config::GetLedConfig().mode));
 }
 
 TEST_CASE("Removed credentials are gone after a reload and their ids can be reused", "[config][roundtrip]")

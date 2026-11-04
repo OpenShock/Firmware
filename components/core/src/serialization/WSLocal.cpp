@@ -2,8 +2,11 @@
 
 #include "serialization/WSLocal.h"
 
+const char* const TAG = "WSLocal";
+
 #include "Chipset.h"
 #include "estop/EStopConfig.h"
+#include "Logging.h"
 #include "OtaUpdateConfig.h"
 #include "radio/RFConfig.h"
 #include "util/HexUtils.h"
@@ -13,6 +16,7 @@
 
 #include "serialization/_fbs/HubToLocalMessage_generated.h"
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -77,9 +81,9 @@ static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::Fl
 }
 
 // createLedSettings casts between these by value
-// Exhaustive with no default on purpose: -Wswitch (IDF builds with -Werror) fails the build when LedMode gains a value
-// that is not mapped here
-static Local::LedMode toSchemaLedMode(OpenShock::LedMode mode)
+// Exhaustive with no default on purpose: -Werror=switch fails the build when LedMode gains a value that is not mapped
+// here. Any other value (a caller can pass anything) falls out as nullopt.
+static std::optional<Local::LedMode> toSchemaLedMode(OpenShock::LedMode mode)
 {
   switch (mode) {
     case OpenShock::LedMode::All:
@@ -89,7 +93,7 @@ static Local::LedMode toSchemaLedMode(OpenShock::LedMode mode)
     case OpenShock::LedMode::Off:
       return Local::LedMode::Off;
   }
-  return Local::LedMode::All;  // Unreachable: the config only holds the values above
+  return std::nullopt;
 }
 
 static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::FlatBufferBuilder& builder)
@@ -108,7 +112,14 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
   auto mono = brightness(LedType::Mono);
   auto rgb  = brightness(LedType::Rgb);
 
-  return Local::CreateLedSettings(builder, toSchemaLedMode(Vsm::GetLedMode()), mono, rgb, Vsm::kRgbBrightnessWarn, Vsm::kPreviewDurationMs);
+  const OpenShock::LedMode ledMode = Vsm::GetLedMode();
+  auto mode                       = toSchemaLedMode(ledMode);
+  if (!mode) {
+    // The LEDs treat a mode they don't know like All (every state shown), so report that
+    OS_LOGE(TAG, "Unknown LED mode %u, reporting all", static_cast<unsigned>(std::to_underlying(ledMode)));
+  }
+
+  return Local::CreateLedSettings(builder, mode.value_or(Local::LedMode::All), mono, rgb, Vsm::kRgbBrightnessWarn, Vsm::kPreviewDurationMs);
 }
 
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)

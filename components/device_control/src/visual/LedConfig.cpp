@@ -59,6 +59,19 @@ uint16_t& LedConfig::Brightness(LedType type, LedSignal signal)
   return signal == LedSignal::Critical ? rgbCriticalBrightness : rgbNormalBrightness;
 }
 
+void LedConfig::Normalize()
+{
+  // Exhaustive with no default: -Werror=switch fails the build when LedMode gains a value not listed here
+  switch (mode) {
+    case LedMode::All:
+    case LedMode::CriticalOnly:
+    case LedMode::Off:
+      return;
+  }
+  OS_LOGW(TAG, "Unknown LED mode %u, using the default", static_cast<unsigned>(std::to_underlying(mode)));
+  mode = kDefaultMode;
+}
+
 bool LedConfig::FromJSON(JSON::JsonView json)
 {
   if (auto done = Parse::ObjectOrDefault(*this, json, TAG)) {

@@ -29,8 +29,9 @@ namespace OpenShock::Config {
     [[nodiscard]] uint16_t& Brightness(LedType type, LedSignal signal);
     [[nodiscard]] uint16_t Brightness(LedType type, LedSignal signal) const { return const_cast<LedConfig*>(this)->Brightness(type, signal); }
 
-    /// @brief Nothing to correct: the mode is checked on load and every uint16 is a valid brightness. The section requires it.
-    void Normalize() { }
+    /// @brief Resets a mode that is none of the LedMode values to the default; every uint16 is a valid brightness. The
+    ///        section runs it on every value it takes in, whoever the caller.
+    void Normalize();
 
     /// @brief Reads this section from `partition`; a missing key is its default, a read error fails.
     bool LoadNvs(const char* partition);
