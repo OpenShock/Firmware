@@ -64,7 +64,7 @@ rgbWarnAbove():number {
  */
 previewMs():number {
   const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 static startLedSettings(builder:flatbuffers.Builder) {
@@ -88,7 +88,7 @@ static addRgbWarnAbove(builder:flatbuffers.Builder, rgbWarnAbove:number) {
 }
 
 static addPreviewMs(builder:flatbuffers.Builder, previewMs:number) {
-  builder.addFieldInt32(4, previewMs, 0);
+  builder.addFieldInt16(4, previewMs, 0);
 }
 
 static endLedSettings(builder:flatbuffers.Builder):flatbuffers.Offset {

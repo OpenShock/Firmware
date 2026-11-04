@@ -51,7 +51,7 @@ namespace OpenShock::VisualStateManager {
     CriticalError,
   };
 
-  inline constexpr uint32_t kPreviewDurationMs = 10'000;
+  inline constexpr uint16_t kPreviewDurationMs = 10'000;  // uint16: the portal gets it as LedSettings.preview_ms
 
   /// @brief Shows `pattern` whatever the LED mode, at the configured brightness.
   void PreviewPattern(LedPattern pattern);

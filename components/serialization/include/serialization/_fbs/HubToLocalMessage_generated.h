@@ -422,8 +422,8 @@ struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     return GetField<uint8_t>(VT_RGB_WARN_ABOVE, 0);
   }
   /// How long a preview holds the LEDs after the last preview message.
-  uint32_t preview_ms() const {
-    return GetField<uint32_t>(VT_PREVIEW_MS, 0);
+  uint16_t preview_ms() const {
+    return GetField<uint16_t>(VT_PREVIEW_MS, 0);
   }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
@@ -434,7 +434,7 @@ struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyOffset(verifier, VT_RGB) &&
            verifier.VerifyTable(rgb()) &&
            VerifyField<uint8_t>(verifier, VT_RGB_WARN_ABOVE, 1) &&
-           VerifyField<uint32_t>(verifier, VT_PREVIEW_MS, 4) &&
+           VerifyField<uint16_t>(verifier, VT_PREVIEW_MS, 2) &&
            verifier.EndTable();
   }
 };
@@ -455,8 +455,8 @@ struct LedSettingsBuilder {
   void add_rgb_warn_above(uint8_t rgb_warn_above) {
     fbb_.AddElement<uint8_t>(LedSettings::VT_RGB_WARN_ABOVE, rgb_warn_above, 0);
   }
-  void add_preview_ms(uint32_t preview_ms) {
-    fbb_.AddElement<uint32_t>(LedSettings::VT_PREVIEW_MS, preview_ms, 0);
+  void add_preview_ms(uint16_t preview_ms) {
+    fbb_.AddElement<uint16_t>(LedSettings::VT_PREVIEW_MS, preview_ms, 0);
   }
   explicit LedSettingsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -475,11 +475,11 @@ inline ::flatbuffers::Offset<LedSettings> CreateLedSettings(
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> mono = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> rgb = 0,
     uint8_t rgb_warn_above = 0,
-    uint32_t preview_ms = 0) {
+    uint16_t preview_ms = 0) {
   LedSettingsBuilder builder_(_fbb);
-  builder_.add_preview_ms(preview_ms);
   builder_.add_rgb(rgb);
   builder_.add_mono(mono);
+  builder_.add_preview_ms(preview_ms);
   builder_.add_rgb_warn_above(rgb_warn_above);
   builder_.add_mode(mode);
   return builder_.Finish();
