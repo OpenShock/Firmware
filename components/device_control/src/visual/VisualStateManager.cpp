@@ -16,11 +16,13 @@ const char* const TAG = "VisualStateManager";
 #include "visual/LedConfig.h"
 
 #include <esp_netif.h>
+#include <esp_timer.h>
 #include <esp_wifi.h>
 
 #include <algorithm>
 #include <atomic>
 #include <memory>
+#include <optional>
 
 // Status LED pins come from the board descriptor stamped into the image (BoardDescriptor.h);
 // -1 (== GPIO_NUM_NC) means the board has no such LED.
@@ -50,13 +52,11 @@ static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 // The `led` section's settings, loaded in Init. Each is atomic on its own; a setter re-applies after storing, so a mix
 // of old and new values read mid-update is replaced at once.
 static std::atomic<OpenShock::LedMode> s_ledMode = OpenShock::LedMode::All;
-static std::atomic<uint8_t> s_monoCriticalBrightness = 100;  // Percent of full output
-static std::atomic<uint8_t> s_monoNormalBrightness   = 100;
-static std::atomic<uint8_t> s_rgbCriticalBrightness  = 8;
-static std::atomic<uint8_t> s_rgbNormalBrightness    = 8;
+static std::atomic<uint8_t> s_monoCriticalBrightness = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;  // Percent of full output
+static std::atomic<uint8_t> s_monoNormalBrightness   = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
+static std::atomic<uint8_t> s_rgbCriticalBrightness  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
+static std::atomic<uint8_t> s_rgbNormalBrightness    = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
 
-// RGB brightness above this gets a warning: a WS2812B is glaring well before full output
-static constexpr uint8_t kRgbBrightnessWarnPercent = 30;
 
 static std::atomic<uint8_t>& brightnessSetting(OpenShock::LedType type, OpenShock::LedSignal signal)
 {
@@ -66,6 +66,17 @@ static std::atomic<uint8_t>& brightnessSetting(OpenShock::LedType type, OpenShoc
   }
   return critical ? s_rgbCriticalBrightness : s_rgbNormalBrightness;
 }
+
+// A preview's content: a state pattern, or a solid color. Guarded by s_applyMutex.
+struct Preview {
+  bool isColor;
+  uint32_t flags;  // Pattern preview: the state flags whose pattern shows
+  uint8_t red, green, blue;
+  std::optional<OpenShock::LedType> only;
+  std::optional<uint8_t> brightness;
+};
+static std::optional<Preview> s_preview;
+static esp_timer_handle_t s_previewTimer = nullptr;  // Ends the preview kPreviewDurationMs after the last call
 
 // Percent (0-100) to the drivers' 0-255 scale, rounded
 static inline uint8_t toDriverBrightness(uint8_t percent)
@@ -313,15 +324,85 @@ static void applyVisualState(uint32_t flags, bool showAll = false)
   OS_LOGW(TAG, "Trying to update visual state, but no LED is active!");
 }
 
-static void updateVisualState()
+static void applyColorPreview(const Preview& preview)
 {
-  OpenShock::ScopedLock lock__(&s_applyMutex);
+  bool monoLit = !preview.only.has_value() || *preview.only == LedType::Mono;
+  bool rgbLit  = !preview.only.has_value() || *preview.only == LedType::Rgb;
 
+  if (s_monoLedDriver != nullptr) {
+    s_monoLedDriver->SetBrightness(toDriverBrightness(preview.brightness.value_or(s_monoNormalBrightness.load())));
+    bool on = monoLit && (preview.red | preview.green | preview.blue) != 0;
+    s_monoLedDriver->SetPattern(on ? kSolidOnPattern : kSolidOffPattern);
+  }
+
+  if (s_rgbLedDriver != nullptr) {
+    s_rgbLedDriver->SetBrightness(toDriverBrightness(preview.brightness.value_or(s_rgbNormalBrightness.load())));
+    const RgbLedDriver::RGBState color[] = {
+      rgbLit ? RgbLedDriver::RGBState {preview.red, preview.green, preview.blue, 100'000} : RgbLedDriver::RGBState {0, 0, 0, 100'000}
+    };
+    s_rgbLedDriver->SetPattern(color);
+  }
+}
+
+// Caller holds s_applyMutex
+static void applyCurrentLocked()
+{
   if (s_ledTestActive.load()) {
-    return;  // Re-applied from the live flags when the test finishes
+    return;  // Re-applied from the live flags (or the preview) when the test finishes
+  }
+
+  if (s_preview.has_value()) {
+    if (s_preview->isColor) {
+      applyColorPreview(*s_preview);
+    } else {
+      applyVisualState(s_preview->flags, true);
+    }
+    return;
   }
 
   applyVisualState(s_stateFlags.load());
+}
+
+static void updateVisualState()
+{
+  OpenShock::ScopedLock lock__(&s_applyMutex);
+  applyCurrentLocked();
+}
+
+static void startPreview(const Preview& preview)
+{
+  if (s_previewTimer == nullptr) {
+    return;  // No LED, or Init has not run
+  }
+
+  OpenShock::ScopedLock lock__(&s_applyMutex);
+  s_preview = preview;
+
+  // Restarted by every preview call, so a client that keeps previewing (a dragged slider) keeps the LEDs
+  esp_timer_stop(s_previewTimer);  // ESP_ERR_INVALID_STATE when not running: fine
+  esp_err_t err = esp_timer_start_once(s_previewTimer, static_cast<uint64_t>(VisualStateManager::kPreviewDurationMs) * 1000);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to start the preview timer: %s", esp_err_to_name(err));
+    s_preview.reset();  // Never leave a preview up with nothing to end it
+  }
+
+  applyCurrentLocked();
+}
+
+static void endPreview()
+{
+  OpenShock::ScopedLock lock__(&s_applyMutex);
+  if (!s_preview.has_value()) {
+    return;
+  }
+  s_preview.reset();
+  applyCurrentLocked();
+}
+
+static void handlePreviewTimer(void* arg)
+{
+  (void)arg;
+  endPreview();
 }
 
 static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -425,6 +506,18 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
   }
 }
 
+// Copies the `led` section into the atomics applyVisualState reads
+static void loadLedConfig()
+{
+  const Config::LedConfig ledConfig = Config::GetLedConfig();
+  s_ledMode.store(ledConfig.mode);
+  for (LedType type : {LedType::Mono, LedType::Rgb}) {
+    for (LedSignal signal : {LedSignal::Critical, LedSignal::Normal}) {
+      brightnessSetting(type, signal).store(ledConfig.Brightness(type, signal));
+    }
+  }
+}
+
 bool VisualStateManager::Init()
 {
   bool ledActive = false;
@@ -465,15 +558,21 @@ bool VisualStateManager::Init()
     return true;
   }
 
-  const Config::LedConfig ledConfig = Config::GetLedConfig();
-  s_ledMode.store(ledConfig.mode);
-  for (LedType type : {LedType::Mono, LedType::Rgb}) {
-    for (LedSignal signal : {LedSignal::Critical, LedSignal::Normal}) {
-      brightnessSetting(type, signal).store(ledConfig.Brightness(type, signal));
-    }
-  }
+  loadLedConfig();
 
-  esp_err_t err;
+  const esp_timer_create_args_t previewTimerArgs = {
+    .callback              = handlePreviewTimer,
+    .arg                   = nullptr,
+    .dispatch_method       = ESP_TIMER_TASK,
+    .name                  = "LedPreview",
+    .skip_unhandled_events = true,
+  };
+  esp_err_t err = esp_timer_create(&previewTimerArgs, &s_previewTimer);
+  if (err != ESP_OK) {
+    // Previews only; the LEDs still show the hub's state
+    OS_LOGE(TAG, "Failed to create the LED preview timer: %s", esp_err_to_name(err));
+    s_previewTimer = nullptr;
+  }
 
   err = esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, handleEspWiFiEvent, nullptr);
   if (err != ESP_OK) {
@@ -506,16 +605,13 @@ LedMode VisualStateManager::GetLedMode()
 
 bool VisualStateManager::SetLedMode(LedMode mode)
 {
-  if (!Config::SetLedMode(mode)) {
-    OS_LOGE(TAG, "Failed to save the LED mode to config");
-    return false;
-  }
-
-  if (s_ledMode.exchange(mode) != mode) {
-    updateVisualState();
-  }
-
-  return true;
+  return UpdateLedConfig([&](Config::LedConfig& led) {
+    if (led.mode == mode) {
+      return false;
+    }
+    led.mode = mode;
+    return true;
+  });
 }
 
 uint8_t VisualStateManager::GetLedBrightness(LedType type, LedSignal signal)
@@ -525,22 +621,91 @@ uint8_t VisualStateManager::GetLedBrightness(LedType type, LedSignal signal)
 
 bool VisualStateManager::SetLedBrightness(LedType type, LedSignal signal, uint8_t percent)
 {
-  percent = std::min(percent, Config::LedConfig::kMaxBrightness);
+  return UpdateLedConfig([&](Config::LedConfig& led) {
+    uint8_t& brightness = led.Brightness(type, signal);
+    if (brightness == percent) {
+      return false;
+    }
+    brightness = percent;  // The section caps it (LedConfig::Normalize)
+    return true;
+  });
+}
 
-  if (!Config::SetLedBrightness(type, signal, percent)) {
-    OS_LOGE(TAG, "Failed to save the LED brightness to config");
+bool VisualStateManager::UpdateLedConfig(Util::FunctionRef<bool(Config::LedConfig&)> update)
+{
+  if (!Config::UpdateLedConfig(update)) {
+    OS_LOGE(TAG, "Failed to save the LED settings to config");
     return false;
   }
 
-  if (type == LedType::Rgb && percent > kRgbBrightnessWarnPercent) {
-    OS_LOGW(TAG, "RGB LED brightness set to %u%%: above %u%% a WS2812B is glaring and runs warm", percent, kRgbBrightnessWarnPercent);
+  // Under s_applyMutex so two updates can't store their snapshots out of order
+  OpenShock::ScopedLock lock__(&s_applyMutex);
+
+  uint8_t rgbBefore[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
+  loadLedConfig();
+  uint8_t rgbAfter[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
+  for (std::size_t i = 0; i < std::size(rgbAfter); ++i) {
+    if (rgbAfter[i] > VisualStateManager::kRgbBrightnessWarnPercent && rgbAfter[i] != rgbBefore[i]) {
+      OS_LOGW(TAG, "RGB LED %s brightness set to %u%%: above %u%% a WS2812B is glaring and runs warm", i == 0 ? "critical" : "normal", rgbAfter[i], VisualStateManager::kRgbBrightnessWarnPercent);
+    }
   }
 
-  if (brightnessSetting(type, signal).exchange(percent) != percent) {
-    updateVisualState();
-  }
-
+  applyCurrentLocked();
   return true;
+}
+
+bool VisualStateManager::HasLed(LedType type)
+{
+  return type == LedType::Mono ? s_monoLedDriver != nullptr : s_rgbLedDriver != nullptr;
+}
+
+void VisualStateManager::PreviewPattern(LedPattern pattern)
+{
+  uint32_t flags = 0;
+  switch (pattern) {
+    case LedPattern::WiFiDisconnected:
+      flags = 0;
+      break;
+    case LedPattern::WiFiScanning:
+      flags = kWiFiScanningFlag;
+      break;
+    case LedPattern::NoBackend:
+      flags = kHasIpAddressFlag | kWiFiConnectedFlag;
+      break;
+    case LedPattern::Connected:
+      flags = kStatusOKMask;
+      break;
+    case LedPattern::EStopped:
+      flags = kEmergencyStoppedFlag;
+      break;
+    case LedPattern::EStopClearing:
+      flags = kEmergencyStoppedFlag | kEmergencyStopActiveClearingFlag;
+      break;
+    case LedPattern::EStopAwaitingRelease:
+      flags = kEmergencyStoppedFlag | kEmergencyStopAwaitingReleaseFlag;
+      break;
+    case LedPattern::CriticalError:
+      flags = kCriticalErrorFlag;
+      break;
+  }
+
+  startPreview(Preview {.isColor = false, .flags = flags, .red = 0, .green = 0, .blue = 0, .only = std::nullopt, .brightness = std::nullopt});
+}
+
+void VisualStateManager::PreviewColor(uint8_t red, uint8_t green, uint8_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness)
+{
+  if (brightness.has_value()) {
+    brightness = std::min(*brightness, Config::LedConfig::kMaxBrightness);
+  }
+  startPreview(Preview {.isColor = true, .flags = 0, .red = red, .green = green, .blue = blue, .only = only, .brightness = brightness});
+}
+
+void VisualStateManager::StopPreview()
+{
+  if (s_previewTimer != nullptr) {
+    esp_timer_stop(s_previewTimer);
+  }
+  endPreview();
 }
 
 void VisualStateManager::SetCriticalError()

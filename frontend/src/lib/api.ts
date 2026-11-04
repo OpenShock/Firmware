@@ -298,3 +298,104 @@ export function checkOtaUpdates(channel: OtaChannel): Promise<boolean> {
     'Failed to check for OTA updates'
   );
 }
+
+// Status LEDs
+
+export type LedMode = 'all' | 'critical' | 'off';
+export type LedType = 'mono' | 'rgb';
+export type LedSignal = 'critical' | 'normal';
+export type LedPattern =
+  | 'disconnected'
+  | 'scanning'
+  | 'nobackend'
+  | 'connected'
+  | 'estop'
+  | 'estopclearing'
+  | 'estoprelease'
+  | 'error';
+
+export interface LedBrightness {
+  present: boolean; // Whether the board has this LED
+  critical: number; // Percent of the LED's full output
+  normal: number;
+}
+
+export interface LedSettings {
+  mode: LedMode;
+  mono: LedBrightness;
+  rgb: LedBrightness;
+  rgbWarnAbove: number; // RGB brightness (percent) above which the hub warns
+  previewMs: number; // How long a preview holds the LEDs after the last preview request
+}
+
+export async function fetchLedSettings(): Promise<LedSettings | null> {
+  try {
+    const res = await apiFetch('/api/led');
+    if (!res.ok) {
+      toast.error('Failed to load LED settings: ' + (await getErrorMessage(res)));
+      return null;
+    }
+    return (await res.json()) as LedSettings;
+  } catch {
+    toast.error('Failed to load LED settings');
+    return null;
+  }
+}
+
+export type LedSettingsPatch = Partial<
+  Record<'mode' | 'monoCritical' | 'monoNormal' | 'rgbCritical' | 'rgbNormal', string>
+>;
+
+// Any subset in one config write (PUT /api/led)
+export async function setLedSettings(params: LedSettingsPatch): Promise<boolean> {
+  try {
+    const res = await apiFetch('/api/led?' + new URLSearchParams(params), { method: 'PUT' });
+    if (!res.ok) {
+      toast.error('Failed to save LED settings: ' + (await getErrorMessage(res)));
+      return false;
+    }
+    return true;
+  } catch {
+    toast.error('Failed to save LED settings');
+    return false;
+  }
+}
+
+// Previews hold the LEDs for LedSettings.previewMs after the last request; nothing is saved.
+
+export async function previewLedPattern(pattern: LedPattern): Promise<void> {
+  try {
+    const res = await apiFetch('/api/led/preview?' + new URLSearchParams({ pattern }), {
+      method: 'POST',
+    });
+    if (!res.ok) toast.error('Failed to preview LED pattern: ' + (await getErrorMessage(res)));
+  } catch {
+    toast.error('Failed to preview LED pattern');
+  }
+}
+
+// `color` is RRGGBB. Silent on failure: called many times a second while dragging.
+export async function previewLedColor(
+  color: string,
+  options: { led?: LedType; brightness?: number } = {}
+): Promise<boolean> {
+  const params: Record<string, string> = { color };
+  if (options.led) params.led = options.led;
+  if (options.brightness !== undefined) params.brightness = String(options.brightness);
+  try {
+    const res = await apiFetch('/api/led/preview?' + new URLSearchParams(params), {
+      method: 'POST',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function stopLedPreview(): Promise<void> {
+  try {
+    await apiFetch('/api/led/preview', { method: 'DELETE' });
+  } catch {
+    // The preview ends on its own
+  }
+}

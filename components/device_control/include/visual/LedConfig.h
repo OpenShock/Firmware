@@ -6,6 +6,7 @@
 
 #include "config/Section.h"
 #include "enums/StatusLed.h"
+#include "util/FunctionRef.h"
 
 #include <cstdint>
 
@@ -43,7 +44,6 @@ namespace OpenShock::Config {
 
   [[nodiscard]] LedConfig GetLedConfig();
   bool SetLedConfig(const LedConfig& config);
-  bool SetLedMode(LedMode mode);
-  /// @brief `percent` is capped at LedConfig::kMaxBrightness.
-  bool SetLedBrightness(LedType type, LedSignal signal, uint8_t percent);
+  /// @brief Read-modify-write of the section (config/Section.h Update); brightness is capped at kMaxBrightness.
+  bool UpdateLedConfig(Util::FunctionRef<bool(LedConfig&)> update);
 }  // namespace OpenShock::Config

@@ -14,7 +14,7 @@ idf_component_register(
   REQUIRES      common esp_hal_gpio esp_driver_rmt freertos   # public headers (enums, gpio_types, rmt_tx/encoder, TaskHandle/QueueHandle)
                 config                                      # its config sections (radio/RFConfig.h, estop/EStopConfig.h): config/Section.h
   PRIV_REQUIRES chipset events led_drivers logging temporal protocols   # concurrency/util folded into common (public REQUIRE)
-                esp_driver_gpio esp_wifi esp_event esp_netif soc
+                esp_driver_gpio esp_wifi esp_event esp_netif esp_timer soc
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)

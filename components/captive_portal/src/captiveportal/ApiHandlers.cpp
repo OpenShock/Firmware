@@ -13,12 +13,15 @@ const char* const TAG = "CaptivePortalApi";
 #include "CommandHandler.h"
 #include "Convert.h"
 #include "enums/OtaUpdateChannel.h"
+#include "enums/StatusLed.h"
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
 #include "Logging.h"
 #include "OtaUpdateConfig.h"
 #include "RateLimiter.h"
 #include "util/TaskUtils.h"
+#include "visual/LedConfig.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -385,6 +388,203 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
   return sendResp(req, S200, nullptr, {});
 }
 
+// GET /api/led: the LED settings, which LEDs the board has, and the limits the UI shows
+static esp_err_t apiLedGet(httpd_req_t* req)
+{
+  namespace Vsm = OpenShock::VisualStateManager;
+
+  OpenShock::JSON::StringWriter writer;
+  json_gen_str_t* gen = writer.gen();
+  json_gen_start_object(gen);
+  OpenShock::JSON::objSetString(gen, "mode", LedModeName(Vsm::GetLedMode()));
+  for (LedType type : {LedType::Mono, LedType::Rgb}) {
+    const char* name = type == LedType::Mono ? "mono" : "rgb";
+    OpenShock::JSON::objBegin(gen, name);
+    json_gen_obj_set_bool(gen, "present", Vsm::HasLed(type));
+    json_gen_obj_set_int(gen, "critical", Vsm::GetLedBrightness(type, LedSignal::Critical));
+    json_gen_obj_set_int(gen, "normal", Vsm::GetLedBrightness(type, LedSignal::Normal));
+    OpenShock::JSON::objEnd(gen, name);
+  }
+  json_gen_obj_set_int(gen, "rgbWarnAbove", Vsm::kRgbBrightnessWarnPercent);
+  json_gen_obj_set_int(gen, "previewMs", static_cast<int>(Vsm::kPreviewDurationMs));
+  json_gen_end_object(gen);
+  std::string json = writer.finish();
+  return sendResp(req, S200, HTTP::ContentType::JSON, json);
+}
+
+// Reads an optional 0-100 percent query parameter; false (after responding) on an invalid value
+static bool parsePercentParam(httpd_req_t* req, const char* key, std::optional<uint8_t>& out, esp_err_t& response)
+{
+  auto str = getQueryParam(req, key);
+  if (!str) {
+    if (str.error() == ParamError::Missing) return true;
+    response = sendParamError(req, str.error());
+    return false;
+  }
+  auto value = Convert::ToUint8(*str);
+  if (!value || *value > Config::LedConfig::kMaxBrightness) {
+    response = sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    return false;
+  }
+  out = *value;
+  return true;
+}
+
+// PUT /api/led?mode=&monoCritical=&monoNormal=&rgbCritical=&rgbNormal=
+// Any subset of the LED settings, saved in one config write.
+static esp_err_t apiLedPut(httpd_req_t* req)
+{
+  std::optional<LedMode> mode;
+  auto modeStr = getQueryParam(req, "mode");
+  if (!modeStr && modeStr.error() != ParamError::Missing) {
+    return sendParamError(req, modeStr.error());
+  }
+  if (modeStr) {
+    mode = TryParseLedMode(*modeStr);
+    if (!mode) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+  }
+
+  std::optional<uint8_t> monoCritical, monoNormal, rgbCritical, rgbNormal;
+  esp_err_t response = ESP_OK;
+  if (!parsePercentParam(req, "monoCritical", monoCritical, response) || !parsePercentParam(req, "monoNormal", monoNormal, response) || !parsePercentParam(req, "rgbCritical", rgbCritical, response)
+      || !parsePercentParam(req, "rgbNormal", rgbNormal, response))
+  {
+    return response;
+  }
+
+  if (!mode && !monoCritical && !monoNormal && !rgbCritical && !rgbNormal) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  }
+
+  bool saved = VisualStateManager::UpdateLedConfig([&](Config::LedConfig& cfg) {
+    bool changed = false;
+    auto apply   = [&changed](auto& field, const auto& value) {
+      if (value && field != *value) {
+        field   = *value;
+        changed = true;
+      }
+    };
+    apply(cfg.mode, mode);
+    apply(cfg.monoCriticalBrightness, monoCritical);
+    apply(cfg.monoNormalBrightness, monoNormal);
+    apply(cfg.rgbCriticalBrightness, rgbCritical);
+    apply(cfg.rgbNormalBrightness, rgbNormal);
+    return changed;
+  });
+  if (!saved) {
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+  return sendResp(req, S200, nullptr, {});
+}
+
+static std::optional<VisualStateManager::LedPattern> parseLedPattern(std::string_view str)
+{
+  using VisualStateManager::LedPattern;
+  struct Entry {
+    std::string_view name;
+    LedPattern pattern;
+  };
+  static constexpr Entry kPatterns[] = {
+    {"disconnected", LedPattern::WiFiDisconnected},
+    {"scanning", LedPattern::WiFiScanning},
+    {"nobackend", LedPattern::NoBackend},
+    {"connected", LedPattern::Connected},
+    {"estop", LedPattern::EStopped},
+    {"estopclearing", LedPattern::EStopClearing},
+    {"estoprelease", LedPattern::EStopAwaitingRelease},
+    {"error", LedPattern::CriticalError},
+  };
+  for (const Entry& entry : kPatterns) {
+    if (StringIEquals(str, entry.name)) {
+      return entry.pattern;
+    }
+  }
+  return std::nullopt;
+}
+
+static std::optional<uint8_t> parseHexByte(std::string_view str)
+{
+  uint8_t value = 0;
+  for (char c : str) {
+    uint8_t digit;
+    if (c >= '0' && c <= '9') {
+      digit = c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+      digit = c - 'a' + 10;
+    } else if (c >= 'A' && c <= 'F') {
+      digit = c - 'A' + 10;
+    } else {
+      return std::nullopt;
+    }
+    value = static_cast<uint8_t>(value * 16 + digit);
+  }
+  return value;
+}
+
+// POST /api/led/preview?pattern=<name>
+// POST /api/led/preview?color=RRGGBB[&led=mono|rgb][&brightness=0-100]
+// Takes over the LEDs for VisualStateManager::kPreviewDurationMs after the last call; nothing is saved.
+static esp_err_t apiLedPreview(httpd_req_t* req)
+{
+  auto patternStr = getQueryParam(req, "pattern");
+  if (!patternStr && patternStr.error() != ParamError::Missing) {
+    return sendParamError(req, patternStr.error());
+  }
+  if (patternStr) {
+    auto pattern = parseLedPattern(*patternStr);
+    if (!pattern) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+    VisualStateManager::PreviewPattern(*pattern);
+    return sendResp(req, S200, nullptr, {});
+  }
+
+  auto colorStr = getQueryParam(req, "color");
+  if (!colorStr) {
+    return sendParamError(req, colorStr.error());
+  }
+  std::string_view color = *colorStr;
+  if (color.size() != 6) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+  }
+  auto red   = parseHexByte(color.substr(0, 2));
+  auto green = parseHexByte(color.substr(2, 2));
+  auto blue  = parseHexByte(color.substr(4, 2));
+  if (!red || !green || !blue) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+  }
+
+  std::optional<LedType> only;
+  auto ledStr = getQueryParam(req, "led");
+  if (!ledStr && ledStr.error() != ParamError::Missing) {
+    return sendParamError(req, ledStr.error());
+  }
+  if (ledStr) {
+    only = TryParseLedType(*ledStr);
+    if (!only) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+  }
+
+  std::optional<uint8_t> brightness;
+  esp_err_t response = ESP_OK;
+  if (!parsePercentParam(req, "brightness", brightness, response)) {
+    return response;
+  }
+
+  VisualStateManager::PreviewColor(*red, *green, *blue, only, brightness);
+  return sendResp(req, S200, nullptr, {});
+}
+
+// DELETE /api/led/preview: ends a preview early
+static esp_err_t apiLedPreviewStop(httpd_req_t* req)
+{
+  VisualStateManager::StopPreview();
+  return sendResp(req, S200, nullptr, {});
+}
+
 void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInstance* instance)
 {
   registerHandler(server, "/api/board", HTTP_GET, apiBoard, instance);
@@ -402,4 +602,8 @@ void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInst
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
   registerHandler(server, "/api/ota/settings", HTTP_PUT, apiOtaSettings, instance);
   registerHandler(server, "/api/ota/check", HTTP_POST, apiOtaCheck, instance);
+  registerHandler(server, "/api/led", HTTP_GET, apiLedGet, instance);
+  registerHandler(server, "/api/led", HTTP_PUT, apiLedPut, instance);
+  registerHandler(server, "/api/led/preview", HTTP_POST, apiLedPreview, instance);
+  registerHandler(server, "/api/led/preview", HTTP_DELETE, apiLedPreviewStop, instance);
 }

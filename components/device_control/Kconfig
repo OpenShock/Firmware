@@ -59,3 +59,35 @@ menu "OpenShock emergency stop"
             At most 16 samples fit the debounce history, hence the 5 ms floor.
 
 endmenu
+
+menu "OpenShock status LEDs"
+
+    # Defaults of the led config section; each is a percent of the LED's full output, changeable at runtime
+    # (serial `led brightness`, the captive portal). The RGB defaults match the 20/255 the hub always used:
+    # a WS2812B at full output is blinding.
+
+    config OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS
+        int "Built-in LED brightness for critical patterns (%)"
+        range 0 100
+        default 100
+        help
+            Brightness of the single-color LED for an E-Stop or a critical error.
+
+    config OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS
+        int "Built-in LED brightness for normal patterns (%)"
+        range 0 100
+        default 100
+
+    config OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS
+        int "RGB LED brightness for critical patterns (%)"
+        range 0 100
+        default 8
+        help
+            Brightness of the WS2812B RGB LED for an E-Stop or a critical error.
+
+    config OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS
+        int "RGB LED brightness for normal patterns (%)"
+        range 0 100
+        default 8
+
+endmenu

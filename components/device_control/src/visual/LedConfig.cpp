@@ -25,20 +25,21 @@ static constexpr const char* kKeyMonoNorm  = "monoNorm";
 static constexpr const char* kKeyRgbCrit   = "rgbCrit";
 static constexpr const char* kKeyRgbNorm   = "rgbNorm";
 
-// Today's levels: the mono LED at full output, the RGB LED at 20/255 (8%) since a WS2812B at full output is blinding
-static constexpr LedMode kDefaultMode       = LedMode::All;
-static constexpr uint8_t kDefaultMonoBright = 100;
-static constexpr uint8_t kDefaultRgbBright  = 8;
+static constexpr LedMode kDefaultMode           = LedMode::All;
+static constexpr uint8_t kDefaultMonoCritBright = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;
+static constexpr uint8_t kDefaultMonoNormBright = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
+static constexpr uint8_t kDefaultRgbCritBright  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
+static constexpr uint8_t kDefaultRgbNormBright  = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
 
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<LedConfig> s_section({.name = "led", .order = 7, .namespaces = kNamespaces});
 
 LedConfig::LedConfig()
   : mode(kDefaultMode)
-  , monoCriticalBrightness(kDefaultMonoBright)
-  , monoNormalBrightness(kDefaultMonoBright)
-  , rgbCriticalBrightness(kDefaultRgbBright)
-  , rgbNormalBrightness(kDefaultRgbBright)
+  , monoCriticalBrightness(kDefaultMonoCritBright)
+  , monoNormalBrightness(kDefaultMonoNormBright)
+  , rgbCriticalBrightness(kDefaultRgbCritBright)
+  , rgbNormalBrightness(kDefaultRgbNormBright)
 {
 }
 
@@ -78,10 +79,10 @@ bool LedConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  monoCriticalBrightness = json["monoCriticalBrightness"].tryGetU8().value_or(kDefaultMonoBright);
-  monoNormalBrightness   = json["monoNormalBrightness"].tryGetU8().value_or(kDefaultMonoBright);
-  rgbCriticalBrightness  = json["rgbCriticalBrightness"].tryGetU8().value_or(kDefaultRgbBright);
-  rgbNormalBrightness    = json["rgbNormalBrightness"].tryGetU8().value_or(kDefaultRgbBright);
+  monoCriticalBrightness = json["monoCriticalBrightness"].tryGetU8().value_or(kDefaultMonoCritBright);
+  monoNormalBrightness   = json["monoNormalBrightness"].tryGetU8().value_or(kDefaultMonoNormBright);
+  rgbCriticalBrightness  = json["rgbCriticalBrightness"].tryGetU8().value_or(kDefaultRgbCritBright);
+  rgbNormalBrightness    = json["rgbNormalBrightness"].tryGetU8().value_or(kDefaultRgbNormBright);
 
   return true;
 }
@@ -106,8 +107,9 @@ bool LedConfig::LoadNvs(const char* partition)
   }
 
   uint8_t storedMode = std::to_underlying(kDefaultMode);
-  bool ok = Nvs::Load(*handle, kKeyMode, storedMode, storedMode) && Nvs::Load(*handle, kKeyMonoCrit, monoCriticalBrightness, kDefaultMonoBright) && Nvs::Load(*handle, kKeyMonoNorm, monoNormalBrightness, kDefaultMonoBright)
-         && Nvs::Load(*handle, kKeyRgbCrit, rgbCriticalBrightness, kDefaultRgbBright) && Nvs::Load(*handle, kKeyRgbNorm, rgbNormalBrightness, kDefaultRgbBright);
+  bool ok = Nvs::Load(*handle, kKeyMode, storedMode, storedMode) && Nvs::Load(*handle, kKeyMonoCrit, monoCriticalBrightness, kDefaultMonoCritBright)
+         && Nvs::Load(*handle, kKeyMonoNorm, monoNormalBrightness, kDefaultMonoNormBright) && Nvs::Load(*handle, kKeyRgbCrit, rgbCriticalBrightness, kDefaultRgbCritBright)
+         && Nvs::Load(*handle, kKeyRgbNorm, rgbNormalBrightness, kDefaultRgbNormBright);
   if (!ok) {
     return false;
   }
@@ -141,18 +143,7 @@ bool OpenShock::Config::SetLedConfig(const LedConfig& config)
   return s_section.Set(config);
 }
 
-bool OpenShock::Config::SetLedMode(LedMode mode)
+bool OpenShock::Config::UpdateLedConfig(Util::FunctionRef<bool(LedConfig&)> update)
 {
-  return s_section.Update([&](LedConfig& led) {
-    led.mode = mode;
-    return true;
-  });
-}
-
-bool OpenShock::Config::SetLedBrightness(LedType type, LedSignal signal, uint8_t percent)
-{
-  return s_section.Update([&](LedConfig& led) {
-    led.Brightness(type, signal) = std::min(percent, LedConfig::kMaxBrightness);
-    return true;
-  });
+  return s_section.Update(update);
 }

@@ -1,8 +1,9 @@
 <script lang="ts" module>
-  import { Wifi, Zap, Cpu, User, Download } from '@lucide/svelte';
+  import { Wifi, Zap, Cpu, User, Download, Lightbulb } from '@lucide/svelte';
   import type { Component } from 'svelte';
 
-  export type AdvancedSection = 'menu' | 'wifi' | 'shocker' | 'hardware' | 'account' | 'ota';
+  export type AdvancedSection =
+    'menu' | 'wifi' | 'shocker' | 'hardware' | 'account' | 'ota' | 'leds';
 
   interface AdvancedSectionDef {
     id: AdvancedSection;
@@ -18,6 +19,7 @@
     { id: 'hardware', label: 'Hardware', description: 'GPIO pin configuration', icon: Cpu },
     { id: 'account', label: 'Account', description: 'Link to OpenShock', icon: User },
     { id: 'ota', label: 'Updates', description: 'OTA update settings', icon: Download },
+    { id: 'leds', label: 'LEDs', description: 'Status LED mode and brightness', icon: Lightbulb },
   ];
 </script>
 
@@ -27,6 +29,7 @@
   import TestStep from '#lib/components/steps/TestStep.svelte';
   import WiFiStep from '#lib/components/steps/WiFiStep.svelte';
   import OtaSection from '#lib/components/sections/OtaSection.svelte';
+  import LedSection from '#lib/components/sections/LedSection.svelte';
   import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { ViewModeStore } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
@@ -108,6 +111,8 @@
           <AccountStep />
         {:else if shownSection === 'ota'}
           <OtaSection />
+        {:else if shownSection === 'leds'}
+          <LedSection />
         {/if}
       </div>
     </div>
