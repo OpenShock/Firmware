@@ -18,16 +18,10 @@ const char* const TAG = "RGBLedDriver";
 
 using namespace OpenShock;
 
-// Dithering: the WS2812B takes 8 bits per color. The driver shows 10 by sending 4 frames that each round a channel
-// down or up to a neighbouring 8-bit level, so their average lands on the quarter step in between, and has the RMT
-// hardware repeat those 4 frames on its own (a looped transmission) for as long as the color holds: no CPU work after
-// apply(). A looped transmission must fit in the channel's RMT memory with an end marker, so the channel takes several
-// memory blocks. Blocks are contiguous and channels are taken lowest first, so this channel (created before the RF
-// transmitter's) occupies the blocks of the channels after it; that leaves the RF transmitter a channel only on chips
-// with more transmit channels than those blocks. On the others (ESP32-C3) the LED rounds to 8 bits.
-static constexpr std::size_t kLoopSymbols   = 4 * 24 + 1;  // 4 frames and the end marker
-static constexpr std::size_t kLoopMemBlocks = (kLoopSymbols + SOC_RMT_MEM_WORDS_PER_CHANNEL - 1) / SOC_RMT_MEM_WORDS_PER_CHANNEL;
-static constexpr bool kLoopDitherFits       = CONFIG_OPENSHOCK_RGB_LED_DITHERING && kLoopMemBlocks < RMT_LL_TX_CANDIDATES_PER_INST;
+// Dithering: the WS2812B takes 8 bits per color. The driver shows more by sending kDitherFrames frames that each round
+// a channel down or up to a neighbouring 8-bit level, so their average lands on the step in between (kDitherFrames = 4:
+// quarter steps, 10-bit output), and has the RMT hardware repeat them on its own (a looped transmission) for as long
+// as the color holds: no CPU work after apply().
 
 // Low time after each frame so the LED latches it: over 280 us for the WS2812B-V5 (older parts need 50 us)
 static constexpr uint16_t kLatchTicks = 3000;  // 300 us at 10 MHz
@@ -66,6 +60,14 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin, uint16_t brightness)
     .intr_priority     = 0,                              // 0 => driver picks a low/medium priority
     .flags             = {},
   };
+  // A looped transmission must fit in the channel's RMT memory with an end marker, so the channel takes several memory
+  // blocks. Blocks are contiguous and channels are taken lowest first, so this channel (created before the RF
+  // transmitter's) occupies the blocks of the channels after it; that leaves the RF transmitter a channel only on chips
+  // with more transmit channels than those blocks. On the others (ESP32-C3) the LED rounds to 8 bits.
+  constexpr std::size_t kLoopSymbols   = kSymbolsPerFrame * kDitherFrames + 1;  // The frames and the end marker
+  constexpr std::size_t kLoopMemBlocks = (kLoopSymbols + SOC_RMT_MEM_WORDS_PER_CHANNEL - 1) / SOC_RMT_MEM_WORDS_PER_CHANNEL;
+  constexpr bool kLoopDitherFits       = CONFIG_OPENSHOCK_RGB_LED_DITHERING && kLoopMemBlocks < RMT_LL_TX_CANDIDATES_PER_INST;
+
   esp_err_t err = ESP_FAIL;
   if constexpr (kLoopDitherFits) {
     // Enough memory blocks for the dither frames; on failure, fall back to one block and 8-bit output
@@ -151,32 +153,33 @@ void RgbLedDriver::apply(const RGBState16& state)
   const uint32_t brightness = m_brightness.load();
   const uint16_t channels[] = {state.red, state.green, state.blue};
 
-  // Each channel in quarter steps of the LED's 8-bit levels (0-1020): the 8-bit level and a 2-bit fraction
-  std::array<uint32_t, 3> quarters;
+  // Each channel in 1/kDitherFrames steps of the LED's 8-bit levels: the 8-bit level and a fraction of kDitherFrames
+  constexpr uint32_t kSteps = kDitherFrames;
+  std::array<uint32_t, 3> steps;
   bool fractional = false;
-  for (std::size_t i = 0; i < quarters.size(); ++i) {
+  for (std::size_t i = 0; i < steps.size(); ++i) {
     const uint32_t value = channels[i] * brightness / 65535;  // 0-65535
-    quarters[i]          = (value * 1020 + 32767) / 65535;
-    fractional |= (quarters[i] & 3) != 0;
+    steps[i]             = (value * (255 * kSteps) + 32767) / 65535;
+    fractional |= (steps[i] % kSteps) != 0;
   }
 
   if (!m_canLoop || !fractional) {
     // A whole 8-bit color (or no room to loop): one frame, the nearest level
-    auto level = [](uint32_t q) { return static_cast<uint8_t>(std::min<uint32_t>((q + 2) >> 2, 255)); };
-    encodeFrame(0, level(quarters[0]), level(quarters[1]), level(quarters[2]), false);
+    auto level = [](uint32_t step) { return static_cast<uint8_t>(std::min<uint32_t>((step + kSteps / 2) / kSteps, 255)); };
+    encodeFrame(0, level(steps[0]), level(steps[1]), level(steps[2]), false);
     transmit(1, false);
     return;
   }
 
-  // Spread each channel's fraction over the 4 frames: 1/4 is one frame a level up, 2/4 every other frame, 3/4 three
+  // Spread each channel's fraction over the frames: with 4, 1/4 is one frame a level up, 2/4 every other frame, 3/4 three
   std::array<uint32_t, 3> error = {};
   for (std::size_t frame = 0; frame < kDitherFrames; ++frame) {
     std::array<uint8_t, 3> out;
     for (std::size_t i = 0; i < out.size(); ++i) {
-      error[i] += quarters[i] & 3;
-      const uint32_t up = error[i] >= 4 ? 1 : 0;
-      error[i] -= up * 4;
-      out[i] = static_cast<uint8_t>((quarters[i] >> 2) + up);  // At most 254 + 1: a whole 255 has no fraction
+      error[i] += steps[i] % kSteps;
+      const uint32_t up = error[i] >= kSteps ? 1 : 0;
+      error[i] -= up * kSteps;
+      out[i] = static_cast<uint8_t>(steps[i] / kSteps + up);  // At most 254 + 1: a whole 255 has no fraction
     }
     encodeFrame(frame, out[0], out[1], out[2], true);
   }

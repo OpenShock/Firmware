@@ -66,7 +66,7 @@ namespace OpenShock {
 
   private:
     static constexpr std::size_t kSymbolsPerFrame = 24;  // 24 bits per LED (8 bits per color * 3 colors)
-    static constexpr std::size_t kDitherFrames    = 4;   // 2 bits below the LED's 8: 10-bit output
+    static constexpr std::size_t kDitherFrames    = 4;   // Steps between two 8-bit levels: 4 is 2 bits more, 10-bit output
 
     void encodeFrame(std::size_t index, uint8_t red, uint8_t green, uint8_t blue, bool latchGap);
     void transmit(std::size_t frames, bool loop);
