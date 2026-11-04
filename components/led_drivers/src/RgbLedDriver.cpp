@@ -39,7 +39,14 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin, uint16_t brightness)
   , m_canLoop(false)
   , m_looping(false)
   , m_frames()
+  , m_latchSymbol()
 {
+  // Low for the latch time. Both halves low; a duration of 0 would mark the end of the data.
+  m_latchSymbol.level0    = 0;
+  m_latchSymbol.duration0 = kLatchTicks;
+  m_latchSymbol.level1    = 0;
+  m_latchSymbol.duration1 = 1;
+
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
     return;
@@ -251,14 +258,34 @@ void RgbLedDriver::encodeFrame(std::size_t index, uint8_t r, uint8_t g, uint8_t 
   }
 }
 
+// Aborts whatever the channel is sending, then holds the line low long enough for the LED to latch. The latch is the
+// point: a transmission cut off mid-frame, or in the low gap after a frame before the LED latched it, would otherwise
+// run straight into the next frame's bits. The LED takes those as the rest of the frame it already has, so it shows a
+// stale frame and passes the new color on to an LED that isn't there. With a looped dither, at low brightness, that
+// stale frame is a whole 8-bit level off the color (often black, or several times too bright), and it stays until the
+// next change.
+void RgbLedDriver::abortAndLatch()
+{
+  rmt_disable(m_rmtChannel);
+  rmt_enable(m_rmtChannel);
+  m_looping = false;
+
+  rmt_transmit_config_t txConfig = {};
+  txConfig.flags.eot_level       = 0;
+  esp_err_t err                  = rmt_transmit(m_rmtChannel, m_rmtEncoder, &m_latchSymbol, sizeof(m_latchSymbol), &txConfig);
+  if (err == ESP_OK) {
+    err = rmt_tx_wait_all_done(m_rmtChannel, 10);
+  }
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to latch the RGB LED after an abort: %s", esp_err_to_name(err));
+  }
+}
+
 bool RgbLedDriver::transmit(std::size_t frames, bool loop)
 {
-  // A looped transmission never finishes on its own; stopping the channel ends it (possibly mid-frame, which the next
-  // frame overwrites within a millisecond)
+  // A looped transmission never finishes on its own; stopping the channel ends it, at any point in a frame
   if (m_looping) {
-    rmt_disable(m_rmtChannel);
-    rmt_enable(m_rmtChannel);
-    m_looping = false;
+    abortAndLatch();
   }
 
   rmt_transmit_config_t txConfig = {};
@@ -277,8 +304,7 @@ bool RgbLedDriver::transmit(std::size_t frames, bool loop)
   // Blocking, wait up to 10ms for the frame
   if (rmt_tx_wait_all_done(m_rmtChannel, 10) != ESP_OK) {
     // Abort the frame still in flight before the buffer is rewritten for the next one
-    rmt_disable(m_rmtChannel);
-    rmt_enable(m_rmtChannel);
+    abortAndLatch();
     return false;
   }
   return true;

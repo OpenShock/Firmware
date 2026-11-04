@@ -72,6 +72,7 @@ namespace OpenShock {
 
     void encodeFrame(std::size_t index, uint8_t red, uint8_t green, uint8_t blue, bool latchGap);
     bool transmit(std::size_t frames, bool loop);  // False when the frames may not have gone out
+    void abortAndLatch();                          // Stops the channel mid-transmission, then lets the LED latch
 
     gpio_num_t m_gpioPin;
     bool m_swapRg;  // Board wants RGB rather than GRB wire order; decided once, apply() runs on the pattern task
@@ -82,5 +83,6 @@ namespace OpenShock {
     bool m_looping;  // Pattern task only; a looped transmission is running and must be stopped before the next one
     // The frames RMT reads from. A member, not a local: after a timed-out wait the transmission may still be reading it.
     std::array<rmt_symbol_word_t, kSymbolsPerFrame * kDitherFrames> m_frames;
+    rmt_symbol_word_t m_latchSymbol;  // The line held low, sent after an abort; a member for the same reason
   };
 }  // namespace OpenShock
