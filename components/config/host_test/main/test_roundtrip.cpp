@@ -103,6 +103,16 @@ TEST_CASE("An unknown LED mode from a caller is reset to the default", "[config]
   TEST_ASSERT_EQUAL_UINT8(std::to_underlying(LedMode::All), std::to_underlying(Config::GetLedConfig().mode));
 }
 
+TEST_CASE("An unknown OTA update channel from a caller is reset to stable", "[config][roundtrip]")
+{
+  InitDefault();
+
+  Config::OtaUpdateConfig ota = Config::GetOtaUpdateConfig();
+  ota.updateChannel           = static_cast<OtaUpdateChannel>(9);
+  TEST_ASSERT_TRUE(Config::SetOtaUpdateConfig(ota));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateChannel::Stable), std::to_underlying(Config::GetOtaUpdateConfig().updateChannel));
+}
+
 TEST_CASE("Removed credentials are gone after a reload and their ids can be reused", "[config][roundtrip]")
 {
   InitDefault();

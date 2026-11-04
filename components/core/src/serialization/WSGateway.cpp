@@ -3,6 +3,7 @@
 const char* const TAG = "WSGateway";
 
 #include <esp_wifi.h>
+#include <optional>
 #include <utility>
 
 #include "Logging.h"
@@ -44,10 +45,20 @@ bool Gateway::SerializePongMessage(Common::SerializationCallbackFn callback)
   return finishMessage(builder, Gateway::HubToGatewayMessagePayload::Pong, pong, callback);
 }
 
-// SerializeBootStatusMessage casts between these by value, and the gateway protocol must stay compatible
-static_assert(std::to_underlying(OpenShock::FirmwareBootType::Normal) == std::to_underlying(Types::FirmwareBootType::Normal));
-static_assert(std::to_underlying(OpenShock::FirmwareBootType::NewFirmware) == std::to_underlying(Types::FirmwareBootType::NewFirmware));
-static_assert(std::to_underlying(OpenShock::FirmwareBootType::Rollback) == std::to_underlying(Types::FirmwareBootType::Rollback));
+// Exhaustive with no default on purpose: -Werror=switch fails the build when FirmwareBootType gains a value that is not
+// mapped here. Any other value (a caller can pass anything) falls out as nullopt.
+static std::optional<Types::FirmwareBootType> toSchemaBootType(OpenShock::FirmwareBootType bootType)
+{
+  switch (bootType) {
+    case OpenShock::FirmwareBootType::Normal:
+      return Types::FirmwareBootType::Normal;
+    case OpenShock::FirmwareBootType::NewFirmware:
+      return Types::FirmwareBootType::NewFirmware;
+    case OpenShock::FirmwareBootType::Rollback:
+      return Types::FirmwareBootType::Rollback;
+  }
+  return std::nullopt;
+}
 
 // Empty prerelease/build stay absent from the message rather than going out as "" (both messages the same way)
 static flatbuffers::Offset<Types::SemVer> createSemVer(flatbuffers::FlatBufferBuilder& builder, const OpenShock::SemVer& version)
@@ -68,7 +79,14 @@ bool Gateway::SerializeBootStatusMessage(int32_t updateId, OpenShock::FirmwareBo
 
   auto fbsVersion = createSemVer(builder, OpenShock::Constants::FirmwareVersion());
 
-  auto fbsBootStatus = Gateway::CreateBootStatus(builder, static_cast<Types::FirmwareBootType>(bootType), fbsVersion, updateId);
+  auto fbsBootType = toSchemaBootType(bootType);
+  if (!fbsBootType) {
+    // Normal is what AppHooks reports when it can't tell; not sending a boot status at all would leave the gateway
+    // without one
+    OS_LOGE(TAG, "Unknown firmware boot type %u, reporting normal", static_cast<unsigned>(std::to_underlying(bootType)));
+  }
+
+  auto fbsBootStatus = Gateway::CreateBootStatus(builder, fbsBootType.value_or(Types::FirmwareBootType::Normal), fbsVersion, updateId);
 
   return finishMessage(builder, Gateway::HubToGatewayMessagePayload::BootStatus, fbsBootStatus, callback);
 }

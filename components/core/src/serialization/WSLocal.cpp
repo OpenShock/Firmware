@@ -66,10 +66,20 @@ static flatbuffers::Offset<OpenShock::Serialization::Types::WifiNetwork> createW
   return Types::CreateWifiNetworkDirect(builder, network.ssid, bssid.data(), network.channel, network.rssi, authMode, network.IsSaved());
 }
 
-// createOtaSettings casts between these by value
-static_assert(std::to_underlying(OpenShock::OtaUpdateChannel::Stable) == std::to_underlying(Local::OtaChannel::Stable));
-static_assert(std::to_underlying(OpenShock::OtaUpdateChannel::Beta) == std::to_underlying(Local::OtaChannel::Beta));
-static_assert(std::to_underlying(OpenShock::OtaUpdateChannel::Develop) == std::to_underlying(Local::OtaChannel::Develop));
+// Exhaustive with no default on purpose: -Werror=switch fails the build when OtaUpdateChannel gains a value that is not
+// mapped here. Any other value (a caller can pass anything) falls out as nullopt.
+static std::optional<Local::OtaChannel> toSchemaOtaChannel(OpenShock::OtaUpdateChannel channel)
+{
+  switch (channel) {
+    case OpenShock::OtaUpdateChannel::Stable:
+      return Local::OtaChannel::Stable;
+    case OpenShock::OtaUpdateChannel::Beta:
+      return Local::OtaChannel::Beta;
+    case OpenShock::OtaUpdateChannel::Develop:
+      return Local::OtaChannel::Develop;
+  }
+  return std::nullopt;
+}
 
 static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::FlatBufferBuilder& builder)
 {
@@ -77,7 +87,14 @@ static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::Fl
 
   auto cdnDomain = builder.CreateString(ota.cdnDomain);
 
-  return Local::CreateOtaSettings(builder, ota.isEnabled, cdnDomain, static_cast<Local::OtaChannel>(ota.updateChannel), ota.checkInterval, ota.allowBackendManagement, ota.requireManualApproval);
+  auto channel = toSchemaOtaChannel(ota.updateChannel);
+  if (!channel) {
+    // The hub follows no channel for one it doesn't know (its update check fails). Stable gives the portal a real
+    // choice to show, and saving it from there repairs the config.
+    OS_LOGE(TAG, "Unknown OTA update channel %u, reporting stable", static_cast<unsigned>(std::to_underlying(ota.updateChannel)));
+  }
+
+  return Local::CreateOtaSettings(builder, ota.isEnabled, cdnDomain, channel.value_or(Local::OtaChannel::Stable), ota.checkInterval, ota.allowBackendManagement, ota.requireManualApproval);
 }
 
 // createLedSettings casts between these by value

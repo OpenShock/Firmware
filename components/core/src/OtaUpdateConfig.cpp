@@ -107,6 +107,21 @@ void OtaUpdateConfig::ToJSON(json_gen_str_t* gen, const char* name, bool withSen
 
 void OtaUpdateConfig::Normalize()
 {
+  // A caller can hand the section any value. Exhaustive with no default: -Werror=switch fails the build when
+  // OtaUpdateChannel gains a value not listed here.
+  const bool knownChannel = [this] {
+    switch (updateChannel) {
+      case OtaUpdateChannel::Stable:
+      case OtaUpdateChannel::Beta:
+      case OtaUpdateChannel::Develop:
+        return true;
+    }
+    return false;
+  }();
+  if (!knownChannel) {
+    OS_LOGW(TAG, "Unknown OTA update channel %u, using stable", static_cast<unsigned>(std::to_underlying(updateChannel)));
+    updateChannel = OtaUpdateChannel::Stable;
+  }
   if (checkInterval == 0) {
     OS_LOGW(TAG, "A zero update check interval is not allowed, using the default");
     checkInterval = kDefaultCheckInterval;
