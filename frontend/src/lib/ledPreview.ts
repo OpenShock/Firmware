@@ -5,6 +5,7 @@ import { LedPreviewStopMessage } from '#lib/_fbs/open-shock/serialization/local/
 import { LedTarget } from '#lib/_fbs/open-shock/serialization/local/led-target.js';
 import { LocalToHubMessagePayload } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message-payload.js';
 import { LocalToHubMessage } from '#lib/_fbs/open-shock/serialization/local/local-to-hub-message.js';
+import { packRgb10, type Rgb } from '#lib/utils/color.js';
 import { ConnectionState, WebSocketClient } from '#lib/WebSocketClient.js';
 import { Builder as FlatbufferBuilder } from 'flatbuffers';
 
@@ -39,29 +40,6 @@ export function stopLedPreview(): boolean {
     LedPreviewStopMessage.startLedPreviewStopMessage(fbb);
     return LedPreviewStopMessage.endLedPreviewStopMessage(fbb);
   });
-}
-
-/** A color with each channel 0-1. Packed as RGB10 on the wire; the hub dithers the RGB LED beyond its 8 bits. */
-export interface Rgb {
-  r: number;
-  g: number;
-  b: number;
-}
-
-/** An RRGGBB hex color. */
-export function hexToRgb(hex: string): Rgb {
-  const value = parseInt(hex, 16);
-  return {
-    r: ((value >> 16) & 0xff) / 255,
-    g: ((value >> 8) & 0xff) / 255,
-    b: (value & 0xff) / 255,
-  };
-}
-
-// RGB10 packed: red in bits 20-29, green 10-19, blue 0-9. `>>> 0` keeps it an unsigned 32-bit number.
-function packRgb10({ r, g, b }: Rgb): number {
-  const ch = (v: number) => Math.min(1023, Math.max(0, Math.round(v * 1023)));
-  return ((ch(r) << 20) | (ch(g) << 10) | ch(b)) >>> 0;
 }
 
 export interface LedColorPreview {

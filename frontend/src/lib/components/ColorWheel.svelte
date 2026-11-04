@@ -1,6 +1,6 @@
 <script lang="ts">
   // Hue around the ring, saturation from the center out; value is always full (brightness is set separately).
-  import type { Rgb } from '#lib/ledPreview.js';
+  import type { Rgb } from '#lib/utils/color.js';
 
   interface Props {
     color?: string; // RRGGBB, for showing the pick

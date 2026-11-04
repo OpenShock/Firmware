@@ -6,13 +6,12 @@
   import {
     LedPreviewPattern,
     LedTarget,
-    hexToRgb,
     previewLedColor,
     previewLedPattern,
     stopLedPreview,
-    type Rgb,
   } from '#lib/ledPreview.js';
   import type { LedMode } from '#lib/mappers/ConfigMapper.js';
+  import { hexToRgb, type Rgb } from '#lib/utils/color.js';
   import { hubState } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { Label } from '@openshock/svelte-core/components/ui/label';
