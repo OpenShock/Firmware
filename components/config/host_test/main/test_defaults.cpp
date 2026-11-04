@@ -56,7 +56,12 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   // The host-test board has no E-Stop pin, so E-Stop defaults to off.
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_ESTOP_PIN, config.estop.gpioPin);
   TEST_ASSERT_FALSE(config.estop.enabled);
-  TEST_ASSERT_TRUE(config.led.statusEnabled);
+  // Today's LED levels: mono at full output, RGB at 20/255
+  TEST_ASSERT_EQUAL_INT(static_cast<int>(LedMode::All), static_cast<int>(config.led.mode));
+  TEST_ASSERT_EQUAL_UINT8(100, config.led.monoCriticalBrightness);
+  TEST_ASSERT_EQUAL_UINT8(100, config.led.monoNormalBrightness);
+  TEST_ASSERT_EQUAL_UINT8(8, config.led.rgbCriticalBrightness);
+  TEST_ASSERT_EQUAL_UINT8(8, config.led.rgbNormalBrightness);
 }
 
 TEST_CASE("An empty store reads as the defaults and Init writes nothing", "[config][defaults]")

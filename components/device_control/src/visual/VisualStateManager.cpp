@@ -18,6 +18,7 @@ const char* const TAG = "VisualStateManager";
 #include <esp_netif.h>
 #include <esp_wifi.h>
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 
@@ -36,8 +37,8 @@ const uint32_t kWiFiScanningFlag                 = 1 << 7;
 // Bitmask of when the system is running normally
 const uint32_t kStatusOKMask = kWebSocketConnectedFlag | kHasIpAddressFlag | kWiFiConnectedFlag;
 
-// Still shown with the status LEDs turned off: a stopped or failing hub must stay visible
-const uint32_t kAlwaysShownMask = kCriticalErrorFlag | kEmergencyStoppedFlag | kEmergencyStopActiveClearingFlag | kEmergencyStopAwaitingReleaseFlag;
+// Critical states: shown in LedMode::CriticalOnly and at the critical brightness. Their patterns win over every other
+const uint32_t kCriticalMask = kCriticalErrorFlag | kEmergencyStoppedFlag | kEmergencyStopActiveClearingFlag | kEmergencyStopAwaitingReleaseFlag;
 
 // 32-bit so the atomic is lock-free. Both need seq_cst so a state change during the LED test isn't lost.
 static std::atomic<uint32_t> s_stateFlags = 0;
@@ -45,7 +46,32 @@ static std::atomic<bool> s_ledTestActive  = false;  // While set, the LED test o
 static OpenShock::SimpleMutex s_applyMutex;         // Serializes reading the flags with applying them, so an older snapshot can't land last
 static std::unique_ptr<OpenShock::MonoLedDriver> s_monoLedDriver;
 static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
-static std::atomic<bool> s_statusEnabled = true;  // The `led` section's statusEnabled, loaded in Init
+
+// The `led` section's settings, loaded in Init. Each is atomic on its own; a setter re-applies after storing, so a mix
+// of old and new values read mid-update is replaced at once.
+static std::atomic<OpenShock::LedMode> s_ledMode = OpenShock::LedMode::All;
+static std::atomic<uint8_t> s_monoCriticalBrightness = 100;  // Percent of full output
+static std::atomic<uint8_t> s_monoNormalBrightness   = 100;
+static std::atomic<uint8_t> s_rgbCriticalBrightness  = 8;
+static std::atomic<uint8_t> s_rgbNormalBrightness    = 8;
+
+// RGB brightness above this gets a warning: a WS2812B is glaring well before full output
+static constexpr uint8_t kRgbBrightnessWarnPercent = 30;
+
+static std::atomic<uint8_t>& brightnessSetting(OpenShock::LedType type, OpenShock::LedSignal signal)
+{
+  bool critical = signal == OpenShock::LedSignal::Critical;
+  if (type == OpenShock::LedType::Mono) {
+    return critical ? s_monoCriticalBrightness : s_monoNormalBrightness;
+  }
+  return critical ? s_rgbCriticalBrightness : s_rgbNormalBrightness;
+}
+
+// Percent (0-100) to the drivers' 0-255 scale, rounded
+static inline uint8_t toDriverBrightness(uint8_t percent)
+{
+  return static_cast<uint8_t>((static_cast<uint32_t>(percent) * 255 + 50) / 100);
+}
 
 // Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
 // SetCriticalError, SetScanningStarted) each see their own change and none is missed.
@@ -236,23 +262,32 @@ static void updateVisualStateRGB(uint32_t flags)
   s_rgbLedDriver->SetPattern(kWiFiDisconnectedRGBPattern);
 }
 
-// `showAll` ignores the status LED setting, for the LED test.
+// `showAll` ignores the LED mode, for the LED test; the brightness settings still apply.
 static void applyVisualState(uint32_t flags, bool showAll = false)
 {
   bool gpioActive = s_monoLedDriver != nullptr;
   bool rgbActive  = s_rgbLedDriver != nullptr;
 
-  if (!showAll && !s_statusEnabled.load()) {
-    flags &= kAlwaysShownMask;
-    if (flags == 0) {
-      if (gpioActive) {
-        s_monoLedDriver->SetPattern(kSolidOffPattern);
-      }
-      if (rgbActive) {
-        s_rgbLedDriver->SetPattern(kSolidOffRGBPattern);
-      }
-      return;
+  bool critical = (flags & kCriticalMask) != 0;
+  LedMode mode  = showAll ? LedMode::All : s_ledMode.load();
+  if (mode == LedMode::Off || (mode == LedMode::CriticalOnly && !critical)) {
+    if (gpioActive) {
+      s_monoLedDriver->SetPattern(kSolidOffPattern);
     }
+    if (rgbActive) {
+      s_rgbLedDriver->SetPattern(kSolidOffRGBPattern);
+    }
+    return;
+  }
+
+  // Before SetPattern: the pattern task applies the brightness with each step, and SetPattern restarts the pattern,
+  // so even a long solid step picks up a new brightness at once
+  LedSignal signal = critical ? LedSignal::Critical : LedSignal::Normal;
+  if (gpioActive) {
+    s_monoLedDriver->SetBrightness(toDriverBrightness(brightnessSetting(LedType::Mono, signal).load()));
+  }
+  if (rgbActive) {
+    s_rgbLedDriver->SetBrightness(toDriverBrightness(brightnessSetting(LedType::Rgb, signal).load()));
   }
 
   if (gpioActive && rgbActive) {
@@ -421,7 +456,6 @@ bool VisualStateManager::Init()
         OS_LOGE(TAG, "Failed to initialize RGB LED manager");
         return false;
       }
-      s_rgbLedDriver->SetBrightness(20);
       ledActive = true;
     }
   }
@@ -431,7 +465,13 @@ bool VisualStateManager::Init()
     return true;
   }
 
-  s_statusEnabled.store(Config::GetLedStatusEnabled());
+  const Config::LedConfig ledConfig = Config::GetLedConfig();
+  s_ledMode.store(ledConfig.mode);
+  for (LedType type : {LedType::Mono, LedType::Rgb}) {
+    for (LedSignal signal : {LedSignal::Critical, LedSignal::Normal}) {
+      brightnessSetting(type, signal).store(ledConfig.Brightness(type, signal));
+    }
+  }
 
   esp_err_t err;
 
@@ -459,19 +499,44 @@ bool VisualStateManager::Init()
   return true;
 }
 
-bool VisualStateManager::GetStatusLedsEnabled()
+LedMode VisualStateManager::GetLedMode()
 {
-  return s_statusEnabled.load();
+  return s_ledMode.load();
 }
 
-bool VisualStateManager::SetStatusLedsEnabled(bool enabled)
+bool VisualStateManager::SetLedMode(LedMode mode)
 {
-  if (!Config::SetLedStatusEnabled(enabled)) {
-    OS_LOGE(TAG, "Failed to save the status LED setting to config");
+  if (!Config::SetLedMode(mode)) {
+    OS_LOGE(TAG, "Failed to save the LED mode to config");
     return false;
   }
 
-  if (s_statusEnabled.exchange(enabled) != enabled) {
+  if (s_ledMode.exchange(mode) != mode) {
+    updateVisualState();
+  }
+
+  return true;
+}
+
+uint8_t VisualStateManager::GetLedBrightness(LedType type, LedSignal signal)
+{
+  return brightnessSetting(type, signal).load();
+}
+
+bool VisualStateManager::SetLedBrightness(LedType type, LedSignal signal, uint8_t percent)
+{
+  percent = std::min(percent, Config::LedConfig::kMaxBrightness);
+
+  if (!Config::SetLedBrightness(type, signal, percent)) {
+    OS_LOGE(TAG, "Failed to save the LED brightness to config");
+    return false;
+  }
+
+  if (type == LedType::Rgb && percent > kRgbBrightnessWarnPercent) {
+    OS_LOGW(TAG, "RGB LED brightness set to %u%%: above %u%% a WS2812B is glaring and runs warm", percent, kRgbBrightnessWarnPercent);
+  }
+
+  if (brightnessSetting(type, signal).exchange(percent) != percent) {
     updateVisualState();
   }
 
@@ -527,16 +592,12 @@ void VisualStateManager::RunLedTest()
       vTaskDelay(pdMS_TO_TICKS(20));
     }
 
-    // Restore default brightness
-    s_monoLedDriver->SetBrightness(255);
     s_monoLedDriver->ClearPattern();
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 
   // --- Phase 2: RGB LED color test ---
   if (s_rgbLedDriver != nullptr) {
-    uint8_t savedBrightness = 20;  // default from Init()
-
     s_rgbLedDriver->SetBrightness(255);
 
     OS_LOGI(TAG, "  [RGB] Red");
@@ -596,7 +657,6 @@ void VisualStateManager::RunLedTest()
       vTaskDelay(pdMS_TO_TICKS(20));
     }
 
-    s_rgbLedDriver->SetBrightness(savedBrightness);
     s_rgbLedDriver->ClearPattern();
     vTaskDelay(pdMS_TO_TICKS(500));
   }

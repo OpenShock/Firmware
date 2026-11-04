@@ -1,15 +1,21 @@
 #pragma once
 
+#include "enums/StatusLed.h"
+
 #include <cstdint>
 
 namespace OpenShock::VisualStateManager {
   [[nodiscard]] bool Init();
 
-  /// @brief Whether the status LEDs show the hub's state. When off, they only light up for an active E-Stop or a
-  ///        critical error.
-  [[nodiscard]] bool GetStatusLedsEnabled();
-  /// @brief Saves the setting to the `led` config section and applies it at once.
-  bool SetStatusLedsEnabled(bool enabled);
+  // The setters save to the `led` config section and apply the change at once.
+
+  [[nodiscard]] LedMode GetLedMode();
+  bool SetLedMode(LedMode mode);
+
+  /// @brief Percent of the LED's full output (0-100) for patterns of `signal`.
+  [[nodiscard]] uint8_t GetLedBrightness(LedType type, LedSignal signal);
+  /// @brief `percent` is capped at 100. Logs a warning for an RGB brightness above 30%.
+  bool SetLedBrightness(LedType type, LedSignal signal, uint8_t percent);
 
   void SetCriticalError();
   void SetScanningStarted();

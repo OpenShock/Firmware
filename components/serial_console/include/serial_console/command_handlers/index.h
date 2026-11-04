@@ -21,7 +21,7 @@ namespace OpenShock::SerialCmds::CommandHandlers {
   OpenShock::SerialCmds::CommandGroup RfTransmitHandler();
   OpenShock::SerialCmds::CommandGroup FactoryResetHandler();
   OpenShock::SerialCmds::CommandGroup LedTestHandler();
-  OpenShock::SerialCmds::CommandGroup StatusLedHandler();
+  OpenShock::SerialCmds::CommandGroup LedHandler();
 
   inline std::vector<OpenShock::SerialCmds::CommandGroup> AllCommandHandlers()
   {
@@ -43,7 +43,7 @@ namespace OpenShock::SerialCmds::CommandHandlers {
       RfTransmitHandler(),
       FactoryResetHandler(),
       LedTestHandler(),
-      StatusLedHandler(),
+      LedHandler(),
     };
     // clang-format on
   }

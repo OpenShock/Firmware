@@ -39,9 +39,11 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetOtaUpdateStep(OtaUpdateStep::Updated));
   TEST_ASSERT_TRUE(Config::SetEStopGpioPin(GPIO_NUM_13));
   TEST_ASSERT_TRUE(Config::SetEStopEnabled(true));
-  TEST_ASSERT_TRUE(Config::SetLedStatusEnabled(false));
+  TEST_ASSERT_TRUE(Config::SetLedMode(LedMode::Off));
+  TEST_ASSERT_TRUE(Config::SetLedBrightness(LedType::Rgb, LedSignal::Normal, 200));  // Capped at 100
 
   const Full before = Snapshot();
+  TEST_ASSERT_EQUAL_UINT8(100, before.led.rgbNormalBrightness);
   TEST_ASSERT_EQUAL_UINT8_ARRAY(bssid, before.wifi.credentialsList[0].bssid.data(), 6);
 
   Reload();
