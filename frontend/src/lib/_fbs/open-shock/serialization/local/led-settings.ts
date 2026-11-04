@@ -9,7 +9,8 @@ import { LedMode } from '../../../open-shock/serialization/local/led-mode';
 
 
 /**
- * The status LED settings the portal shows and edits.
+ * The status LED settings the portal shows and edits. Only the LEDs the board has are present, so the portal shows
+ * no option for an LED that isn't there.
  */
 export class LedSettings {
   bb: flatbuffers.ByteBuffer|null = null;
@@ -34,31 +35,27 @@ mode():LedMode {
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : LedMode.All;
 }
 
-hasMono():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
-}
-
-hasRgb():boolean {
-  const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? !!this.bb!.readInt8(this.bb_pos + offset) : false;
-}
-
+/**
+ * The single-color built-in LED; absent when the board has none.
+ */
 mono(obj?:LedBrightness):LedBrightness|null {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? (obj || new LedBrightness()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
-}
-
-rgb(obj?:LedBrightness):LedBrightness|null {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
+  const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? (obj || new LedBrightness()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
 /**
- * The hub warns about an RGB brightness above this percent.
+ * The WS2812B RGB LED; absent when the board has none.
+ */
+rgb(obj?:LedBrightness):LedBrightness|null {
+  const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? (obj || new LedBrightness()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
+/**
+ * The hub warns about an RGB brightness above this percent. Only meaningful with `rgb`.
  */
 rgbWarnAbove():number {
-  const offset = this.bb!.__offset(this.bb_pos, 14);
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
 }
 
@@ -66,40 +63,32 @@ rgbWarnAbove():number {
  * How long a preview holds the LEDs after the last preview message.
  */
 previewMs():number {
-  const offset = this.bb!.__offset(this.bb_pos, 16);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? this.bb!.readUint32(this.bb_pos + offset) : 0;
 }
 
 static startLedSettings(builder:flatbuffers.Builder) {
-  builder.startObject(7);
+  builder.startObject(5);
 }
 
 static addMode(builder:flatbuffers.Builder, mode:LedMode) {
   builder.addFieldInt8(0, mode, LedMode.All);
 }
 
-static addHasMono(builder:flatbuffers.Builder, hasMono:boolean) {
-  builder.addFieldInt8(1, +hasMono, +false);
-}
-
-static addHasRgb(builder:flatbuffers.Builder, hasRgb:boolean) {
-  builder.addFieldInt8(2, +hasRgb, +false);
-}
-
 static addMono(builder:flatbuffers.Builder, monoOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(3, monoOffset, 0);
+  builder.addFieldOffset(1, monoOffset, 0);
 }
 
 static addRgb(builder:flatbuffers.Builder, rgbOffset:flatbuffers.Offset) {
-  builder.addFieldOffset(4, rgbOffset, 0);
+  builder.addFieldOffset(2, rgbOffset, 0);
 }
 
 static addRgbWarnAbove(builder:flatbuffers.Builder, rgbWarnAbove:number) {
-  builder.addFieldInt8(5, rgbWarnAbove, 0);
+  builder.addFieldInt8(3, rgbWarnAbove, 0);
 }
 
 static addPreviewMs(builder:flatbuffers.Builder, previewMs:number) {
-  builder.addFieldInt32(6, previewMs, 0);
+  builder.addFieldInt32(4, previewMs, 0);
 }
 
 static endLedSettings(builder:flatbuffers.Builder):flatbuffers.Offset {

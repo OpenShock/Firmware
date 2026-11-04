@@ -30,6 +30,8 @@ const _errorMessages: Record<string, string> = {
   PasswordTooLong: 'Password must be at most 63 characters',
   // OTA
   InvalidChannel: 'Invalid update channel',
+  // LEDs
+  NoSuchLed: 'This board does not have that LED',
   // Generic
   MissingParam: 'Missing parameter',
   InvalidParam: 'Invalid value',

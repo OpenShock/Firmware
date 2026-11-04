@@ -45,7 +45,7 @@ blue():number {
 }
 
 /**
- * The LED to light; the other stays dark.
+ * The LED to light; the other stays dark. A target the board doesn't have lights nothing.
  */
 target():LedTarget {
   const offset = this.bb!.__offset(this.bb_pos, 10);

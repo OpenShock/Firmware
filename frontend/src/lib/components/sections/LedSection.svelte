@@ -231,8 +231,9 @@
 
     <div class="border-info/30 bg-info/10 rounded-lg border p-3">
       <p class="text-xs">
-        Previews show a state's pattern whatever the mode, at the saved brightness, or light the RGB
-        LED in the picked color. They last {previewSeconds} seconds and change nothing on the hub.
+        Previews show a state's pattern whatever the mode, at the saved brightness{led.rgb.present
+          ? ', or light the RGB LED in the picked color'
+          : ''}. They last {previewSeconds} seconds and change nothing on the hub.
       </p>
     </div>
 

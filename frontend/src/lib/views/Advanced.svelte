@@ -31,7 +31,7 @@
   import OtaSection from '#lib/components/sections/OtaSection.svelte';
   import LedSection from '#lib/components/sections/LedSection.svelte';
   import SectionHeader from '#lib/components/SectionHeader.svelte';
-  import { ViewModeStore } from '#lib/stores/index.js';
+  import { hubState, ViewModeStore } from '#lib/stores/index.js';
   import { Button } from '@openshock/svelte-core/components/ui/button';
   import { ChevronRight, ArrowLeft } from '@lucide/svelte';
 
@@ -41,8 +41,18 @@
 
   let { activeSection = $bindable<AdvancedSection>('menu') }: Props = $props();
 
+  // No LEDs section on a board without a status LED. Shown until the hub's config arrives, which says.
+  let hasLeds = $derived(
+    !hubState.config || hubState.config.led.mono.present || hubState.config.led.rgb.present
+  );
+  let sections = $derived(advancedSections.filter((s) => s.id !== 'leds' || hasLeds));
+
   // On a phone 'menu' hides the content panel, so this only shows from md up.
-  let shownSection = $derived(activeSection === 'menu' ? advancedSections[0].id : activeSection);
+  let shownSection = $derived(
+    activeSection === 'menu' || !sections.some((s) => s.id === activeSection)
+      ? sections[0].id
+      : activeSection
+  );
 </script>
 
 <!-- Phones drill down from the menu into one section. From md up the menu is a sidebar and a
@@ -72,7 +82,7 @@
         description="Configure each part of the hub on its own."
       />
       <div class="mt-4 flex flex-col gap-1">
-        {#each advancedSections as { id, label, description, icon: Icon } (id)}
+        {#each sections as { id, label, description, icon: Icon } (id)}
           <button
             class="hover:bg-muted/50 focus-visible:ring-ring/50 md:aria-[current=page]:bg-muted flex cursor-pointer items-center gap-3 rounded-lg p-3 text-left transition-colors outline-none focus-visible:ring-3"
             aria-current={id === shownSection ? 'page' : undefined}

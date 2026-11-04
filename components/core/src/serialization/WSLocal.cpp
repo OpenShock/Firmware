@@ -87,11 +87,17 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
   using OpenShock::LedSignal;
   using OpenShock::LedType;
 
-  auto brightness = [&](LedType type) { return Local::CreateLedBrightness(builder, Vsm::GetLedBrightness(type, LedSignal::Critical), Vsm::GetLedBrightness(type, LedSignal::Normal)); };
-  auto mono       = brightness(LedType::Mono);
-  auto rgb        = brightness(LedType::Rgb);
+  // Only the LEDs the board has, so the portal shows no option for one that isn't there
+  auto brightness = [&](LedType type) -> flatbuffers::Offset<Local::LedBrightness> {
+    if (!Vsm::HasLed(type)) {
+      return 0;
+    }
+    return Local::CreateLedBrightness(builder, Vsm::GetLedBrightness(type, LedSignal::Critical), Vsm::GetLedBrightness(type, LedSignal::Normal));
+  };
+  auto mono = brightness(LedType::Mono);
+  auto rgb  = brightness(LedType::Rgb);
 
-  return Local::CreateLedSettings(builder, static_cast<Local::LedMode>(Vsm::GetLedMode()), Vsm::HasLed(LedType::Mono), Vsm::HasLed(LedType::Rgb), mono, rgb, Vsm::kRgbBrightnessWarnPercent, Vsm::kPreviewDurationMs);
+  return Local::CreateLedSettings(builder, static_cast<Local::LedMode>(Vsm::GetLedMode()), mono, rgb, Vsm::kRgbBrightnessWarnPercent, Vsm::kPreviewDurationMs);
 }
 
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)

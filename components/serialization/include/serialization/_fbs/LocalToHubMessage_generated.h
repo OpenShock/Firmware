@@ -252,7 +252,7 @@ struct LedPreviewColorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   uint8_t blue() const {
     return GetField<uint8_t>(VT_BLUE, 0);
   }
-  /// The LED to light; the other stays dark.
+  /// The LED to light; the other stays dark. A target the board doesn't have lights nothing.
   OpenShock::Serialization::Local::LedTarget target() const {
     return static_cast<OpenShock::Serialization::Local::LedTarget>(GetField<uint8_t>(VT_TARGET, 0));
   }

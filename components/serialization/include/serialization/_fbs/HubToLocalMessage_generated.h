@@ -391,7 +391,8 @@ struct LedBrightness::Traits {
   static auto constexpr Create = CreateLedBrightness;
 };
 
-/// The status LED settings the portal shows and edits.
+/// The status LED settings the portal shows and edits. Only the LEDs the board has are present, so the portal shows
+/// no option for an LED that isn't there.
 struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef LedSettingsBuilder Builder;
   struct Traits;
@@ -400,29 +401,23 @@ struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_MODE = 4,
-    VT_HAS_MONO = 6,
-    VT_HAS_RGB = 8,
-    VT_MONO = 10,
-    VT_RGB = 12,
-    VT_RGB_WARN_ABOVE = 14,
-    VT_PREVIEW_MS = 16
+    VT_MONO = 6,
+    VT_RGB = 8,
+    VT_RGB_WARN_ABOVE = 10,
+    VT_PREVIEW_MS = 12
   };
   OpenShock::Serialization::Local::LedMode mode() const {
     return static_cast<OpenShock::Serialization::Local::LedMode>(GetField<uint8_t>(VT_MODE, 0));
   }
-  bool has_mono() const {
-    return GetField<uint8_t>(VT_HAS_MONO, 0) != 0;
-  }
-  bool has_rgb() const {
-    return GetField<uint8_t>(VT_HAS_RGB, 0) != 0;
-  }
+  /// The single-color built-in LED; absent when the board has none.
   const OpenShock::Serialization::Local::LedBrightness *mono() const {
     return GetPointer<const OpenShock::Serialization::Local::LedBrightness *>(VT_MONO);
   }
+  /// The WS2812B RGB LED; absent when the board has none.
   const OpenShock::Serialization::Local::LedBrightness *rgb() const {
     return GetPointer<const OpenShock::Serialization::Local::LedBrightness *>(VT_RGB);
   }
-  /// The hub warns about an RGB brightness above this percent.
+  /// The hub warns about an RGB brightness above this percent. Only meaningful with `rgb`.
   uint8_t rgb_warn_above() const {
     return GetField<uint8_t>(VT_RGB_WARN_ABOVE, 0);
   }
@@ -434,8 +429,6 @@ struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_MODE, 1) &&
-           VerifyField<uint8_t>(verifier, VT_HAS_MONO, 1) &&
-           VerifyField<uint8_t>(verifier, VT_HAS_RGB, 1) &&
            VerifyOffset(verifier, VT_MONO) &&
            verifier.VerifyTable(mono()) &&
            VerifyOffset(verifier, VT_RGB) &&
@@ -452,12 +445,6 @@ struct LedSettingsBuilder {
   ::flatbuffers::uoffset_t start_;
   void add_mode(OpenShock::Serialization::Local::LedMode mode) {
     fbb_.AddElement<uint8_t>(LedSettings::VT_MODE, static_cast<uint8_t>(mode), 0);
-  }
-  void add_has_mono(bool has_mono) {
-    fbb_.AddElement<uint8_t>(LedSettings::VT_HAS_MONO, static_cast<uint8_t>(has_mono), 0);
-  }
-  void add_has_rgb(bool has_rgb) {
-    fbb_.AddElement<uint8_t>(LedSettings::VT_HAS_RGB, static_cast<uint8_t>(has_rgb), 0);
   }
   void add_mono(::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> mono) {
     fbb_.AddOffset(LedSettings::VT_MONO, mono);
@@ -485,8 +472,6 @@ struct LedSettingsBuilder {
 inline ::flatbuffers::Offset<LedSettings> CreateLedSettings(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     OpenShock::Serialization::Local::LedMode mode = OpenShock::Serialization::Local::LedMode::All,
-    bool has_mono = false,
-    bool has_rgb = false,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> mono = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> rgb = 0,
     uint8_t rgb_warn_above = 0,
@@ -496,8 +481,6 @@ inline ::flatbuffers::Offset<LedSettings> CreateLedSettings(
   builder_.add_rgb(rgb);
   builder_.add_mono(mono);
   builder_.add_rgb_warn_above(rgb_warn_above);
-  builder_.add_has_rgb(has_rgb);
-  builder_.add_has_mono(has_mono);
   builder_.add_mode(mode);
   return builder_.Finish();
 }

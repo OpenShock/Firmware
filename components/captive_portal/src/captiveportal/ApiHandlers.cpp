@@ -46,6 +46,7 @@ static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLon
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
 static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_NO_SUCH_LED     = "{\"error\":\"NoSuchLed\"}";
 
 using namespace OpenShock;
 using namespace OpenShock::CaptivePortal;
@@ -432,6 +433,13 @@ static esp_err_t apiLedPut(httpd_req_t* req)
 
   if (!mode && !monoCritical && !monoNormal && !rgbCritical && !rgbNormal) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  }
+
+  // Settings only for the LEDs the board has; the portal never shows the others
+  if ((mode && !VisualStateManager::HasAnyLed()) || ((monoCritical || monoNormal) && !VisualStateManager::HasLed(LedType::Mono))
+      || ((rgbCritical || rgbNormal) && !VisualStateManager::HasLed(LedType::Rgb)))
+  {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_NO_SUCH_LED);
   }
 
   bool saved = VisualStateManager::UpdateLedConfig([&](Config::LedConfig& cfg) {

@@ -1,3 +1,4 @@
+import type { LedBrightness as LedBrightnessTable } from '#lib/_fbs/open-shock/serialization/local/led-brightness.js';
 import { LedMode as FbsLedMode } from '#lib/_fbs/open-shock/serialization/local/led-mode.js';
 import type { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import type { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
@@ -46,12 +47,16 @@ function mapLedConfig(ready: ReadyMessage): LedConfig {
   const led = ready.led();
   if (!led) throw new Error('ready.led is null');
 
-  const mono = led.mono();
-  const rgb = led.rgb();
+  // The hub only sends the LEDs the board has
+  const mapBrightness = (b: LedBrightnessTable | null): LedBrightness => ({
+    present: b !== null,
+    critical: b?.critical() ?? 0,
+    normal: b?.normal() ?? 0,
+  });
   return {
     mode: _ledModes[led.mode()] ?? 'all',
-    mono: { present: led.hasMono(), critical: mono?.critical() ?? 0, normal: mono?.normal() ?? 0 },
-    rgb: { present: led.hasRgb(), critical: rgb?.critical() ?? 0, normal: rgb?.normal() ?? 0 },
+    mono: mapBrightness(led.mono()),
+    rgb: mapBrightness(led.rgb()),
     rgbWarnAbove: led.rgbWarnAbove(),
     previewMs: led.previewMs(),
   };

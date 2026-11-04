@@ -14,6 +14,11 @@ static void handleLedModeCommand(std::string_view arg, bool isAutomated)
 {
   (void)isAutomated;
 
+  if (!OpenShock::VisualStateManager::HasAnyLed()) {
+    SERPR_ERROR("This board has no status LED");
+    return;
+  }
+
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
     SERPR_RESPONSE("LedMode|%s", OpenShock::LedModeName(OpenShock::VisualStateManager::GetLedMode()));
@@ -33,13 +38,24 @@ static void handleLedBrightnessCommand(std::string_view arg, bool isAutomated)
 {
   (void)isAutomated;
 
+  using OpenShock::VisualStateManager::GetLedBrightness;
+  using OpenShock::VisualStateManager::HasLed;
+
   arg = OpenShock::StringTrim(arg);
   if (arg.empty()) {
-    using OpenShock::VisualStateManager::GetLedBrightness;
-    SERPR_RESPONSE("LedBrightness|mono|critical|%u", GetLedBrightness(LedType::Mono, LedSignal::Critical));
-    SERPR_RESPONSE("LedBrightness|mono|normal|%u", GetLedBrightness(LedType::Mono, LedSignal::Normal));
-    SERPR_RESPONSE("LedBrightness|rgb|critical|%u", GetLedBrightness(LedType::Rgb, LedSignal::Critical));
-    SERPR_RESPONSE("LedBrightness|rgb|normal|%u", GetLedBrightness(LedType::Rgb, LedSignal::Normal));
+    // Only the LEDs the board has
+    if (!OpenShock::VisualStateManager::HasAnyLed()) {
+      SERPR_ERROR("This board has no status LED");
+      return;
+    }
+    for (LedType type : {LedType::Mono, LedType::Rgb}) {
+      if (!HasLed(type)) {
+        continue;
+      }
+      const char* name = type == LedType::Mono ? "mono" : "rgb";
+      SERPR_RESPONSE("LedBrightness|%s|critical|%u", name, GetLedBrightness(type, LedSignal::Critical));
+      SERPR_RESPONSE("LedBrightness|%s|normal|%u", name, GetLedBrightness(type, LedSignal::Normal));
+    }
     return;
   }
 
@@ -54,6 +70,10 @@ static void handleLedBrightnessCommand(std::string_view arg, bool isAutomated)
   auto percent = OpenShock::Convert::ToUint8(OpenShock::StringTrim((*parts)[2]));
   if (!type) {
     SERPR_ERROR("Invalid LED type (must be mono or rgb)");
+    return;
+  }
+  if (!HasLed(*type)) {
+    SERPR_ERROR("This board has no %s LED", *type == LedType::Mono ? "mono" : "rgb");
     return;
   }
   if (!signal) {

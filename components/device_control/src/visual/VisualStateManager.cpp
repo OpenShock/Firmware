@@ -645,7 +645,7 @@ bool VisualStateManager::UpdateLedConfig(Util::FunctionRef<bool(Config::LedConfi
   loadLedConfig();
   uint8_t rgbAfter[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
   for (std::size_t i = 0; i < std::size(rgbAfter); ++i) {
-    if (rgbAfter[i] > VisualStateManager::kRgbBrightnessWarnPercent && rgbAfter[i] != rgbBefore[i]) {
+    if (s_rgbLedDriver != nullptr && rgbAfter[i] > VisualStateManager::kRgbBrightnessWarnPercent && rgbAfter[i] != rgbBefore[i]) {
       OS_LOGW(TAG, "RGB LED %s brightness set to %u%%: above %u%% a WS2812B is glaring and runs warm", i == 0 ? "critical" : "normal", rgbAfter[i], VisualStateManager::kRgbBrightnessWarnPercent);
     }
   }
