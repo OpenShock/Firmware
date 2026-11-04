@@ -15,4 +15,4 @@ idf_component_register(
                 common logging temporal osjson chipset   # used directly; previously only reachable through core's public REQUIRES
 )
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error -Werror=switch)  # -Wswitch stays fatal: exhaustive enum switches rely on it

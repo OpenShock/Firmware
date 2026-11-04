@@ -10,16 +10,51 @@ const char* const TAG = "LocalMessageHandlers";
 
 namespace Schemas = OpenShock::Serialization::Local;
 namespace Vsm     = OpenShock::VisualStateManager;
+using OpenShock::LedType;
 
-// The handlers cast between these by value
-static_assert(std::to_underlying(Vsm::LedPattern::WiFiDisconnected) == std::to_underlying(Schemas::LedPreviewPattern::WifiDisconnected));
-static_assert(std::to_underlying(Vsm::LedPattern::WiFiScanning) == std::to_underlying(Schemas::LedPreviewPattern::WifiScanning));
-static_assert(std::to_underlying(Vsm::LedPattern::NoBackend) == std::to_underlying(Schemas::LedPreviewPattern::NoBackend));
-static_assert(std::to_underlying(Vsm::LedPattern::Connected) == std::to_underlying(Schemas::LedPreviewPattern::Connected));
-static_assert(std::to_underlying(Vsm::LedPattern::EStopped) == std::to_underlying(Schemas::LedPreviewPattern::EStopped));
-static_assert(std::to_underlying(Vsm::LedPattern::EStopClearing) == std::to_underlying(Schemas::LedPreviewPattern::EStopClearing));
-static_assert(std::to_underlying(Vsm::LedPattern::EStopAwaitingRelease) == std::to_underlying(Schemas::LedPreviewPattern::EStopAwaitingRelease));
-static_assert(std::to_underlying(Vsm::LedPattern::CriticalError) == std::to_underlying(Schemas::LedPreviewPattern::CriticalError));
+// The conversions are exhaustive switches with no default on purpose: -Wswitch (IDF builds with -Werror) fails the
+// build when the schema gains a value that is not handled here. The value still comes off the wire unchecked (the
+// verifier does not check an enum's range), so anything else falls out of the switch as unknown.
+
+static std::optional<Vsm::LedPattern> toLedPattern(Schemas::LedPreviewPattern pattern)
+{
+  switch (pattern) {
+    case Schemas::LedPreviewPattern::WifiDisconnected:
+      return Vsm::LedPattern::WiFiDisconnected;
+    case Schemas::LedPreviewPattern::WifiScanning:
+      return Vsm::LedPattern::WiFiScanning;
+    case Schemas::LedPreviewPattern::NoBackend:
+      return Vsm::LedPattern::NoBackend;
+    case Schemas::LedPreviewPattern::Connected:
+      return Vsm::LedPattern::Connected;
+    case Schemas::LedPreviewPattern::EStopped:
+      return Vsm::LedPattern::EStopped;
+    case Schemas::LedPreviewPattern::EStopClearing:
+      return Vsm::LedPattern::EStopClearing;
+    case Schemas::LedPreviewPattern::EStopAwaitingRelease:
+      return Vsm::LedPattern::EStopAwaitingRelease;
+    case Schemas::LedPreviewPattern::CriticalError:
+      return Vsm::LedPattern::CriticalError;
+  }
+  return std::nullopt;
+}
+
+// The LEDs a color preview lights: nullopt for every LED, or one type
+static bool toLedTarget(Schemas::LedTarget target, std::optional<LedType>& only)
+{
+  switch (target) {
+    case Schemas::LedTarget::All:
+      only = std::nullopt;
+      return true;
+    case Schemas::LedTarget::Mono:
+      only = LedType::Mono;
+      return true;
+    case Schemas::LedTarget::Rgb:
+      only = LedType::Rgb;
+      return true;
+  }
+  return false;
+}
 
 void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewPatternMessage(uint8_t socketId, const Schemas::LocalToHubMessage* msg)
 {
@@ -31,14 +66,13 @@ void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewPatternMessage
     return;
   }
 
-  // The enum comes off the wire: the verifier does not check its range
-  auto pattern = preview->pattern();
-  if (pattern < Schemas::LedPreviewPattern::MIN || pattern > Schemas::LedPreviewPattern::MAX) {
-    OS_LOGW(TAG, "Unknown LED preview pattern %u", static_cast<unsigned>(std::to_underlying(pattern)));
+  auto pattern = toLedPattern(preview->pattern());
+  if (!pattern) {
+    OS_LOGW(TAG, "Unknown LED preview pattern %u", static_cast<unsigned>(std::to_underlying(preview->pattern())));
     return;
   }
 
-  Vsm::PreviewPattern(static_cast<Vsm::LedPattern>(std::to_underlying(pattern)));
+  Vsm::PreviewPattern(*pattern);
 }
 
 void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewColorMessage(uint8_t socketId, const Schemas::LocalToHubMessage* msg)
@@ -52,18 +86,9 @@ void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewColorMessage(u
   }
 
   std::optional<LedType> only;
-  switch (preview->target()) {
-    case Schemas::LedTarget::All:
-      break;
-    case Schemas::LedTarget::Mono:
-      only = LedType::Mono;
-      break;
-    case Schemas::LedTarget::Rgb:
-      only = LedType::Rgb;
-      break;
-    default:
-      OS_LOGW(TAG, "Unknown LED preview target %u", static_cast<unsigned>(std::to_underlying(preview->target())));
-      return;
+  if (!toLedTarget(preview->target(), only)) {
+    OS_LOGW(TAG, "Unknown LED preview target %u", static_cast<unsigned>(std::to_underlying(preview->target())));
+    return;
   }
 
   auto brightness = preview->brightness();

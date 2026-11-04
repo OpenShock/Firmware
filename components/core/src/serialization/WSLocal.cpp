@@ -77,9 +77,20 @@ static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::Fl
 }
 
 // createLedSettings casts between these by value
-static_assert(std::to_underlying(OpenShock::LedMode::All) == std::to_underlying(Local::LedMode::All));
-static_assert(std::to_underlying(OpenShock::LedMode::CriticalOnly) == std::to_underlying(Local::LedMode::CriticalOnly));
-static_assert(std::to_underlying(OpenShock::LedMode::Off) == std::to_underlying(Local::LedMode::Off));
+// Exhaustive with no default on purpose: -Wswitch (IDF builds with -Werror) fails the build when LedMode gains a value
+// that is not mapped here
+static Local::LedMode toSchemaLedMode(OpenShock::LedMode mode)
+{
+  switch (mode) {
+    case OpenShock::LedMode::All:
+      return Local::LedMode::All;
+    case OpenShock::LedMode::CriticalOnly:
+      return Local::LedMode::CriticalOnly;
+    case OpenShock::LedMode::Off:
+      return Local::LedMode::Off;
+  }
+  return Local::LedMode::All;  // Unreachable: the config only holds the values above
+}
 
 static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::FlatBufferBuilder& builder)
 {
@@ -97,7 +108,7 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
   auto mono = brightness(LedType::Mono);
   auto rgb  = brightness(LedType::Rgb);
 
-  return Local::CreateLedSettings(builder, static_cast<Local::LedMode>(Vsm::GetLedMode()), mono, rgb, Vsm::kRgbBrightnessWarn, Vsm::kPreviewDurationMs);
+  return Local::CreateLedSettings(builder, toSchemaLedMode(Vsm::GetLedMode()), mono, rgb, Vsm::kRgbBrightnessWarn, Vsm::kPreviewDurationMs);
 }
 
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)

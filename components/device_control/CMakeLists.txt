@@ -17,4 +17,4 @@ idf_component_register(
                 esp_driver_gpio esp_wifi esp_event esp_netif esp_timer soc
 )
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error -Werror=switch)  # -Wswitch stays fatal: exhaustive enum switches rely on it
