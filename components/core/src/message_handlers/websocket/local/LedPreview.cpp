@@ -72,7 +72,7 @@ void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewColorMessage(u
   const uint32_t packed = preview->color_rgb10();
 
   auto brightness = preview->brightness();
-  Vsm::PreviewColor(Widen10To16(Rgb10Red(packed)), Widen10To16(Rgb10Green(packed)), Widen10To16(Rgb10Blue(packed)), only, brightness.has_value() ? std::optional<uint8_t>(*brightness) : std::nullopt);
+  Vsm::PreviewColor(Widen10To16(Rgb10Red(packed)), Widen10To16(Rgb10Green(packed)), Widen10To16(Rgb10Blue(packed)), only, brightness.has_value() ? std::optional<uint16_t>(*brightness) : std::nullopt);
 }
 
 void OpenShock::MessageHandlers::Local::_Private::HandleLedPreviewStopMessage(uint8_t socketId, const Schemas::LocalToHubMessage* msg)

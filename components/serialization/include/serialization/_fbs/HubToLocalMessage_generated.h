@@ -327,7 +327,7 @@ inline ::flatbuffers::Offset<OtaSettings> CreateOtaSettingsDirect(
       require_manual_approval);
 }
 
-/// Brightness of one status LED, in percent of its full output.
+/// Brightness of one status LED, 16-bit: 0-65535 of its full output.
 struct LedBrightness FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef LedBrightnessBuilder Builder;
   struct Traits;
@@ -339,18 +339,18 @@ struct LedBrightness FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_NORMAL = 6
   };
   /// E-Stop and critical-error patterns
-  uint8_t critical() const {
-    return GetField<uint8_t>(VT_CRITICAL, 0);
+  uint16_t critical() const {
+    return GetField<uint16_t>(VT_CRITICAL, 0);
   }
   /// Every other pattern
-  uint8_t normal() const {
-    return GetField<uint8_t>(VT_NORMAL, 0);
+  uint16_t normal() const {
+    return GetField<uint16_t>(VT_NORMAL, 0);
   }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint8_t>(verifier, VT_CRITICAL, 1) &&
-           VerifyField<uint8_t>(verifier, VT_NORMAL, 1) &&
+           VerifyField<uint16_t>(verifier, VT_CRITICAL, 2) &&
+           VerifyField<uint16_t>(verifier, VT_NORMAL, 2) &&
            verifier.EndTable();
   }
 };
@@ -359,11 +359,11 @@ struct LedBrightnessBuilder {
   typedef LedBrightness Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_critical(uint8_t critical) {
-    fbb_.AddElement<uint8_t>(LedBrightness::VT_CRITICAL, critical, 0);
+  void add_critical(uint16_t critical) {
+    fbb_.AddElement<uint16_t>(LedBrightness::VT_CRITICAL, critical, 0);
   }
-  void add_normal(uint8_t normal) {
-    fbb_.AddElement<uint8_t>(LedBrightness::VT_NORMAL, normal, 0);
+  void add_normal(uint16_t normal) {
+    fbb_.AddElement<uint16_t>(LedBrightness::VT_NORMAL, normal, 0);
   }
   explicit LedBrightnessBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -378,8 +378,8 @@ struct LedBrightnessBuilder {
 
 inline ::flatbuffers::Offset<LedBrightness> CreateLedBrightness(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    uint8_t critical = 0,
-    uint8_t normal = 0) {
+    uint16_t critical = 0,
+    uint16_t normal = 0) {
   LedBrightnessBuilder builder_(_fbb);
   builder_.add_normal(normal);
   builder_.add_critical(critical);
@@ -417,9 +417,9 @@ struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Local::LedBrightness *rgb() const {
     return GetPointer<const OpenShock::Serialization::Local::LedBrightness *>(VT_RGB);
   }
-  /// The hub warns about an RGB brightness above this percent. Only meaningful with `rgb`.
-  uint8_t rgb_warn_above() const {
-    return GetField<uint8_t>(VT_RGB_WARN_ABOVE, 0);
+  /// The hub warns about an RGB brightness above this (0-65535). Only meaningful with `rgb`.
+  uint16_t rgb_warn_above() const {
+    return GetField<uint16_t>(VT_RGB_WARN_ABOVE, 0);
   }
   /// How long a preview holds the LEDs after the last preview message.
   uint16_t preview_ms() const {
@@ -433,7 +433,7 @@ struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(mono()) &&
            VerifyOffset(verifier, VT_RGB) &&
            verifier.VerifyTable(rgb()) &&
-           VerifyField<uint8_t>(verifier, VT_RGB_WARN_ABOVE, 1) &&
+           VerifyField<uint16_t>(verifier, VT_RGB_WARN_ABOVE, 2) &&
            VerifyField<uint16_t>(verifier, VT_PREVIEW_MS, 2) &&
            verifier.EndTable();
   }
@@ -452,8 +452,8 @@ struct LedSettingsBuilder {
   void add_rgb(::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> rgb) {
     fbb_.AddOffset(LedSettings::VT_RGB, rgb);
   }
-  void add_rgb_warn_above(uint8_t rgb_warn_above) {
-    fbb_.AddElement<uint8_t>(LedSettings::VT_RGB_WARN_ABOVE, rgb_warn_above, 0);
+  void add_rgb_warn_above(uint16_t rgb_warn_above) {
+    fbb_.AddElement<uint16_t>(LedSettings::VT_RGB_WARN_ABOVE, rgb_warn_above, 0);
   }
   void add_preview_ms(uint16_t preview_ms) {
     fbb_.AddElement<uint16_t>(LedSettings::VT_PREVIEW_MS, preview_ms, 0);
@@ -474,7 +474,7 @@ inline ::flatbuffers::Offset<LedSettings> CreateLedSettings(
     OpenShock::Serialization::Local::LedMode mode = OpenShock::Serialization::Local::LedMode::All,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> mono = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> rgb = 0,
-    uint8_t rgb_warn_above = 0,
+    uint16_t rgb_warn_above = 0,
     uint16_t preview_ms = 0) {
   LedSettingsBuilder builder_(_fbb);
   builder_.add_rgb(rgb);

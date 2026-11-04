@@ -19,17 +19,17 @@ namespace OpenShock::VisualStateManager {
   [[nodiscard]] inline bool HasAnyLed() { return HasLed(LedType::Mono) || HasLed(LedType::Rgb); }
 
   // The setters save to the `led` config section and apply the change at once. A save that raises an RGB brightness
-  // above kRgbBrightnessWarnPercent logs a warning: a WS2812B is glaring and runs warm well before full output.
+  // above kRgbBrightnessWarn logs a warning: a WS2812B is glaring and runs warm well before full output.
 
-  inline constexpr uint8_t kRgbBrightnessWarnPercent = 30;
+  inline constexpr uint16_t kRgbBrightnessWarn = 19661;  // 30% of 65535
 
   [[nodiscard]] LedMode GetLedMode();
   bool SetLedMode(LedMode mode);
 
-  /// @brief Percent of the LED's full output (0-100) for patterns of `signal`.
-  [[nodiscard]] uint8_t GetLedBrightness(LedType type, LedSignal signal);
-  /// @brief `percent` is capped at 100.
-  bool SetLedBrightness(LedType type, LedSignal signal, uint8_t percent);
+  /// @brief 16-bit, 0-65535 of the LED's full output, for patterns of `signal`. The drivers reduce it to what the LED
+  ///        shows (10 bits on the dithered RGB LED).
+  [[nodiscard]] uint16_t GetLedBrightness(LedType type, LedSignal signal);
+  bool SetLedBrightness(LedType type, LedSignal signal, uint16_t brightness);
 
   /// @brief Several LED settings in one config write (Config::UpdateLedConfig).
   bool UpdateLedConfig(Util::FunctionRef<bool(Config::LedConfig&)> update);
@@ -58,8 +58,8 @@ namespace OpenShock::VisualStateManager {
   /// @brief Shows a solid color: the RGB LED in `red`/`green`/`blue` (16 bits per channel, 0-65535; the driver dithers
   ///        what the LED's 8 bits can't show), the mono LED on unless the color is black.
   /// @param only Light only this LED; the other stays dark. All LEDs when unset.
-  /// @param brightness Percent (capped at 100) for this preview only; each LED's normal brightness when unset.
-  void PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness);
+  /// @param brightness 0-65535 for this preview only; each LED's normal brightness when unset.
+  void PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint16_t> brightness);
   /// @brief Ends a preview early.
   void StopPreview();
 

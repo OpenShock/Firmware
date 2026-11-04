@@ -47,11 +47,11 @@ target():LedTarget {
 }
 
 /**
- * Percent for this preview only; null is each LED's saved normal brightness.
+ * 16-bit brightness (0-65535) for this preview only; null is each LED's saved normal brightness.
  */
 brightness():number|null {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : null;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : null;
 }
 
 static startLedPreviewColorMessage(builder:flatbuffers.Builder) {
@@ -67,7 +67,7 @@ static addTarget(builder:flatbuffers.Builder, target:LedTarget) {
 }
 
 static addBrightness(builder:flatbuffers.Builder, brightness:number) {
-  builder.addFieldInt8(2, brightness, null);
+  builder.addFieldInt16(2, brightness, null);
 }
 
 static endLedPreviewColorMessage(builder:flatbuffers.Builder):flatbuffers.Offset {

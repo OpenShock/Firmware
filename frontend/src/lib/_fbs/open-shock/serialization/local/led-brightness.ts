@@ -5,7 +5,7 @@
 import * as flatbuffers from 'flatbuffers';
 
 /**
- * Brightness of one status LED, in percent of its full output.
+ * Brightness of one status LED, 16-bit: 0-65535 of its full output.
  */
 export class LedBrightness {
   bb: flatbuffers.ByteBuffer|null = null;
@@ -30,7 +30,7 @@ static getSizePrefixedRootAsLedBrightness(bb:flatbuffers.ByteBuffer, obj?:LedBri
  */
 critical():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 /**
@@ -38,7 +38,7 @@ critical():number {
  */
 normal():number {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 static startLedBrightness(builder:flatbuffers.Builder) {
@@ -46,11 +46,11 @@ static startLedBrightness(builder:flatbuffers.Builder) {
 }
 
 static addCritical(builder:flatbuffers.Builder, critical:number) {
-  builder.addFieldInt8(0, critical, 0);
+  builder.addFieldInt16(0, critical, 0);
 }
 
 static addNormal(builder:flatbuffers.Builder, normal:number) {
-  builder.addFieldInt8(1, normal, 0);
+  builder.addFieldInt16(1, normal, 0);
 }
 
 static endLedBrightness(builder:flatbuffers.Builder):flatbuffers.Offset {

@@ -390,7 +390,8 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
 }
 
 // Reads an optional 0-100 percent query parameter; false (after responding) on an invalid value
-static bool parsePercentParam(httpd_req_t* req, const char* key, std::optional<uint8_t>& out, esp_err_t& response)
+// A 16-bit brightness, 0-65535
+static bool parseBrightnessParam(httpd_req_t* req, const char* key, std::optional<uint16_t>& out, esp_err_t& response)
 {
   auto str = getQueryParam(req, key);
   if (!str) {
@@ -398,8 +399,8 @@ static bool parsePercentParam(httpd_req_t* req, const char* key, std::optional<u
     response = sendParamError(req, str.error());
     return false;
   }
-  auto value = Convert::ToUint8(*str);
-  if (!value || *value > Config::LedConfig::kMaxBrightness) {
+  auto value = Convert::ToUint16(*str);
+  if (!value) {
     response = sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
     return false;
   }
@@ -423,10 +424,10 @@ static esp_err_t apiLedPut(httpd_req_t* req)
     }
   }
 
-  std::optional<uint8_t> monoCritical, monoNormal, rgbCritical, rgbNormal;
+  std::optional<uint16_t> monoCritical, monoNormal, rgbCritical, rgbNormal;
   esp_err_t response = ESP_OK;
-  if (!parsePercentParam(req, "monoCritical", monoCritical, response) || !parsePercentParam(req, "monoNormal", monoNormal, response) || !parsePercentParam(req, "rgbCritical", rgbCritical, response)
-      || !parsePercentParam(req, "rgbNormal", rgbNormal, response))
+  if (!parseBrightnessParam(req, "monoCritical", monoCritical, response) || !parseBrightnessParam(req, "monoNormal", monoNormal, response) || !parseBrightnessParam(req, "rgbCritical", rgbCritical, response)
+      || !parseBrightnessParam(req, "rgbNormal", rgbNormal, response))
   {
     return response;
   }

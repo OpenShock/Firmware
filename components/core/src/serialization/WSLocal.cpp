@@ -97,7 +97,7 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
   auto mono = brightness(LedType::Mono);
   auto rgb  = brightness(LedType::Rgb);
 
-  return Local::CreateLedSettings(builder, static_cast<Local::LedMode>(Vsm::GetLedMode()), mono, rgb, Vsm::kRgbBrightnessWarnPercent, Vsm::kPreviewDurationMs);
+  return Local::CreateLedSettings(builder, static_cast<Local::LedMode>(Vsm::GetLedMode()), mono, rgb, Vsm::kRgbBrightnessWarn, Vsm::kPreviewDurationMs);
 }
 
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)

@@ -10,7 +10,6 @@ const char* const TAG = "Config::LedConfig";
 
 #include "json/Json.h"
 
-#include <algorithm>
 #include <utility>
 
 using namespace OpenShock::Config;
@@ -26,10 +25,10 @@ static constexpr const char* kKeyRgbCrit   = "rgbCrit";
 static constexpr const char* kKeyRgbNorm   = "rgbNorm";
 
 static constexpr LedMode kDefaultMode           = LedMode::All;
-static constexpr uint8_t kDefaultMonoCritBright = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;
-static constexpr uint8_t kDefaultMonoNormBright = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
-static constexpr uint8_t kDefaultRgbCritBright  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
-static constexpr uint8_t kDefaultRgbNormBright  = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
+static constexpr uint16_t kDefaultMonoCritBright = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;
+static constexpr uint16_t kDefaultMonoNormBright = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
+static constexpr uint16_t kDefaultRgbCritBright  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
+static constexpr uint16_t kDefaultRgbNormBright  = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
 
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<LedConfig> s_section({.name = "led", .order = 7, .namespaces = kNamespaces});
@@ -43,7 +42,7 @@ LedConfig::LedConfig()
 {
 }
 
-LedConfig::LedConfig(LedMode mode, uint8_t monoCriticalBrightness, uint8_t monoNormalBrightness, uint8_t rgbCriticalBrightness, uint8_t rgbNormalBrightness)
+LedConfig::LedConfig(LedMode mode, uint16_t monoCriticalBrightness, uint16_t monoNormalBrightness, uint16_t rgbCriticalBrightness, uint16_t rgbNormalBrightness)
   : mode(mode)
   , monoCriticalBrightness(monoCriticalBrightness)
   , monoNormalBrightness(monoNormalBrightness)
@@ -52,19 +51,12 @@ LedConfig::LedConfig(LedMode mode, uint8_t monoCriticalBrightness, uint8_t monoN
 {
 }
 
-uint8_t& LedConfig::Brightness(LedType type, LedSignal signal)
+uint16_t& LedConfig::Brightness(LedType type, LedSignal signal)
 {
   if (type == LedType::Mono) {
     return signal == LedSignal::Critical ? monoCriticalBrightness : monoNormalBrightness;
   }
   return signal == LedSignal::Critical ? rgbCriticalBrightness : rgbNormalBrightness;
-}
-
-void LedConfig::Normalize()
-{
-  for (uint8_t* brightness : {&monoCriticalBrightness, &monoNormalBrightness, &rgbCriticalBrightness, &rgbNormalBrightness}) {
-    *brightness = std::min(*brightness, kMaxBrightness);
-  }
 }
 
 bool LedConfig::FromJSON(JSON::JsonView json)
@@ -79,10 +71,10 @@ bool LedConfig::FromJSON(JSON::JsonView json)
     return false;
   }
 
-  monoCriticalBrightness = json["monoCriticalBrightness"].tryGetU8().value_or(kDefaultMonoCritBright);
-  monoNormalBrightness   = json["monoNormalBrightness"].tryGetU8().value_or(kDefaultMonoNormBright);
-  rgbCriticalBrightness  = json["rgbCriticalBrightness"].tryGetU8().value_or(kDefaultRgbCritBright);
-  rgbNormalBrightness    = json["rgbNormalBrightness"].tryGetU8().value_or(kDefaultRgbNormBright);
+  monoCriticalBrightness = json["monoCriticalBrightness"].tryGetU16().value_or(kDefaultMonoCritBright);
+  monoNormalBrightness   = json["monoNormalBrightness"].tryGetU16().value_or(kDefaultMonoNormBright);
+  rgbCriticalBrightness  = json["rgbCriticalBrightness"].tryGetU16().value_or(kDefaultRgbCritBright);
+  rgbNormalBrightness    = json["rgbNormalBrightness"].tryGetU16().value_or(kDefaultRgbNormBright);
 
   return true;
 }

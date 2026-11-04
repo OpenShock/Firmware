@@ -45,7 +45,7 @@ export function stopLedPreview(): boolean {
 export interface LedColorPreview {
   color: Rgb;
   target?: LedTarget; // Default: every LED
-  brightness?: number; // Percent for this preview only; default: each LED's saved normal brightness
+  brightness?: number; // 0-65535 for this preview only; default: each LED's saved normal brightness
 }
 
 function sendColor({ color, target = LedTarget.All, brightness }: LedColorPreview): boolean {

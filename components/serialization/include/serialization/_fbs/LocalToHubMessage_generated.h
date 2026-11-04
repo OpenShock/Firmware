@@ -250,16 +250,16 @@ struct LedPreviewColorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::T
   OpenShock::Serialization::Local::LedTarget target() const {
     return static_cast<OpenShock::Serialization::Local::LedTarget>(GetField<uint8_t>(VT_TARGET, 0));
   }
-  /// Percent for this preview only; null is each LED's saved normal brightness.
-  ::flatbuffers::Optional<uint8_t> brightness() const {
-    return GetOptional<uint8_t, uint8_t>(VT_BRIGHTNESS);
+  /// 16-bit brightness (0-65535) for this preview only; null is each LED's saved normal brightness.
+  ::flatbuffers::Optional<uint16_t> brightness() const {
+    return GetOptional<uint16_t, uint16_t>(VT_BRIGHTNESS);
   }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint32_t>(verifier, VT_COLOR_RGB10, 4) &&
            VerifyField<uint8_t>(verifier, VT_TARGET, 1) &&
-           VerifyField<uint8_t>(verifier, VT_BRIGHTNESS, 1) &&
+           VerifyField<uint16_t>(verifier, VT_BRIGHTNESS, 2) &&
            verifier.EndTable();
   }
 };
@@ -274,8 +274,8 @@ struct LedPreviewColorMessageBuilder {
   void add_target(OpenShock::Serialization::Local::LedTarget target) {
     fbb_.AddElement<uint8_t>(LedPreviewColorMessage::VT_TARGET, static_cast<uint8_t>(target), 0);
   }
-  void add_brightness(uint8_t brightness) {
-    fbb_.AddElement<uint8_t>(LedPreviewColorMessage::VT_BRIGHTNESS, brightness);
+  void add_brightness(uint16_t brightness) {
+    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_BRIGHTNESS, brightness);
   }
   explicit LedPreviewColorMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -292,7 +292,7 @@ inline ::flatbuffers::Offset<LedPreviewColorMessage> CreateLedPreviewColorMessag
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint32_t color_rgb10 = 0,
     OpenShock::Serialization::Local::LedTarget target = OpenShock::Serialization::Local::LedTarget::All,
-    ::flatbuffers::Optional<uint8_t> brightness = ::flatbuffers::nullopt) {
+    ::flatbuffers::Optional<uint16_t> brightness = ::flatbuffers::nullopt) {
   LedPreviewColorMessageBuilder builder_(_fbb);
   builder_.add_color_rgb10(color_rgb10);
   if(brightness) { builder_.add_brightness(*brightness); }

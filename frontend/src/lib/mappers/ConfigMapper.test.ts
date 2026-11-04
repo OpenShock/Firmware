@@ -1,3 +1,6 @@
+import { LedBrightness } from '#lib/_fbs/open-shock/serialization/local/led-brightness.js';
+import { LedMode } from '#lib/_fbs/open-shock/serialization/local/led-mode.js';
+import { LedSettings } from '#lib/_fbs/open-shock/serialization/local/led-settings.js';
 import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import { OtaSettings } from '#lib/_fbs/open-shock/serialization/local/ota-settings.js';
 import { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
@@ -8,6 +11,17 @@ import { mapConfig } from './ConfigMapper';
 function readBack(b: Builder, root: number): ReadyMessage {
   b.finish(root);
   return ReadyMessage.getRootAsReadyMessage(new ByteBuffer(b.asUint8Array()));
+}
+
+// The LED settings of a board with only an RGB LED, the way the hub serializes them
+function buildLed(b: Builder): number {
+  const rgb = LedBrightness.createLedBrightness(b, 40000, 5140);
+  LedSettings.startLedSettings(b);
+  LedSettings.addMode(b, LedMode.CriticalOnly);
+  LedSettings.addRgb(b, rgb);
+  LedSettings.addRgbWarnAbove(b, 19661);
+  LedSettings.addPreviewMs(b, 10000);
+  return LedSettings.endLedSettings(b);
 }
 
 // Builds a Ready message the way the hub serializes it.
@@ -21,12 +35,15 @@ function buildReady(cdnDomain: string, ssids: string[]): ReadyMessage {
     ssids.map((ssid) => b.createString(ssid))
   );
 
+  const led = buildLed(b);
+
   ReadyMessage.startReadyMessage(b);
   ReadyMessage.addRfTxPin(b, 15);
   ReadyMessage.addEstopEnabled(b, true);
   ReadyMessage.addEstopGpioPin(b, 13);
   ReadyMessage.addSavedSsids(b, saved);
   ReadyMessage.addOta(b, ota);
+  ReadyMessage.addLed(b, led);
   return readBack(b, ReadyMessage.endReadyMessage(b));
 }
 
@@ -44,6 +61,13 @@ describe('mapConfig', () => {
         requireManualApproval: true,
       },
       savedSSIDs: ['HomeNet', 'Cafe'],
+      led: {
+        mode: 'critical',
+        mono: { present: false, critical: 0, normal: 0 },
+        rgb: { present: true, critical: 40000, normal: 5140 },
+        rgbWarnAbove: 19661,
+        previewMs: 10000,
+      },
     });
   });
 
@@ -58,13 +82,25 @@ describe('mapConfig', () => {
     const b = new Builder(64);
     const domain = b.createString('fw.example.org');
     const ota = OtaSettings.createOtaSettings(b, true, domain, OtaChannel.Stable, 30, true, false);
+    const led = buildLed(b);
     ReadyMessage.startReadyMessage(b);
     ReadyMessage.addOta(b, ota);
+    ReadyMessage.addLed(b, led);
 
     const config = mapConfig(readBack(b, ReadyMessage.endReadyMessage(b)));
 
     expect(config.rf.txPin).toBe(-1);
     expect(config.estop.gpioPin).toBe(-1);
+  });
+
+  it('rejects a message without the LED settings', () => {
+    const b = new Builder(64);
+    const domain = b.createString('fw.example.org');
+    const ota = OtaSettings.createOtaSettings(b, true, domain, OtaChannel.Stable, 30, true, false);
+    ReadyMessage.startReadyMessage(b);
+    ReadyMessage.addOta(b, ota);
+
+    expect(() => mapConfig(readBack(b, ReadyMessage.endReadyMessage(b)))).toThrow('ready.led');
   });
 
   it('rejects a message without the OTA settings', () => {

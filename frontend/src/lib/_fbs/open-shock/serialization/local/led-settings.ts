@@ -52,11 +52,11 @@ rgb(obj?:LedBrightness):LedBrightness|null {
 }
 
 /**
- * The hub warns about an RGB brightness above this percent. Only meaningful with `rgb`.
+ * The hub warns about an RGB brightness above this (0-65535). Only meaningful with `rgb`.
  */
 rgbWarnAbove():number {
   const offset = this.bb!.__offset(this.bb_pos, 10);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 /**
@@ -84,7 +84,7 @@ static addRgb(builder:flatbuffers.Builder, rgbOffset:flatbuffers.Offset) {
 }
 
 static addRgbWarnAbove(builder:flatbuffers.Builder, rgbWarnAbove:number) {
-  builder.addFieldInt8(3, rgbWarnAbove, 0);
+  builder.addFieldInt16(3, rgbWarnAbove, 0);
 }
 
 static addPreviewMs(builder:flatbuffers.Builder, previewMs:number) {

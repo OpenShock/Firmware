@@ -16,7 +16,7 @@ export type LedMode = 'all' | 'critical' | 'off';
 
 export interface LedBrightness {
   present: boolean; // Whether the board has this LED
-  critical: number; // Percent of the LED's full output
+  critical: number; // 16-bit, 0-65535 of the LED's full output
   normal: number;
 }
 
@@ -24,7 +24,7 @@ export interface LedConfig {
   mode: LedMode;
   mono: LedBrightness;
   rgb: LedBrightness;
-  rgbWarnAbove: number; // RGB brightness (percent) above which the hub warns
+  rgbWarnAbove: number; // RGB brightness (0-65535) above which the hub warns
   previewMs: number; // How long a preview holds the LEDs after the last preview message
 }
 

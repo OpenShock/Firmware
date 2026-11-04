@@ -8,5 +8,5 @@ The status LEDs can now be set to one of three modes: show every state (the defa
 
 Change these with the `led mode` and `led brightness` serial commands, or in the captive portal's new LEDs section, which also lets you preview each state's LED pattern and try colors on the RGB LED. Only the LEDs your board has are shown.
 
-- Brightness is a percent of the LED's full output. Defaults match previous firmware: built-in LED 100%, RGB LED 8%; boards can change them in Kconfig (`OPENSHOCK_LED_*_BRIGHTNESS`)
+- Brightness is stored as 16 bits (0-65535) of the LED's full output; the portal shows it as a percent. Defaults match previous firmware exactly: built-in LED 65535 (100%), RGB LED 5140 (20/255, 7.8%); boards can change them in Kconfig (`OPENSHOCK_LED_*_BRIGHTNESS`)
 - Setting the RGB LED above 30% logs a warning

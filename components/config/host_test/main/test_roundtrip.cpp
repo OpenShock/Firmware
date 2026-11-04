@@ -41,12 +41,12 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetEStopEnabled(true));
   TEST_ASSERT_TRUE(Config::UpdateLedConfig([](Config::LedConfig& led) {
     led.mode                = LedMode::Off;
-    led.rgbNormalBrightness = 200;  // Capped at 100
+    led.rgbNormalBrightness = 60000;  // Above 255: survives only as a u16
     return true;
   }));
 
   const Full before = Snapshot();
-  TEST_ASSERT_EQUAL_UINT8(100, before.led.rgbNormalBrightness);
+  TEST_ASSERT_EQUAL_UINT16(60000, before.led.rgbNormalBrightness);
   TEST_ASSERT_EQUAL_UINT8_ARRAY(bssid, before.wifi.credentialsList[0].bssid.data(), 6);
 
   Reload();

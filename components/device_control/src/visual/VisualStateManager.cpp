@@ -52,13 +52,13 @@ static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 // The `led` section's settings, loaded in Init. Each is atomic on its own; a setter re-applies after storing, so a mix
 // of old and new values read mid-update is replaced at once.
 static std::atomic<OpenShock::LedMode> s_ledMode = OpenShock::LedMode::All;
-static std::atomic<uint8_t> s_monoCriticalBrightness = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;  // Percent of full output
-static std::atomic<uint8_t> s_monoNormalBrightness   = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
-static std::atomic<uint8_t> s_rgbCriticalBrightness  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
-static std::atomic<uint8_t> s_rgbNormalBrightness    = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
+static std::atomic<uint16_t> s_monoCriticalBrightness = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;  // 0-65535 of full output
+static std::atomic<uint16_t> s_monoNormalBrightness   = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
+static std::atomic<uint16_t> s_rgbCriticalBrightness  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
+static std::atomic<uint16_t> s_rgbNormalBrightness    = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
 
 
-static std::atomic<uint8_t>& brightnessSetting(OpenShock::LedType type, OpenShock::LedSignal signal)
+static std::atomic<uint16_t>& brightnessSetting(OpenShock::LedType type, OpenShock::LedSignal signal)
 {
   bool critical = signal == OpenShock::LedSignal::Critical;
   if (type == OpenShock::LedType::Mono) {
@@ -73,21 +73,16 @@ struct Preview {
   uint32_t flags;  // Pattern preview: the state flags whose pattern shows
   uint16_t red, green, blue;  // Color preview: 16 bits per channel
   std::optional<OpenShock::LedType> only;
-  std::optional<uint8_t> brightness;
+  std::optional<uint16_t> brightness;
 };
 static std::optional<Preview> s_preview;
 static esp_timer_handle_t s_previewTimer = nullptr;  // Ends the preview kPreviewDurationMs after the last call
 
-// Percent (0-100) to the mono driver's 0-255 scale, rounded
-static inline uint8_t toDriverBrightness(uint8_t percent)
+// The 16-bit brightness (0-65535) to the mono driver's 0-255 scale, rounded. The RGB driver takes it as is and
+// reduces it to its 10-bit output.
+static inline uint8_t toDriverBrightness(uint16_t brightness)
 {
-  return static_cast<uint8_t>((static_cast<uint32_t>(percent) * 255 + 50) / 100);
-}
-
-// Percent (0-100) to the RGB driver's 0-65535 scale, rounded; the driver dithers what 8 bits can't show
-static inline uint16_t toRgbDriverBrightness(uint8_t percent)
-{
-  return static_cast<uint16_t>((static_cast<uint32_t>(percent) * 65535 + 50) / 100);
+  return static_cast<uint8_t>((static_cast<uint32_t>(brightness) * 255 + 32767) / 65535);
 }
 
 // Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
@@ -304,7 +299,7 @@ static void applyVisualState(uint32_t flags, bool showAll = false)
     s_monoLedDriver->SetBrightness(toDriverBrightness(brightnessSetting(LedType::Mono, signal).load()));
   }
   if (rgbActive) {
-    s_rgbLedDriver->SetBrightness16(toRgbDriverBrightness(brightnessSetting(LedType::Rgb, signal).load()));
+    s_rgbLedDriver->SetBrightness16(brightnessSetting(LedType::Rgb, signal).load());
   }
 
   if (gpioActive && rgbActive) {
@@ -342,7 +337,7 @@ static void applyColorPreview(const Preview& preview)
   }
 
   if (s_rgbLedDriver != nullptr) {
-    s_rgbLedDriver->SetBrightness16(toRgbDriverBrightness(preview.brightness.value_or(s_rgbNormalBrightness.load())));
+    s_rgbLedDriver->SetBrightness16(preview.brightness.value_or(s_rgbNormalBrightness.load()));
     const RgbLedDriver::RGBState16 color[] = {
       rgbLit ? RgbLedDriver::RGBState16 {preview.red, preview.green, preview.blue, 100'000} : RgbLedDriver::RGBState16 {0, 0, 0, 100'000}
     };
@@ -620,19 +615,19 @@ bool VisualStateManager::SetLedMode(LedMode mode)
   });
 }
 
-uint8_t VisualStateManager::GetLedBrightness(LedType type, LedSignal signal)
+uint16_t VisualStateManager::GetLedBrightness(LedType type, LedSignal signal)
 {
   return brightnessSetting(type, signal).load();
 }
 
-bool VisualStateManager::SetLedBrightness(LedType type, LedSignal signal, uint8_t percent)
+bool VisualStateManager::SetLedBrightness(LedType type, LedSignal signal, uint16_t value)
 {
   return UpdateLedConfig([&](Config::LedConfig& led) {
-    uint8_t& brightness = led.Brightness(type, signal);
-    if (brightness == percent) {
+    uint16_t& brightness = led.Brightness(type, signal);
+    if (brightness == value) {
       return false;
     }
-    brightness = percent;  // The section caps it (LedConfig::Normalize)
+    brightness = value;  // The section caps it (LedConfig::Normalize)
     return true;
   });
 }
@@ -647,12 +642,12 @@ bool VisualStateManager::UpdateLedConfig(Util::FunctionRef<bool(Config::LedConfi
   // Under s_applyMutex so two updates can't store their snapshots out of order
   OpenShock::ScopedLock lock__(&s_applyMutex);
 
-  uint8_t rgbBefore[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
+  uint16_t rgbBefore[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
   loadLedConfig();
-  uint8_t rgbAfter[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
+  uint16_t rgbAfter[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
   for (std::size_t i = 0; i < std::size(rgbAfter); ++i) {
-    if (s_rgbLedDriver != nullptr && rgbAfter[i] > VisualStateManager::kRgbBrightnessWarnPercent && rgbAfter[i] != rgbBefore[i]) {
-      OS_LOGW(TAG, "RGB LED %s brightness set to %u%%: above %u%% a WS2812B is glaring and runs warm", i == 0 ? "critical" : "normal", rgbAfter[i], VisualStateManager::kRgbBrightnessWarnPercent);
+    if (s_rgbLedDriver != nullptr && rgbAfter[i] > VisualStateManager::kRgbBrightnessWarn && rgbAfter[i] != rgbBefore[i]) {
+      OS_LOGW(TAG, "RGB LED %s brightness set to %u/65535: above %u a WS2812B is glaring and runs warm", i == 0 ? "critical" : "normal", rgbAfter[i], VisualStateManager::kRgbBrightnessWarn);
     }
   }
 
@@ -698,11 +693,8 @@ void VisualStateManager::PreviewPattern(LedPattern pattern)
   startPreview(Preview {.isColor = false, .flags = flags, .red = 0, .green = 0, .blue = 0, .only = std::nullopt, .brightness = std::nullopt});
 }
 
-void VisualStateManager::PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness)
+void VisualStateManager::PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint16_t> brightness)
 {
-  if (brightness.has_value()) {
-    brightness = std::min(*brightness, Config::LedConfig::kMaxBrightness);
-  }
   startPreview(Preview {.isColor = true, .flags = 0, .red = red, .green = green, .blue = blue, .only = only, .brightness = brightness});
 }
 

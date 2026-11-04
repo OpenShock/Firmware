@@ -2,7 +2,7 @@
 
 // The `led` config section: which states the status LEDs show and how bright they are. Owned by device_control and
 // kept in NVS through the config framework (config/Section.h); namespace "led", keys mode, monoCrit, monoNorm, rgbCrit
-// and rgbNorm (u8).
+// and rgbNorm (u16).
 
 #include "config/Section.h"
 #include "enums/StatusLed.h"
@@ -16,22 +16,21 @@ namespace OpenShock::JSON {
 
 namespace OpenShock::Config {
   struct LedConfig {
-    static constexpr uint8_t kMaxBrightness = 100;  // Brightness is a percent of the LED's full output
-
     LedConfig();  // The defaults: the one place they are defined
-    LedConfig(LedMode mode, uint8_t monoCriticalBrightness, uint8_t monoNormalBrightness, uint8_t rgbCriticalBrightness, uint8_t rgbNormalBrightness);
+    LedConfig(LedMode mode, uint16_t monoCriticalBrightness, uint16_t monoNormalBrightness, uint16_t rgbCriticalBrightness, uint16_t rgbNormalBrightness);
 
     LedMode mode;
-    uint8_t monoCriticalBrightness;
-    uint8_t monoNormalBrightness;
-    uint8_t rgbCriticalBrightness;
-    uint8_t rgbNormalBrightness;
+    // 16-bit, 0-65535 of the LED's full output
+    uint16_t monoCriticalBrightness;
+    uint16_t monoNormalBrightness;
+    uint16_t rgbCriticalBrightness;
+    uint16_t rgbNormalBrightness;
 
-    [[nodiscard]] uint8_t& Brightness(LedType type, LedSignal signal);
-    [[nodiscard]] uint8_t Brightness(LedType type, LedSignal signal) const { return const_cast<LedConfig*>(this)->Brightness(type, signal); }
+    [[nodiscard]] uint16_t& Brightness(LedType type, LedSignal signal);
+    [[nodiscard]] uint16_t Brightness(LedType type, LedSignal signal) const { return const_cast<LedConfig*>(this)->Brightness(type, signal); }
 
-    /// @brief Caps each brightness at kMaxBrightness. The section runs it on every value it takes in.
-    void Normalize();
+    /// @brief Nothing to correct: the mode is checked on load and every uint16 is a valid brightness. The section requires it.
+    void Normalize() { }
 
     /// @brief Reads this section from `partition`; a missing key is its default, a read error fails.
     bool LoadNvs(const char* partition);
@@ -44,6 +43,6 @@ namespace OpenShock::Config {
 
   [[nodiscard]] LedConfig GetLedConfig();
   bool SetLedConfig(const LedConfig& config);
-  /// @brief Read-modify-write of the section (config/Section.h Update); brightness is capped at kMaxBrightness.
+  /// @brief Read-modify-write of the section (config/Section.h Update).
   bool UpdateLedConfig(Util::FunctionRef<bool(LedConfig&)> update);
 }  // namespace OpenShock::Config

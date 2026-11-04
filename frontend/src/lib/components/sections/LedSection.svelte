@@ -55,7 +55,14 @@
 
   let led = $derived(hubState.config?.led);
 
-  // A brightness being dragged, shown instead of the saved value until it is saved
+  // Brightness is stored as 16 bits (0-65535); the sliders move in tenths of a percent, finer than the RGB LED's
+  // 10-bit output is anyway, and an untouched value keeps its exact 16 bits
+  const SLIDER_MAX = 1000;
+  const toSlider = (b: number) => Math.round((b * SLIDER_MAX) / 65535);
+  const fromSlider = (v: number) => Math.round((v * 65535) / SLIDER_MAX);
+  const percentText = (b: number) => `${((b * 100) / 65535).toFixed(1)}%`;
+
+  // A brightness (0-65535) being dragged, shown instead of the saved value until it is saved
   let dragging = $state<{ type: LedType; signal: LedSignal; value: number } | null>(null);
   let saving = $state(false);
   let previewing = $state(false);
@@ -88,7 +95,8 @@
   }
 
   // While dragging: light that LED alone, in the signal's color, at the slider's brightness. Saved on release.
-  function onBrightnessDrag(type: LedType, signal: LedSignal, value: number) {
+  function onBrightnessDrag(type: LedType, signal: LedSignal, sliderValue: number) {
+    const value = fromSlider(sliderValue);
     // Another slider's unsaved value is saved first, or it would snap back to the saved one
     if (saveTimer !== null && dragging && (dragging.type !== type || dragging.signal !== signal)) {
       void saveBrightness();
@@ -105,8 +113,8 @@
   const SAVE_DELAY_MS = 500;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function onBrightnessCommit(type: LedType, signal: LedSignal, value: number) {
-    dragging = { type, signal, value };
+  function onBrightnessCommit(type: LedType, signal: LedSignal, sliderValue: number) {
+    dragging = { type, signal, value: fromSlider(sliderValue) };
     if (saveTimer !== null) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => void saveBrightness(), SAVE_DELAY_MS);
   }
@@ -187,19 +195,20 @@
                 {s.label}
                 <span class="text-muted-foreground font-normal">({s.description})</span>
               </span>
-              <span class="text-sm tabular-nums" aria-hidden="true">{value}%</span>
+              <span class="text-sm tabular-nums" aria-hidden="true">{percentText(value)}</span>
             </div>
             <LabeledSlider
               labelledby={labelId}
-              {value}
-              valuetext="{value}%"
+              value={toSlider(value)}
+              max={SLIDER_MAX}
+              valuetext={percentText(value)}
               onValueChange={(v) => onBrightnessDrag(type, s.signal, v)}
               onValueCommit={(v) => onBrightnessCommit(type, s.signal, v)}
             />
             {#if type === 'rgb' && value > led.rgbWarnAbove}
               <p class="text-warning flex items-center gap-1.5 text-xs">
                 <TriangleAlert class="h-3.5 w-3.5 shrink-0" />
-                Above {led.rgbWarnAbove}% the RGB LED is glaring and runs warm.
+                Above {percentText(led.rgbWarnAbove)} the RGB LED is glaring and runs warm.
               </p>
             {/if}
           </div>

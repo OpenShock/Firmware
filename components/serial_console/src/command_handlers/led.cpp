@@ -61,13 +61,13 @@ static void handleLedBrightnessCommand(std::string_view arg, bool isAutomated)
 
   auto parts = OpenShock::TryStringSplit<3>(arg, ' ');
   if (!parts) {
-    SERPR_ERROR("Invalid arguments (expected <mono|rgb> <critical|normal> <percent>)");
+    SERPR_ERROR("Invalid arguments (expected <mono|rgb> <critical|normal> <0-65535>)");
     return;
   }
 
   auto type    = OpenShock::TryParseLedType((*parts)[0]);
   auto signal  = OpenShock::TryParseLedSignal((*parts)[1]);
-  auto percent = OpenShock::Convert::ToUint8(OpenShock::StringTrim((*parts)[2]));
+  auto value   = OpenShock::Convert::ToUint16(OpenShock::StringTrim((*parts)[2]));
   if (!type) {
     SERPR_ERROR("Invalid LED type (must be mono or rgb)");
     return;
@@ -80,12 +80,12 @@ static void handleLedBrightnessCommand(std::string_view arg, bool isAutomated)
     SERPR_ERROR("Invalid signal (must be critical or normal)");
     return;
   }
-  if (!percent || *percent > 100) {
-    SERPR_ERROR("Invalid brightness (must be a percent, 0-100)");
+  if (!value) {
+    SERPR_ERROR("Invalid brightness (must be 0-65535)");
     return;
   }
 
-  OpenShock::SerialCmds::ReportSaved(OpenShock::VisualStateManager::SetLedBrightness(*type, *signal, *percent));
+  OpenShock::SerialCmds::ReportSaved(OpenShock::VisualStateManager::SetLedBrightness(*type, *signal, *value));
 }
 
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::LedHandler()
@@ -100,7 +100,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::LedH
   auto& setBrightnessCommand = group.addCommand("brightness", "Set the brightness of one LED type for critical (E-Stop, critical error) or normal patterns", handleLedBrightnessCommand);
   setBrightnessCommand.addArgument("type", "mono or rgb", "rgb");
   setBrightnessCommand.addArgument("signal", "critical or normal", "normal");
-  setBrightnessCommand.addArgument("percent", "0-100, of the LED's full output; RGB above 30% logs a warning", "8");
+  setBrightnessCommand.addArgument("brightness", "0-65535, of the LED's full output; RGB above 19661 (30%) logs a warning", "5140");
 
   return group;
 }
