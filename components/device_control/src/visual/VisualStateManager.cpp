@@ -228,12 +228,6 @@ const MonoLedDriver::State kSolidOnPattern[] = {
   {true, 100'000}
 };
 
-const MonoLedDriver::State kSolidOffPattern[] = {
-  {false, 100'000}
-};
-const RgbLedDriver::RGBState kSolidOffRGBPattern[] = {
-  {0, 0, 0, 100'000}
-};
 
 template<std::size_t N>
 static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[N])
@@ -283,11 +277,12 @@ static void applyVisualState(uint32_t flags, bool showAll = false)
   bool critical = (flags & kCriticalMask) != 0;
   LedMode mode  = showAll ? LedMode::All : s_ledMode.load();
   if (mode == LedMode::Off || (mode == LedMode::CriticalOnly && !critical)) {
+    // Off for real: the drivers rest their hardware rather than keep writing black
     if (gpioActive) {
-      s_monoLedDriver->SetPattern(kSolidOffPattern);
+      s_monoLedDriver->Sleep();
     }
     if (rgbActive) {
-      s_rgbLedDriver->SetPattern(kSolidOffRGBPattern);
+      s_rgbLedDriver->Sleep();
     }
     return;
   }
@@ -306,7 +301,7 @@ static void applyVisualState(uint32_t flags, bool showAll = false)
     if (flags == kStatusOKMask) {
       updateVisualStateGPIO(kSolidOnPattern);
     } else {
-      updateVisualStateGPIO(kSolidOffPattern);
+      s_monoLedDriver->Sleep();  // The RGB LED shows every other state
     }
     updateVisualStateRGB(flags);
     return;
@@ -333,15 +328,23 @@ static void applyColorPreview(const Preview& preview)
   if (s_monoLedDriver != nullptr) {
     s_monoLedDriver->SetBrightness(toDriverBrightness(preview.brightness.value_or(s_monoNormalBrightness.load())));
     bool on = monoLit && (preview.red | preview.green | preview.blue) != 0;
-    s_monoLedDriver->SetPattern(on ? kSolidOnPattern : kSolidOffPattern);
+    if (on) {
+      s_monoLedDriver->SetPattern(kSolidOnPattern);
+    } else {
+      s_monoLedDriver->Sleep();
+    }
   }
 
   if (s_rgbLedDriver != nullptr) {
-    s_rgbLedDriver->SetBrightness16(preview.brightness.value_or(s_rgbNormalBrightness.load()));
-    const RgbLedDriver::RGBState16 color[] = {
-      rgbLit ? RgbLedDriver::RGBState16 {preview.red, preview.green, preview.blue, 100'000} : RgbLedDriver::RGBState16 {0, 0, 0, 100'000}
-    };
-    s_rgbLedDriver->SetPattern(color);
+    if (rgbLit) {
+      s_rgbLedDriver->SetBrightness16(preview.brightness.value_or(s_rgbNormalBrightness.load()));
+      const RgbLedDriver::RGBState16 color[] = {
+        {preview.red, preview.green, preview.blue, 100'000}
+      };
+      s_rgbLedDriver->SetPattern(color);
+    } else {
+      s_rgbLedDriver->Sleep();
+    }
   }
 }
 

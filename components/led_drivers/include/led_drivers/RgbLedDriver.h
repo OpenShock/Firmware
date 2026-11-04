@@ -63,6 +63,8 @@ namespace OpenShock {
 
   protected:
     void apply(const RGBState16& state) override;
+    void enterSleep() override;
+    void exitSleep() override;
 
   private:
     static constexpr std::size_t kSymbolsPerFrame = 24;  // 24 bits per LED (8 bits per color * 3 colors)

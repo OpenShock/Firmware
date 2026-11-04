@@ -126,7 +126,9 @@ RgbLedDriver::~RgbLedDriver()
   stopTask();  // before the RMT channel goes away
 
   if (m_rmtChannel != nullptr) {
-    rmt_disable(m_rmtChannel);
+    if (!isAsleep()) {  // Asleep, the channel is already disabled
+      rmt_disable(m_rmtChannel);
+    }
     rmt_del_channel(m_rmtChannel);
     m_rmtChannel = nullptr;
   }
@@ -184,6 +186,23 @@ void RgbLedDriver::apply(const RGBState16& state)
     encodeFrame(frame, out[0], out[1], out[2], true);
   }
   transmit(kDitherFrames, true);
+}
+
+void RgbLedDriver::enterSleep()
+{
+  // One black frame so the LED latches off (it holds its last color), then the channel disabled: that stops any looped
+  // transmission and releases the RMT's clock and power management lock until exitSleep
+  encodeFrame(0, 0, 0, 0, false);
+  transmit(1, false);
+  rmt_disable(m_rmtChannel);
+}
+
+void RgbLedDriver::exitSleep()
+{
+  esp_err_t err = rmt_enable(m_rmtChannel);
+  if (err != ESP_OK) {
+    OS_LOGE(TAG, "Failed to enable the RMT channel after sleep: %s", esp_err_to_name(err));
+  }
 }
 
 void RgbLedDriver::encodeFrame(std::size_t index, uint8_t r, uint8_t g, uint8_t b, bool latchGap)

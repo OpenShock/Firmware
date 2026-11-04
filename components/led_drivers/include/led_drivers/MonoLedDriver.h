@@ -32,6 +32,8 @@ namespace OpenShock {
 
   protected:
     void apply(const State& state) override;
+    void enterSleep() override;
+    void exitSleep() override;
 
   private:
     gpio_num_t m_gpioPin;

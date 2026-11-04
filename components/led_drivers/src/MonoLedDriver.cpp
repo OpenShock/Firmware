@@ -79,6 +79,22 @@ MonoLedDriver::~MonoLedDriver()
   stopTask();
 
   ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);  // TODO: Error handling
+  if (isAsleep()) {
+    ledc_timer_resume(OS_LEDC_SPEED, OS_LEDC_TIMER);  // Leave the timer as it was configured
+  }
+}
+
+void MonoLedDriver::enterSleep()
+{
+  // Output off and held low, then the timer's counter stopped: nothing toggles until exitSleep
+  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);
+  ledc_timer_pause(OS_LEDC_SPEED, OS_LEDC_TIMER);
+}
+
+void MonoLedDriver::exitSleep()
+{
+  // The output comes back with the next apply(): ledc_update_duty enables it again
+  ledc_timer_resume(OS_LEDC_SPEED, OS_LEDC_TIMER);
 }
 
 void MonoLedDriver::apply(const State& state)
