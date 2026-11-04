@@ -1,0 +1,25 @@
+menu "OpenShock LED drivers"
+
+    config OPENSHOCK_RGB_LED_DITHERING
+        bool "Temporal dithering on the RGB LED"
+        default y
+        help
+            The WS2812B takes 8 bits per channel. With dithering the driver keeps 16 bits per
+            channel (color times brightness) and alternates between the two nearest 8-bit
+            steps from frame to frame, so the average shows the 16-bit value: smooth colors
+            and fine dimming at low brightness, where 8 bits are coarsest. Frames only go out
+            while a channel sits between two steps.
+
+            Off, each color is rounded to the nearest 8-bit step and sent once.
+
+    config OPENSHOCK_RGB_LED_DITHER_INTERVAL_MS
+        int "Dither frame interval (ms)"
+        depends on OPENSHOCK_RGB_LED_DITHERING
+        range 1 10
+        default 1
+        help
+            Time between dithered frames. Shorter keeps the alternation above what the eye
+            sees; the slowest fractions (1/256 of a step) still take 256 frames to come
+            around. Each frame costs an RMT transmission of about 30 us.
+
+endmenu

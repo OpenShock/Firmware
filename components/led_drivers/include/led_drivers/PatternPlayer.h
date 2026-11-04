@@ -7,6 +7,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -47,6 +48,12 @@ namespace OpenShock {
 
     virtual void apply(const State& state) = 0;
 
+    /// @brief How often refresh() should run while the current state holds, in milliseconds; 0 for never. Asked after
+    ///        apply() and after each refresh(), on the pattern task, so a driver can refresh only while it needs to.
+    virtual uint32_t refreshIntervalMs() const { return 0; }
+    /// @brief Re-sends the current state (temporal dithering, for one). Runs on the pattern task between apply()s.
+    virtual void refresh() { }
+
     bool startTask(const char* name, uint32_t stackSize)
     {
       return m_task.startExpensive(name, stackSize, 1, [this] { run(); });
@@ -79,10 +86,35 @@ namespace OpenShock {
         for (const State& state : pattern) {
           apply(state);
 
-          // Sleep for the state's duration, but wake immediately on a new pattern or a stop request
-          if (TaskUtils::WaitForNotify(pdMS_TO_TICKS(state.duration)) != 0) {
+          // Hold the state for its duration, refreshing it as often as the driver asks, but wake immediately on a
+          // new pattern or a stop request
+          if (holdState(state.duration)) {
             break;
           }
+        }
+      }
+    }
+
+    // Returns true when woken by a new pattern or a stop request
+    bool holdState(uint32_t durationMs)
+    {
+      const TickType_t start    = xTaskGetTickCount();
+      const TickType_t duration = pdMS_TO_TICKS(durationMs);
+      while (true) {
+        const TickType_t elapsed = xTaskGetTickCount() - start;
+        if (elapsed >= duration) {
+          return false;
+        }
+        TickType_t wait     = duration - elapsed;
+        uint32_t intervalMs = refreshIntervalMs();
+        if (intervalMs != 0) {
+          wait = std::min(wait, std::max<TickType_t>(pdMS_TO_TICKS(intervalMs), 1));
+        }
+        if (TaskUtils::WaitForNotify(wait) != 0) {
+          return true;
+        }
+        if (intervalMs != 0) {
+          refresh();
         }
       }
     }

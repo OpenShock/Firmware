@@ -78,10 +78,16 @@ struct Preview {
 static std::optional<Preview> s_preview;
 static esp_timer_handle_t s_previewTimer = nullptr;  // Ends the preview kPreviewDurationMs after the last call
 
-// Percent (0-100) to the drivers' 0-255 scale, rounded
+// Percent (0-100) to the mono driver's 0-255 scale, rounded
 static inline uint8_t toDriverBrightness(uint8_t percent)
 {
   return static_cast<uint8_t>((static_cast<uint32_t>(percent) * 255 + 50) / 100);
+}
+
+// Percent (0-100) to the RGB driver's 0-65535 scale, rounded; the driver dithers what 8 bits can't show
+static inline uint16_t toRgbDriverBrightness(uint8_t percent)
+{
+  return static_cast<uint16_t>((static_cast<uint32_t>(percent) * 65535 + 50) / 100);
 }
 
 // Sets or clears `flag` and returns whether that changed it. Atomic per flag, so concurrent setters (the event loop,
@@ -298,7 +304,7 @@ static void applyVisualState(uint32_t flags, bool showAll = false)
     s_monoLedDriver->SetBrightness(toDriverBrightness(brightnessSetting(LedType::Mono, signal).load()));
   }
   if (rgbActive) {
-    s_rgbLedDriver->SetBrightness(toDriverBrightness(brightnessSetting(LedType::Rgb, signal).load()));
+    s_rgbLedDriver->SetBrightness16(toRgbDriverBrightness(brightnessSetting(LedType::Rgb, signal).load()));
   }
 
   if (gpioActive && rgbActive) {
@@ -336,7 +342,7 @@ static void applyColorPreview(const Preview& preview)
   }
 
   if (s_rgbLedDriver != nullptr) {
-    s_rgbLedDriver->SetBrightness(toDriverBrightness(preview.brightness.value_or(s_rgbNormalBrightness.load())));
+    s_rgbLedDriver->SetBrightness16(toRgbDriverBrightness(preview.brightness.value_or(s_rgbNormalBrightness.load())));
     const RgbLedDriver::RGBState color[] = {
       rgbLit ? RgbLedDriver::RGBState {preview.red, preview.green, preview.blue, 100'000} : RgbLedDriver::RGBState {0, 0, 0, 100'000}
     };
