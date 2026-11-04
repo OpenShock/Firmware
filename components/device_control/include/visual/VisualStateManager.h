@@ -17,7 +17,10 @@ namespace OpenShock::VisualStateManager {
   /// @brief Whether this board has an LED of `type`. False for both before Init.
   [[nodiscard]] bool HasLed(LedType type);
   /// @brief Whether this board has any status LED.
-  [[nodiscard]] inline bool HasAnyLed() { return HasLed(LedType::Mono) || HasLed(LedType::Rgb); }
+  [[nodiscard]] inline bool HasAnyLed()
+  {
+    return HasLed(LedType::Mono) || HasLed(LedType::Rgb);
+  }
 
   // The setters save to the `led` config section and apply the change at once. A save that raises an RGB brightness
   // above kRgbBrightnessWarn logs a warning: a WS2812B is glaring and runs warm well before full output.

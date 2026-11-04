@@ -17,14 +17,14 @@ using OpenShock::LedMode;
 using OpenShock::LedSignal;
 using OpenShock::LedType;
 
-static constexpr const char* kNamespace    = "led";
-static constexpr const char* kKeyMode      = "mode";
-static constexpr const char* kKeyMonoCrit  = "monoCrit";
-static constexpr const char* kKeyMonoNorm  = "monoNorm";
-static constexpr const char* kKeyRgbCrit   = "rgbCrit";
-static constexpr const char* kKeyRgbNorm   = "rgbNorm";
+static constexpr const char* kNamespace   = "led";
+static constexpr const char* kKeyMode     = "mode";
+static constexpr const char* kKeyMonoCrit = "monoCrit";
+static constexpr const char* kKeyMonoNorm = "monoNorm";
+static constexpr const char* kKeyRgbCrit  = "rgbCrit";
+static constexpr const char* kKeyRgbNorm  = "rgbNorm";
 
-static constexpr LedMode kDefaultMode           = LedMode::All;
+static constexpr LedMode kDefaultMode            = LedMode::All;
 static constexpr uint16_t kDefaultMonoCritBright = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;
 static constexpr uint16_t kDefaultMonoNormBright = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
 static constexpr uint16_t kDefaultRgbCritBright  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
@@ -112,9 +112,8 @@ bool LedConfig::LoadNvs(const char* partition)
   }
 
   uint8_t storedMode = std::to_underlying(kDefaultMode);
-  bool ok = Nvs::Load(*handle, kKeyMode, storedMode, storedMode) && Nvs::Load(*handle, kKeyMonoCrit, monoCriticalBrightness, kDefaultMonoCritBright)
-         && Nvs::Load(*handle, kKeyMonoNorm, monoNormalBrightness, kDefaultMonoNormBright) && Nvs::Load(*handle, kKeyRgbCrit, rgbCriticalBrightness, kDefaultRgbCritBright)
-         && Nvs::Load(*handle, kKeyRgbNorm, rgbNormalBrightness, kDefaultRgbNormBright);
+  bool ok            = Nvs::Load(*handle, kKeyMode, storedMode, storedMode) && Nvs::Load(*handle, kKeyMonoCrit, monoCriticalBrightness, kDefaultMonoCritBright) && Nvs::Load(*handle, kKeyMonoNorm, monoNormalBrightness, kDefaultMonoNormBright)
+         && Nvs::Load(*handle, kKeyRgbCrit, rgbCriticalBrightness, kDefaultRgbCritBright) && Nvs::Load(*handle, kKeyRgbNorm, rgbNormalBrightness, kDefaultRgbNormBright);
   if (!ok) {
     return false;
   }

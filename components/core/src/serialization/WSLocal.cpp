@@ -130,7 +130,7 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
   auto rgb  = brightness(LedType::Rgb);
 
   const OpenShock::LedMode ledMode = Vsm::GetLedMode();
-  auto mode                       = toSchemaLedMode(ledMode);
+  auto mode                        = toSchemaLedMode(ledMode);
   if (!mode) {
     // The LEDs treat a mode they don't know like All (every state shown), so report that
     OS_LOGE(TAG, "Unknown LED mode %u, reporting all", static_cast<unsigned>(std::to_underlying(ledMode)));

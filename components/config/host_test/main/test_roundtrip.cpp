@@ -1,7 +1,7 @@
 // Round trips: a config written by this firmware must read back unchanged after a reboot, through the NVS store
 // and through the jsonconfig (GetAsJSON / SaveFromJSON) path.
-#include <utility>
 #include <freertos/FreeRTOS.h>
+#include <utility>
 
 #include "unity.h"
 

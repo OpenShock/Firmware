@@ -51,12 +51,11 @@ static std::unique_ptr<OpenShock::RgbLedDriver> s_rgbLedDriver;
 
 // The `led` section's settings, loaded in Init. Each is atomic on its own; a setter re-applies after storing, so a mix
 // of old and new values read mid-update is replaced at once.
-static std::atomic<OpenShock::LedMode> s_ledMode = OpenShock::LedMode::All;
+static std::atomic<OpenShock::LedMode> s_ledMode      = OpenShock::LedMode::All;
 static std::atomic<uint16_t> s_monoCriticalBrightness = CONFIG_OPENSHOCK_LED_MONO_CRITICAL_BRIGHTNESS;  // 0-65535 of full output
 static std::atomic<uint16_t> s_monoNormalBrightness   = CONFIG_OPENSHOCK_LED_MONO_NORMAL_BRIGHTNESS;
 static std::atomic<uint16_t> s_rgbCriticalBrightness  = CONFIG_OPENSHOCK_LED_RGB_CRITICAL_BRIGHTNESS;
 static std::atomic<uint16_t> s_rgbNormalBrightness    = CONFIG_OPENSHOCK_LED_RGB_NORMAL_BRIGHTNESS;
-
 
 static std::atomic<uint16_t>& brightnessSetting(OpenShock::LedType type, OpenShock::LedSignal signal)
 {
@@ -70,7 +69,7 @@ static std::atomic<uint16_t>& brightnessSetting(OpenShock::LedType type, OpenSho
 // A preview's content: a state pattern, or a solid color. Guarded by s_applyMutex.
 struct Preview {
   bool isColor;
-  uint32_t flags;  // Pattern preview: the state flags whose pattern shows
+  uint32_t flags;             // Pattern preview: the state flags whose pattern shows
   uint16_t red, green, blue;  // Color preview: 16 bits per channel
   std::optional<OpenShock::LedType> only;
   std::optional<uint16_t> brightness;
@@ -227,7 +226,6 @@ const RgbLedDriver::RGBState kWebSocketConnectedRGBPattern[] = {
 const MonoLedDriver::State kSolidOnPattern[] = {
   {true, 100'000}
 };
-
 
 template<std::size_t N>
 static inline void updateVisualStateGPIO(const MonoLedDriver::State (&override)[N])

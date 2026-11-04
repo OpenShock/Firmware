@@ -120,10 +120,10 @@ namespace OpenShock {
     }
 
     SimpleMutex m_patternMutex;
-    std::vector<State> m_pattern;  // Guarded by m_patternMutex
-    uint32_t m_generation = 0;     // Guarded by m_patternMutex; bumped on every SetPattern and Sleep
-    bool m_sleep          = false; // Guarded by m_patternMutex; Sleep() asked for the hardware to rest
-    bool m_asleep         = false; // Pattern task only: enterSleep() ran and exitSleep() has not
+    std::vector<State> m_pattern;   // Guarded by m_patternMutex
+    uint32_t m_generation = 0;      // Guarded by m_patternMutex; bumped on every SetPattern and Sleep
+    bool m_sleep          = false;  // Guarded by m_patternMutex; Sleep() asked for the hardware to rest
+    bool m_asleep         = false;  // Pattern task only: enterSleep() ran and exitSleep() has not
 
     ManagedTask m_task {"PatternPlayer", "LED pattern task"};
   };

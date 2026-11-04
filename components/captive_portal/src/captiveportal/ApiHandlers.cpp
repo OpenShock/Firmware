@@ -437,9 +437,7 @@ static esp_err_t apiLedPut(httpd_req_t* req)
   }
 
   // Settings only for the LEDs the board has; the portal never shows the others
-  if ((mode && !VisualStateManager::HasAnyLed()) || ((monoCritical || monoNormal) && !VisualStateManager::HasLed(LedType::Mono))
-      || ((rgbCritical || rgbNormal) && !VisualStateManager::HasLed(LedType::Rgb)))
-  {
+  if ((mode && !VisualStateManager::HasAnyLed()) || ((monoCritical || monoNormal) && !VisualStateManager::HasLed(LedType::Mono)) || ((rgbCritical || rgbNormal) && !VisualStateManager::HasLed(LedType::Rgb))) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_NO_SUCH_LED);
   }
 

@@ -65,9 +65,9 @@ static void handleLedBrightnessCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  auto type    = OpenShock::TryParseLedType((*parts)[0]);
-  auto signal  = OpenShock::TryParseLedSignal((*parts)[1]);
-  auto value   = OpenShock::Convert::ToUint16(OpenShock::StringTrim((*parts)[2]));
+  auto type   = OpenShock::TryParseLedType((*parts)[0]);
+  auto signal = OpenShock::TryParseLedSignal((*parts)[1]);
+  auto value  = OpenShock::Convert::ToUint16(OpenShock::StringTrim((*parts)[2]));
   if (!type) {
     SERPR_ERROR("Invalid LED type (must be mono or rgb)");
     return;

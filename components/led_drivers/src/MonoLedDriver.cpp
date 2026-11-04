@@ -78,7 +78,7 @@ MonoLedDriver::~MonoLedDriver()
   // Before the LEDC channel goes away
   stopTask();
 
-  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);  // TODO: Error handling
+  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);       // TODO: Error handling
   if (isAsleep()) {
     ledc_timer_resume(OS_LEDC_SPEED, OS_LEDC_TIMER);  // Leave the timer as it was configured
   }

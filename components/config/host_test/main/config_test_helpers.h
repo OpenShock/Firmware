@@ -10,10 +10,10 @@
 #include "BackendConfig.h"
 #include "captiveportal/CaptivePortalConfig.h"
 #include "estop/EStopConfig.h"
-#include "visual/LedConfig.h"
 #include "OtaUpdateConfig.h"
 #include "radio/RFConfig.h"
 #include "serial_console/SerialInputConfig.h"
+#include "visual/LedConfig.h"
 #include "wifi/WiFiConfig.h"
 
 #include <cstddef>

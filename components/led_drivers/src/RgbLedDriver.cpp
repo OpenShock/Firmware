@@ -167,7 +167,9 @@ void RgbLedDriver::apply(const RGBState16& state)
 
   if (!m_canLoop || !fractional) {
     // A whole 8-bit color (or no room to loop): one frame, the nearest level
-    auto level = [](uint32_t step) { return static_cast<uint8_t>(std::min<uint32_t>((step + kSteps / 2) / kSteps, 255)); };
+    auto level = [](uint32_t step) {
+      return static_cast<uint8_t>(std::min<uint32_t>((step + kSteps / 2) / kSteps, 255));
+    };
     encodeFrame(0, level(steps[0]), level(steps[1]), level(steps[2]), false);
     transmit(1, false);
     return;
