@@ -9,6 +9,10 @@
 
   let { color = $bindable('ff0000'), size = 200, disabled = false, onchange }: Props = $props();
 
+  // White in the middle fading out over the hue ring
+  const WHEEL_BACKGROUND =
+    'radial-gradient(circle closest-side, #fff, transparent), conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
+
   let wheel = $state<HTMLDivElement | null>(null);
   let hue = $state(0); // degrees, 0 = red at the top, clockwise
   let saturation = $state(1);
@@ -75,8 +79,7 @@
   ]}
   style:width="{size}px"
   style:height="{size}px"
-  style:background="radial-gradient(circle closest-side, #fff, transparent), conic-gradient(red,
-  yellow, lime, cyan, blue, magenta, red)"
+  style:background={WHEEL_BACKGROUND}
   role="slider"
   tabindex={disabled ? -1 : 0}
   aria-label="Color"
@@ -93,6 +96,6 @@
     class="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow ring-1 ring-black/40"
     style:left="{markerX}%"
     style:top="{markerY}%"
-    style:background="#{color}"
+    style:background={'#' + color}
   ></span>
 </div>

@@ -24,6 +24,12 @@ namespace Local {
 struct OtaSettings;
 struct OtaSettingsBuilder;
 
+struct LedBrightness;
+struct LedBrightnessBuilder;
+
+struct LedSettings;
+struct LedSettingsBuilder;
+
 struct ReadyMessage;
 struct ReadyMessageBuilder;
 
@@ -79,6 +85,39 @@ inline const char *EnumNameOtaChannel(OtaChannel e) {
   if (::flatbuffers::IsOutRange(e, OtaChannel::Stable, OtaChannel::Develop)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesOtaChannel()[index];
+}
+
+enum class LedMode : uint8_t {
+  All = 0,
+  CriticalOnly = 1,
+  Off = 2,
+  MIN = All,
+  MAX = Off
+};
+
+inline const LedMode (&EnumValuesLedMode())[3] {
+  static const LedMode values[] = {
+    LedMode::All,
+    LedMode::CriticalOnly,
+    LedMode::Off
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLedMode() {
+  static const char * const names[4] = {
+    "All",
+    "CriticalOnly",
+    "Off",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLedMode(LedMode e) {
+  if (::flatbuffers::IsOutRange(e, LedMode::All, LedMode::Off)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLedMode()[index];
 }
 
 enum class HubToLocalMessagePayload : uint8_t {
@@ -288,6 +327,186 @@ inline ::flatbuffers::Offset<OtaSettings> CreateOtaSettingsDirect(
       require_manual_approval);
 }
 
+/// Brightness of one status LED, in percent of its full output.
+struct LedBrightness FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedBrightnessBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedBrightness";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_CRITICAL = 4,
+    VT_NORMAL = 6
+  };
+  /// E-Stop and critical-error patterns
+  uint8_t critical() const {
+    return GetField<uint8_t>(VT_CRITICAL, 0);
+  }
+  /// Every other pattern
+  uint8_t normal() const {
+    return GetField<uint8_t>(VT_NORMAL, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_CRITICAL, 1) &&
+           VerifyField<uint8_t>(verifier, VT_NORMAL, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedBrightnessBuilder {
+  typedef LedBrightness Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_critical(uint8_t critical) {
+    fbb_.AddElement<uint8_t>(LedBrightness::VT_CRITICAL, critical, 0);
+  }
+  void add_normal(uint8_t normal) {
+    fbb_.AddElement<uint8_t>(LedBrightness::VT_NORMAL, normal, 0);
+  }
+  explicit LedBrightnessBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedBrightness> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedBrightness>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedBrightness> CreateLedBrightness(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint8_t critical = 0,
+    uint8_t normal = 0) {
+  LedBrightnessBuilder builder_(_fbb);
+  builder_.add_normal(normal);
+  builder_.add_critical(critical);
+  return builder_.Finish();
+}
+
+struct LedBrightness::Traits {
+  using type = LedBrightness;
+  static auto constexpr Create = CreateLedBrightness;
+};
+
+/// The status LED settings the portal shows and edits.
+struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedSettingsBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedSettings";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_MODE = 4,
+    VT_HAS_MONO = 6,
+    VT_HAS_RGB = 8,
+    VT_MONO = 10,
+    VT_RGB = 12,
+    VT_RGB_WARN_ABOVE = 14,
+    VT_PREVIEW_MS = 16
+  };
+  OpenShock::Serialization::Local::LedMode mode() const {
+    return static_cast<OpenShock::Serialization::Local::LedMode>(GetField<uint8_t>(VT_MODE, 0));
+  }
+  bool has_mono() const {
+    return GetField<uint8_t>(VT_HAS_MONO, 0) != 0;
+  }
+  bool has_rgb() const {
+    return GetField<uint8_t>(VT_HAS_RGB, 0) != 0;
+  }
+  const OpenShock::Serialization::Local::LedBrightness *mono() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedBrightness *>(VT_MONO);
+  }
+  const OpenShock::Serialization::Local::LedBrightness *rgb() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedBrightness *>(VT_RGB);
+  }
+  /// The hub warns about an RGB brightness above this percent.
+  uint8_t rgb_warn_above() const {
+    return GetField<uint8_t>(VT_RGB_WARN_ABOVE, 0);
+  }
+  /// How long a preview holds the LEDs after the last preview message.
+  uint32_t preview_ms() const {
+    return GetField<uint32_t>(VT_PREVIEW_MS, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_MODE, 1) &&
+           VerifyField<uint8_t>(verifier, VT_HAS_MONO, 1) &&
+           VerifyField<uint8_t>(verifier, VT_HAS_RGB, 1) &&
+           VerifyOffset(verifier, VT_MONO) &&
+           verifier.VerifyTable(mono()) &&
+           VerifyOffset(verifier, VT_RGB) &&
+           verifier.VerifyTable(rgb()) &&
+           VerifyField<uint8_t>(verifier, VT_RGB_WARN_ABOVE, 1) &&
+           VerifyField<uint32_t>(verifier, VT_PREVIEW_MS, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedSettingsBuilder {
+  typedef LedSettings Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_mode(OpenShock::Serialization::Local::LedMode mode) {
+    fbb_.AddElement<uint8_t>(LedSettings::VT_MODE, static_cast<uint8_t>(mode), 0);
+  }
+  void add_has_mono(bool has_mono) {
+    fbb_.AddElement<uint8_t>(LedSettings::VT_HAS_MONO, static_cast<uint8_t>(has_mono), 0);
+  }
+  void add_has_rgb(bool has_rgb) {
+    fbb_.AddElement<uint8_t>(LedSettings::VT_HAS_RGB, static_cast<uint8_t>(has_rgb), 0);
+  }
+  void add_mono(::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> mono) {
+    fbb_.AddOffset(LedSettings::VT_MONO, mono);
+  }
+  void add_rgb(::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> rgb) {
+    fbb_.AddOffset(LedSettings::VT_RGB, rgb);
+  }
+  void add_rgb_warn_above(uint8_t rgb_warn_above) {
+    fbb_.AddElement<uint8_t>(LedSettings::VT_RGB_WARN_ABOVE, rgb_warn_above, 0);
+  }
+  void add_preview_ms(uint32_t preview_ms) {
+    fbb_.AddElement<uint32_t>(LedSettings::VT_PREVIEW_MS, preview_ms, 0);
+  }
+  explicit LedSettingsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedSettings> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedSettings>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedSettings> CreateLedSettings(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Local::LedMode mode = OpenShock::Serialization::Local::LedMode::All,
+    bool has_mono = false,
+    bool has_rgb = false,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> mono = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedBrightness> rgb = 0,
+    uint8_t rgb_warn_above = 0,
+    uint32_t preview_ms = 0) {
+  LedSettingsBuilder builder_(_fbb);
+  builder_.add_preview_ms(preview_ms);
+  builder_.add_rgb(rgb);
+  builder_.add_mono(mono);
+  builder_.add_rgb_warn_above(rgb_warn_above);
+  builder_.add_has_rgb(has_rgb);
+  builder_.add_has_mono(has_mono);
+  builder_.add_mode(mode);
+  return builder_.Finish();
+}
+
+struct LedSettings::Traits {
+  using type = LedSettings;
+  static auto constexpr Create = CreateLedSettings;
+};
+
 struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReadyMessageBuilder Builder;
   struct Traits;
@@ -305,7 +524,8 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_ESTOP_ENABLED = 18,
     VT_ESTOP_GPIO_PIN = 20,
     VT_SAVED_SSIDS = 22,
-    VT_OTA = 24
+    VT_OTA = 24,
+    VT_LED = 26
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -341,6 +561,9 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Local::OtaSettings *ota() const {
     return GetPointer<const OpenShock::Serialization::Local::OtaSettings *>(VT_OTA);
   }
+  const OpenShock::Serialization::Local::LedSettings *led() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedSettings *>(VT_LED);
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -361,6 +584,8 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyVectorOfStrings(saved_ssids()) &&
            VerifyOffset(verifier, VT_OTA) &&
            verifier.VerifyTable(ota()) &&
+           VerifyOffset(verifier, VT_LED) &&
+           verifier.VerifyTable(led()) &&
            verifier.EndTable();
   }
 };
@@ -402,6 +627,9 @@ struct ReadyMessageBuilder {
   void add_ota(::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota) {
     fbb_.AddOffset(ReadyMessage::VT_OTA, ota);
   }
+  void add_led(::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led) {
+    fbb_.AddOffset(ReadyMessage::VT_LED, led);
+  }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -425,8 +653,10 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     bool estop_enabled = false,
     int8_t estop_gpio_pin = -1,
     ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> saved_ssids = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_led(led);
   builder_.add_ota(ota);
   builder_.add_saved_ssids(saved_ssids);
   builder_.add_gpio_valid_outputs(gpio_valid_outputs);
@@ -458,7 +688,8 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
     bool estop_enabled = false,
     int8_t estop_gpio_pin = -1,
     const std::vector<::flatbuffers::Offset<::flatbuffers::String>> *saved_ssids = nullptr,
-    ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0) {
   auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<int8_t>(*gpio_valid_inputs) : 0;
   auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<int8_t>(*gpio_valid_outputs) : 0;
   auto saved_ssids__ = saved_ssids ? _fbb.CreateVector<::flatbuffers::Offset<::flatbuffers::String>>(*saved_ssids) : 0;
@@ -474,7 +705,8 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
       estop_enabled,
       estop_gpio_pin,
       saved_ssids__,
-      ota);
+      ota,
+      led);
 }
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

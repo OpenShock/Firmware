@@ -12,6 +12,6 @@ The captive portal has a new LEDs section with the same settings, brightness sli
 
 - Add the `led` config section (NVS namespace `led`, keys `mode`, `monoCrit`, `monoNorm`, `rgbCrit`, `rgbNorm` (u8); `led.mode`, `led.monoCriticalBrightness`, `led.monoNormalBrightness`, `led.rgbCriticalBrightness` and `led.rgbNormalBrightness` in jsonconfig)
 - The defaults keep today's look: every state shown, the built-in LED at 100%, the RGB LED at 8% (20/255). The default brightnesses are Kconfig options (`OPENSHOCK_LED_*_BRIGHTNESS`)
-- Captive portal API: `GET`/`PUT /api/led` reads and saves the settings, `POST /api/led/preview?pattern=` or `?color=RRGGBB[&led=][&brightness=]` previews for 10 seconds without saving, `DELETE /api/led/preview` ends a preview
+- The portal gets the LED settings in its Ready message and saves them with `PUT /api/led` (any subset in one config write). Previews stream over the local WebSocket (`LedPreviewPatternMessage`, `LedPreviewColorMessage`, `LedPreviewStopMessage`), rate limited by the portal, and last 10 seconds after the last one without saving anything
 - An RGB brightness above 30% logs a warning
 - The LED test (`ledtest`) shows every state pattern whatever the mode, at the configured brightness

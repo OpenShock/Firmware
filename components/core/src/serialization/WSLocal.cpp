@@ -7,6 +7,7 @@
 #include "OtaUpdateConfig.h"
 #include "radio/RFConfig.h"
 #include "util/HexUtils.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiConfig.h"
 #include "wifi/WiFiNetwork.h"
 
@@ -75,6 +76,24 @@ static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::Fl
   return Local::CreateOtaSettings(builder, ota.isEnabled, cdnDomain, static_cast<Local::OtaChannel>(ota.updateChannel), ota.checkInterval, ota.allowBackendManagement, ota.requireManualApproval);
 }
 
+// createLedSettings casts between these by value
+static_assert(std::to_underlying(OpenShock::LedMode::All) == std::to_underlying(Local::LedMode::All));
+static_assert(std::to_underlying(OpenShock::LedMode::CriticalOnly) == std::to_underlying(Local::LedMode::CriticalOnly));
+static_assert(std::to_underlying(OpenShock::LedMode::Off) == std::to_underlying(Local::LedMode::Off));
+
+static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::FlatBufferBuilder& builder)
+{
+  namespace Vsm = OpenShock::VisualStateManager;
+  using OpenShock::LedSignal;
+  using OpenShock::LedType;
+
+  auto brightness = [&](LedType type) { return Local::CreateLedBrightness(builder, Vsm::GetLedBrightness(type, LedSignal::Critical), Vsm::GetLedBrightness(type, LedSignal::Normal)); };
+  auto mono       = brightness(LedType::Mono);
+  auto rgb        = brightness(LedType::Rgb);
+
+  return Local::CreateLedSettings(builder, static_cast<Local::LedMode>(Vsm::GetLedMode()), Vsm::HasLed(LedType::Mono), Vsm::HasLed(LedType::Rgb), mono, rgb, Vsm::kRgbBrightnessWarnPercent, Vsm::kPreviewDurationMs);
+}
+
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)
 {
   flatbuffers::FlatBufferBuilder builder(64 + message.length());
@@ -106,11 +125,12 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
   auto savedSsidsOffset = builder.CreateVector(savedSsids);
 
   auto otaOffset = createOtaSettings(builder);
+  auto ledOffset = createLedSettings(builder);
 
   const auto rfTxPin = static_cast<int8_t>(OpenShock::Config::GetRFConfigTxPin());
   const auto estop   = OpenShock::Config::GetEStopConfig();
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset);
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset, ledOffset);
 
   return finishMessage(builder, Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset, callback);
 }

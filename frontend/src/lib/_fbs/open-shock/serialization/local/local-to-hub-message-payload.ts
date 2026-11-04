@@ -3,32 +3,44 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 import { ShockerCommandList } from '../../../open-shock/serialization/common/shocker-command-list';
+import { LedPreviewColorMessage } from '../../../open-shock/serialization/local/led-preview-color-message';
+import { LedPreviewPatternMessage } from '../../../open-shock/serialization/local/led-preview-pattern-message';
+import { LedPreviewStopMessage } from '../../../open-shock/serialization/local/led-preview-stop-message';
 
 
 export enum LocalToHubMessagePayload {
   NONE = 0,
-  Common_ShockerCommandList = 1
+  Common_ShockerCommandList = 1,
+  LedPreviewPatternMessage = 2,
+  LedPreviewColorMessage = 3,
+  LedPreviewStopMessage = 4
 }
 
 export function unionToLocalToHubMessagePayload(
   type: LocalToHubMessagePayload,
-  accessor: (obj:ShockerCommandList) => ShockerCommandList|null
-): ShockerCommandList|null {
+  accessor: (obj:LedPreviewColorMessage|LedPreviewPatternMessage|LedPreviewStopMessage|ShockerCommandList) => LedPreviewColorMessage|LedPreviewPatternMessage|LedPreviewStopMessage|ShockerCommandList|null
+): LedPreviewColorMessage|LedPreviewPatternMessage|LedPreviewStopMessage|ShockerCommandList|null {
   switch(LocalToHubMessagePayload[type]) {
     case 'NONE': return null; 
     case 'Common_ShockerCommandList': return accessor(new ShockerCommandList())! as ShockerCommandList;
+    case 'LedPreviewPatternMessage': return accessor(new LedPreviewPatternMessage())! as LedPreviewPatternMessage;
+    case 'LedPreviewColorMessage': return accessor(new LedPreviewColorMessage())! as LedPreviewColorMessage;
+    case 'LedPreviewStopMessage': return accessor(new LedPreviewStopMessage())! as LedPreviewStopMessage;
     default: return null;
   }
 }
 
 export function unionListToLocalToHubMessagePayload(
   type: LocalToHubMessagePayload, 
-  accessor: (index: number, obj:ShockerCommandList) => ShockerCommandList|null, 
+  accessor: (index: number, obj:LedPreviewColorMessage|LedPreviewPatternMessage|LedPreviewStopMessage|ShockerCommandList) => LedPreviewColorMessage|LedPreviewPatternMessage|LedPreviewStopMessage|ShockerCommandList|null, 
   index: number
-): ShockerCommandList|null {
+): LedPreviewColorMessage|LedPreviewPatternMessage|LedPreviewStopMessage|ShockerCommandList|null {
   switch(LocalToHubMessagePayload[type]) {
     case 'NONE': return null; 
     case 'Common_ShockerCommandList': return accessor(index, new ShockerCommandList())! as ShockerCommandList;
+    case 'LedPreviewPatternMessage': return accessor(index, new LedPreviewPatternMessage())! as LedPreviewPatternMessage;
+    case 'LedPreviewColorMessage': return accessor(index, new LedPreviewColorMessage())! as LedPreviewColorMessage;
+    case 'LedPreviewStopMessage': return accessor(index, new LedPreviewStopMessage())! as LedPreviewStopMessage;
     default: return null;
   }
 }

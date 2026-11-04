@@ -2,5 +2,10 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
+export { LedPreviewColorMessage } from './local/led-preview-color-message';
+export { LedPreviewPattern } from './local/led-preview-pattern';
+export { LedPreviewPatternMessage } from './local/led-preview-pattern-message';
+export { LedPreviewStopMessage } from './local/led-preview-stop-message';
+export { LedTarget } from './local/led-target';
 export { LocalToHubMessage } from './local/local-to-hub-message';
 export { LocalToHubMessagePayload } from './local/local-to-hub-message-payload';
