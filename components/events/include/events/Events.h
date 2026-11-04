@@ -14,6 +14,8 @@ enum {
   OPENSHOCK_EVENT_WIFI_STATE_CHANGED,            // Event for when the WiFi station connectivity state changes
   OPENSHOCK_EVENT_DEVICE_ACTIVITY,               // A shocker command was accepted (no payload)
   OPENSHOCK_EVENT_LED_CONFIG_CHANGED,            // The LED settings were saved and applied (no payload)
+  OPENSHOCK_EVENT_LED_STATUS_CHANGED,            // What the LEDs show changed, an override ended, or an LED request failed (VisualStateManager::LedStatusNotice)
+  OPENSHOCK_EVENT_LED_OVERRIDE_DUE,              // An LED override deadline passed; VisualStateManager's own timer tick (no payload)
 };
 
 // OPENSHOCK_EVENT_DEVICE_ACTIVITY is posted at most this often, so a listener's view of the last activity can be this

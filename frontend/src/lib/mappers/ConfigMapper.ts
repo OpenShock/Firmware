@@ -1,8 +1,8 @@
-import type { LedBrightness as LedBrightnessTable } from '#lib/_fbs/open-shock/serialization/local/led-brightness.js';
-import { LedMode as FbsLedMode } from '#lib/_fbs/open-shock/serialization/local/led-mode.js';
 import type { LedSettings } from '#lib/_fbs/open-shock/serialization/local/led-settings.js';
 import type { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import type { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
+import type { LedBrightness as LedBrightnessTable } from '#lib/_fbs/open-shock/serialization/types/led-brightness.js';
+import { LedMode as FbsLedMode } from '#lib/_fbs/open-shock/serialization/types/led-mode.js';
 
 export interface OtaUpdateConfig {
   isEnabled: boolean;
@@ -26,7 +26,6 @@ export interface LedConfig {
   mono: LedBrightness;
   rgb: LedBrightness;
   rgbWarnAbove: number; // RGB brightness (0-65535) above which the hub warns
-  previewMs: number; // How long a preview holds the LEDs after the last preview message
 }
 
 // The settings the portal shows, as the hub reports them in its Ready message.
@@ -57,7 +56,6 @@ export function mapLedConfig(led: LedSettings): LedConfig {
     mono: mapBrightness(led.mono()),
     rgb: mapBrightness(led.rgb()),
     rgbWarnAbove: led.rgbWarnAbove(),
-    previewMs: led.previewMs(),
   };
 }
 

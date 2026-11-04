@@ -4,8 +4,8 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { LedBrightness } from '../../../open-shock/serialization/local/led-brightness';
-import { LedMode } from '../../../open-shock/serialization/local/led-mode';
+import { LedBrightness } from '../../../open-shock/serialization/types/led-brightness';
+import { LedMode } from '../../../open-shock/serialization/types/led-mode';
 
 
 /**
@@ -59,16 +59,8 @@ rgbWarnAbove():number {
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
-/**
- * How long a preview holds the LEDs after the last preview message.
- */
-previewMs():number {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
-}
-
 static startLedSettings(builder:flatbuffers.Builder) {
-  builder.startObject(5);
+  builder.startObject(4);
 }
 
 static addMode(builder:flatbuffers.Builder, mode:LedMode) {
@@ -85,10 +77,6 @@ static addRgb(builder:flatbuffers.Builder, rgbOffset:flatbuffers.Offset) {
 
 static addRgbWarnAbove(builder:flatbuffers.Builder, rgbWarnAbove:number) {
   builder.addFieldInt16(3, rgbWarnAbove, 0);
-}
-
-static addPreviewMs(builder:flatbuffers.Builder, previewMs:number) {
-  builder.addFieldInt16(4, previewMs, 0);
 }
 
 static endLedSettings(builder:flatbuffers.Builder):flatbuffers.Offset {

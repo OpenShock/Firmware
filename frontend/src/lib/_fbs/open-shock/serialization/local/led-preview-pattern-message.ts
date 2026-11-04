@@ -4,11 +4,11 @@
 
 import * as flatbuffers from 'flatbuffers';
 
-import { LedPreviewPattern } from '../../../open-shock/serialization/local/led-preview-pattern';
+import { LedPattern } from '../../../open-shock/serialization/types/led-pattern';
 
 
 /**
- * Shows a state's pattern on the status LEDs whatever the LED mode, at the saved brightness. Nothing is saved.
+ * Shows a state's pattern whatever the LED mode, for about two of its cycles. Nothing is saved.
  */
 export class LedPreviewPatternMessage {
   bb: flatbuffers.ByteBuffer|null = null;
@@ -28,17 +28,26 @@ static getSizePrefixedRootAsLedPreviewPatternMessage(bb:flatbuffers.ByteBuffer, 
   return (obj || new LedPreviewPatternMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-pattern():LedPreviewPattern {
+seq():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : LedPreviewPattern.WifiDisconnected;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
+}
+
+pattern():LedPattern {
+  const offset = this.bb!.__offset(this.bb_pos, 6);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : LedPattern.WifiDisconnected;
 }
 
 static startLedPreviewPatternMessage(builder:flatbuffers.Builder) {
-  builder.startObject(1);
+  builder.startObject(2);
 }
 
-static addPattern(builder:flatbuffers.Builder, pattern:LedPreviewPattern) {
-  builder.addFieldInt8(0, pattern, LedPreviewPattern.WifiDisconnected);
+static addSeq(builder:flatbuffers.Builder, seq:number) {
+  builder.addFieldInt16(0, seq, 0);
+}
+
+static addPattern(builder:flatbuffers.Builder, pattern:LedPattern) {
+  builder.addFieldInt8(1, pattern, LedPattern.WifiDisconnected);
 }
 
 static endLedPreviewPatternMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -46,8 +55,9 @@ static endLedPreviewPatternMessage(builder:flatbuffers.Builder):flatbuffers.Offs
   return offset;
 }
 
-static createLedPreviewPatternMessage(builder:flatbuffers.Builder, pattern:LedPreviewPattern):flatbuffers.Offset {
+static createLedPreviewPatternMessage(builder:flatbuffers.Builder, seq:number, pattern:LedPattern):flatbuffers.Offset {
   LedPreviewPatternMessage.startLedPreviewPatternMessage(builder);
+  LedPreviewPatternMessage.addSeq(builder, seq);
   LedPreviewPatternMessage.addPattern(builder, pattern);
   return LedPreviewPatternMessage.endLedPreviewPatternMessage(builder);
 }

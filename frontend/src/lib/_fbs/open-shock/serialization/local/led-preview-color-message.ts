@@ -4,12 +4,13 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { LedSignal } from '../../../open-shock/serialization/local/led-signal';
 import { LedTarget } from '../../../open-shock/serialization/local/led-target';
 
 
 /**
- * Shows a solid color on the status LEDs: the RGB LED in the color, the mono LED on unless it is black.
- * Sent at a high rate while the user drags a color or brightness control. Nothing is saved.
+ * Shows a solid color: the RGB LED in the color, the mono LED on unless it is black. Sent at a high rate while the
+ * user drags a color or brightness control; the hub ends it two seconds after the last one. Nothing is saved.
  */
 export class LedPreviewColorMessage {
   bb: flatbuffers.ByteBuffer|null = null;
@@ -29,21 +30,26 @@ static getSizePrefixedRootAsLedPreviewColorMessage(bb:flatbuffers.ByteBuffer, ob
   return (obj || new LedPreviewColorMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
-/**
- * 16 bits per channel (0-65535); the hub reduces them to what the RGB LED shows.
- */
-red():number {
+seq():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
-green():number {
+/**
+ * 16 bits per channel (0-65535); the hub reduces them to what the RGB LED shows.
+ */
+red():number {
   const offset = this.bb!.__offset(this.bb_pos, 6);
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
-blue():number {
+green():number {
   const offset = this.bb!.__offset(this.bb_pos, 8);
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
+}
+
+blue():number {
+  const offset = this.bb!.__offset(this.bb_pos, 10);
   return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
@@ -51,40 +57,44 @@ blue():number {
  * The LED to light; the other stays dark. A target the board doesn't have lights nothing.
  */
 target():LedTarget {
-  const offset = this.bb!.__offset(this.bb_pos, 10);
+  const offset = this.bb!.__offset(this.bb_pos, 12);
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : LedTarget.All;
 }
 
 /**
- * 16-bit brightness (0-65535) for this preview only; null is each LED's saved normal brightness.
+ * Which brightness setting it shows at: the client's draft if it holds one, else the saved one.
  */
-brightness():number|null {
-  const offset = this.bb!.__offset(this.bb_pos, 12);
-  return offset ? this.bb!.readUint16(this.bb_pos + offset) : null;
+signal():LedSignal {
+  const offset = this.bb!.__offset(this.bb_pos, 14);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : LedSignal.Normal;
 }
 
 static startLedPreviewColorMessage(builder:flatbuffers.Builder) {
-  builder.startObject(5);
+  builder.startObject(6);
+}
+
+static addSeq(builder:flatbuffers.Builder, seq:number) {
+  builder.addFieldInt16(0, seq, 0);
 }
 
 static addRed(builder:flatbuffers.Builder, red:number) {
-  builder.addFieldInt16(0, red, 0);
+  builder.addFieldInt16(1, red, 0);
 }
 
 static addGreen(builder:flatbuffers.Builder, green:number) {
-  builder.addFieldInt16(1, green, 0);
+  builder.addFieldInt16(2, green, 0);
 }
 
 static addBlue(builder:flatbuffers.Builder, blue:number) {
-  builder.addFieldInt16(2, blue, 0);
+  builder.addFieldInt16(3, blue, 0);
 }
 
 static addTarget(builder:flatbuffers.Builder, target:LedTarget) {
-  builder.addFieldInt8(3, target, LedTarget.All);
+  builder.addFieldInt8(4, target, LedTarget.All);
 }
 
-static addBrightness(builder:flatbuffers.Builder, brightness:number) {
-  builder.addFieldInt16(4, brightness, null);
+static addSignal(builder:flatbuffers.Builder, signal:LedSignal) {
+  builder.addFieldInt8(5, signal, LedSignal.Normal);
 }
 
 static endLedPreviewColorMessage(builder:flatbuffers.Builder):flatbuffers.Offset {
@@ -92,14 +102,14 @@ static endLedPreviewColorMessage(builder:flatbuffers.Builder):flatbuffers.Offset
   return offset;
 }
 
-static createLedPreviewColorMessage(builder:flatbuffers.Builder, red:number, green:number, blue:number, target:LedTarget, brightness:number|null):flatbuffers.Offset {
+static createLedPreviewColorMessage(builder:flatbuffers.Builder, seq:number, red:number, green:number, blue:number, target:LedTarget, signal:LedSignal):flatbuffers.Offset {
   LedPreviewColorMessage.startLedPreviewColorMessage(builder);
+  LedPreviewColorMessage.addSeq(builder, seq);
   LedPreviewColorMessage.addRed(builder, red);
   LedPreviewColorMessage.addGreen(builder, green);
   LedPreviewColorMessage.addBlue(builder, blue);
   LedPreviewColorMessage.addTarget(builder, target);
-  if (brightness !== null)
-    LedPreviewColorMessage.addBrightness(builder, brightness);
+  LedPreviewColorMessage.addSignal(builder, signal);
   return LedPreviewColorMessage.endLedPreviewColorMessage(builder);
 }
 }

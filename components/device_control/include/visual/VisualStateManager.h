@@ -3,9 +3,9 @@
 #include "enums/StatusLed.h"
 #include "util/FunctionRef.h"
 #include "util/PercentUtils.h"
+#include "visual/LedOverrides.h"  // Previews and unsaved brightness
 
 #include <cstdint>
-#include <optional>
 
 namespace OpenShock::Config {
   struct LedConfig;
@@ -41,32 +41,7 @@ namespace OpenShock::VisualStateManager {
   void SetCriticalError();
   void SetScanningStarted();
 
-  // Previews take over the LEDs for a few seconds after the last preview call, then the live state shows again.
-  // State events keep being tracked meanwhile. The LED test wins over a preview.
-
-  enum class LedPattern : uint8_t {
-    WiFiDisconnected,
-    WiFiScanning,
-    NoBackend,  // Network up, gateway not connected
-    Connected,
-    EStopped,
-    EStopClearing,
-    EStopAwaitingRelease,
-    CriticalError,
-  };
-
-  inline constexpr uint16_t kPreviewDurationMs = 10'000;  // uint16: the portal gets it as LedSettings.preview_ms
-
-  /// @brief Shows `pattern` whatever the LED mode, at the configured brightness.
-  void PreviewPattern(LedPattern pattern);
-  /// @brief Shows a solid color: the RGB LED in `red`/`green`/`blue` (16 bits per channel, 0-65535; the driver dithers
-  ///        what the LED's 8 bits can't show), the mono LED on unless the color is black.
-  /// @param only Light only this LED; the other stays dark. All LEDs when unset.
-  /// @param brightness 0-65535 for this preview only; each LED's normal brightness when unset.
-  void PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint16_t> brightness);
-  /// @brief Ends a preview early.
-  void StopPreview();
-
-  /// Cycles through all LED patterns for visual verification. Blocks for ~20s.
+  /// Cycles through all LED patterns for visual verification. Blocks for ~20s. Ends every override, and turns new ones
+  /// down until it is done.
   void RunLedTest();
 }  // namespace OpenShock::VisualStateManager

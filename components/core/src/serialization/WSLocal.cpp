@@ -97,18 +97,17 @@ static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::Fl
   return Local::CreateOtaSettings(builder, ota.isEnabled, cdnDomain, channel.value_or(Local::OtaChannel::Stable), ota.checkInterval, ota.allowBackendManagement, ota.requireManualApproval);
 }
 
-// createLedSettings casts between these by value
 // Exhaustive with no default on purpose: -Werror=switch fails the build when LedMode gains a value that is not mapped
 // here. Any other value (a caller can pass anything) falls out as nullopt.
-static std::optional<Local::LedMode> toSchemaLedMode(OpenShock::LedMode mode)
+static std::optional<Types::LedMode> toSchemaLedMode(OpenShock::LedMode mode)
 {
   switch (mode) {
     case OpenShock::LedMode::All:
-      return Local::LedMode::All;
+      return Types::LedMode::All;
     case OpenShock::LedMode::CriticalOnly:
-      return Local::LedMode::CriticalOnly;
+      return Types::LedMode::CriticalOnly;
     case OpenShock::LedMode::Off:
-      return Local::LedMode::Off;
+      return Types::LedMode::Off;
   }
   return std::nullopt;
 }
@@ -120,11 +119,11 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
   using OpenShock::LedType;
 
   // Only the LEDs the board has, so the portal shows no option for one that isn't there
-  auto brightness = [&](LedType type) -> flatbuffers::Offset<Local::LedBrightness> {
+  auto brightness = [&](LedType type) -> flatbuffers::Offset<Types::LedBrightness> {
     if (!Vsm::HasLed(type)) {
       return 0;
     }
-    return Local::CreateLedBrightness(builder, Vsm::GetLedBrightness(type, LedSignal::Critical), Vsm::GetLedBrightness(type, LedSignal::Normal));
+    return Types::CreateLedBrightness(builder, Vsm::GetLedBrightness(type, LedSignal::Critical), Vsm::GetLedBrightness(type, LedSignal::Normal));
   };
   auto mono = brightness(LedType::Mono);
   auto rgb  = brightness(LedType::Rgb);
@@ -136,7 +135,118 @@ static flatbuffers::Offset<Local::LedSettings> createLedSettings(flatbuffers::Fl
     OS_LOGE(TAG, "Unknown LED mode %u, reporting all", static_cast<unsigned>(std::to_underlying(ledMode)));
   }
 
-  return Local::CreateLedSettings(builder, mode.value_or(Local::LedMode::All), mono, rgb, Vsm::kRgbBrightnessWarn, Vsm::kPreviewDurationMs);
+  return Local::CreateLedSettings(builder, mode.value_or(Types::LedMode::All), mono, rgb, Vsm::kRgbBrightnessWarn);
+}
+
+// The LED status conversions: exhaustive switches like the ones above, so a new value fails the build until it is
+// mapped. A value outside the enum (none is produced) falls out as the first one.
+
+static Types::LedPattern toSchemaLedPattern(OpenShock::VisualStateManager::LedPattern pattern)
+{
+  using OpenShock::VisualStateManager::LedPattern;
+  switch (pattern) {
+    case LedPattern::WiFiDisconnected:
+      return Types::LedPattern::WifiDisconnected;
+    case LedPattern::WiFiScanning:
+      return Types::LedPattern::WifiScanning;
+    case LedPattern::NoBackend:
+      return Types::LedPattern::NoBackend;
+    case LedPattern::Connected:
+      return Types::LedPattern::Connected;
+    case LedPattern::EStopped:
+      return Types::LedPattern::EStopped;
+    case LedPattern::EStopClearing:
+      return Types::LedPattern::EStopClearing;
+    case LedPattern::EStopAwaitingRelease:
+      return Types::LedPattern::EStopAwaitingRelease;
+    case LedPattern::CriticalError:
+      return Types::LedPattern::CriticalError;
+  }
+  return Types::LedPattern::WifiDisconnected;
+}
+
+static Local::LedShowing toSchemaLedShowing(OpenShock::VisualStateManager::LedShowing showing)
+{
+  using OpenShock::VisualStateManager::LedShowing;
+  switch (showing) {
+    case LedShowing::Live:
+      return Local::LedShowing::Live;
+    case LedShowing::Hidden:
+      return Local::LedShowing::Hidden;
+    case LedShowing::Pattern:
+      return Local::LedShowing::Pattern;
+    case LedShowing::Color:
+      return Local::LedShowing::Color;
+    case LedShowing::Test:
+      return Local::LedShowing::Test;
+  }
+  return Local::LedShowing::Live;
+}
+
+static Types::LedOverrideLayer toSchemaLedOverrideLayer(OpenShock::VisualStateManager::LedOverrideLayer layer)
+{
+  using OpenShock::VisualStateManager::LedOverrideLayer;
+  switch (layer) {
+    case LedOverrideLayer::Display:
+      return Types::LedOverrideLayer::Display;
+    case LedOverrideLayer::Draft:
+      return Types::LedOverrideLayer::Draft;
+  }
+  return Types::LedOverrideLayer::Display;
+}
+
+static Local::LedOverrideEnd toSchemaLedOverrideEnd(OpenShock::VisualStateManager::LedOverrideEnd reason)
+{
+  using OpenShock::VisualStateManager::LedOverrideEnd;
+  switch (reason) {
+    case LedOverrideEnd::Expired:
+      return Local::LedOverrideEnd::Expired;
+    case LedOverrideEnd::Stopped:
+      return Local::LedOverrideEnd::Stopped;
+    case LedOverrideEnd::Replaced:
+      return Local::LedOverrideEnd::Replaced;
+    case LedOverrideEnd::OwnerLeft:
+      return Local::LedOverrideEnd::OwnerLeft;
+    case LedOverrideEnd::Committed:
+      return Local::LedOverrideEnd::Committed;
+    case LedOverrideEnd::LedTest:
+      return Local::LedOverrideEnd::LedTest;
+  }
+  return Local::LedOverrideEnd::Expired;
+}
+
+static Local::LedRequestError toSchemaLedRequestError(OpenShock::VisualStateManager::LedRequestError error)
+{
+  using OpenShock::VisualStateManager::LedRequestError;
+  switch (error) {
+    case LedRequestError::NoLed:
+      return Local::LedRequestError::NoLed;
+    case LedRequestError::LedTestRunning:
+      return Local::LedRequestError::LedTestRunning;
+    case LedRequestError::NotHeld:
+      return Local::LedRequestError::NotHeld;
+    case LedRequestError::SaveFailed:
+      return Local::LedRequestError::SaveFailed;
+    case LedRequestError::InvalidValue:
+      return Local::LedRequestError::InvalidValue;
+  }
+  return Local::LedRequestError::InvalidValue;
+}
+
+static flatbuffers::Offset<Local::LedStatus> createLedStatus(flatbuffers::FlatBufferBuilder& builder)
+{
+  const auto status = OpenShock::VisualStateManager::GetLedStatus();
+
+  auto layer = [&](const std::optional<OpenShock::VisualStateManager::LedOverrideInfo>& info) -> flatbuffers::Offset<Local::LedOverride> {
+    if (!info.has_value()) {
+      return 0;
+    }
+    return Local::CreateLedOverride(builder, info->owner, info->timeoutMs);
+  };
+  auto display = layer(status.display);
+  auto draft   = layer(status.draft);
+
+  return Local::CreateLedStatus(builder, toSchemaLedShowing(status.showing), toSchemaLedPattern(status.pattern), display, draft);
 }
 
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)
@@ -148,7 +258,7 @@ bool Local::SerializeErrorMessage(std::string_view message, Common::Serializatio
   return finishMessage(builder, Local::HubToLocalMessagePayload::ErrorMessage, wrapperOffset, callback);
 }
 
-bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, Common::SerializationCallbackFn callback)
+bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool accountLinked, uint8_t clientId, Common::SerializationCallbackFn callback)
 {
   flatbuffers::FlatBufferBuilder builder(768);
 
@@ -169,13 +279,16 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
   OpenShock::Config::ForEachWiFiSsid([&](std::string_view ssid) { savedSsids.push_back(builder.CreateString(ssid.data(), ssid.size())); });
   auto savedSsidsOffset = builder.CreateVector(savedSsids);
 
-  auto otaOffset = createOtaSettings(builder);
-  auto ledOffset = createLedSettings(builder);
+  auto otaOffset       = createOtaSettings(builder);
+  auto ledOffset       = createLedSettings(builder);
+  auto ledStatusOffset = createLedStatus(builder);
 
   const auto rfTxPin = static_cast<int8_t>(OpenShock::Config::GetRFConfigTxPin());
   const auto estop   = OpenShock::Config::GetEStopConfig();
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset, ledOffset);
+  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(
+    builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset, ledOffset, ledStatusOffset, clientId
+  );
 
   return finishMessage(builder, Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset, callback);
 }
@@ -240,4 +353,29 @@ bool Local::SerializeLedSettingsChangedEvent(Common::SerializationCallbackFn cal
   auto ledOffset   = createLedSettings(builder);
   auto eventOffset = Local::CreateLedSettingsChangedEvent(builder, ledOffset);
   return finishMessage(builder, Local::HubToLocalMessagePayload::LedSettingsChangedEvent, eventOffset, callback);
+}
+
+bool Local::SerializeLedStatusEvent(const VisualStateManager::LedStatusNotice& notice, Common::SerializationCallbackFn callback)
+{
+  using Kind = VisualStateManager::LedStatusNotice::Kind;
+
+  flatbuffers::FlatBufferBuilder builder(128);
+
+  auto statusOffset = createLedStatus(builder);
+
+  flatbuffers::Offset<Local::LedOverrideEnded> endedOffset  = 0;
+  flatbuffers::Offset<Local::LedRequestFailed> failedOffset = 0;
+  switch (notice.kind) {
+    case Kind::StatusChanged:
+      break;
+    case Kind::Ended:
+      endedOffset = Local::CreateLedOverrideEnded(builder, toSchemaLedOverrideLayer(notice.layer), toSchemaLedOverrideEnd(notice.reason), notice.owner, notice.seq);
+      break;
+    case Kind::Failed:
+      failedOffset = Local::CreateLedRequestFailed(builder, notice.owner, notice.seq, toSchemaLedRequestError(notice.error));
+      break;
+  }
+
+  auto eventOffset = Local::CreateLedStatusEvent(builder, statusOffset, endedOffset, failedOffset);
+  return finishMessage(builder, Local::HubToLocalMessagePayload::LedStatusEvent, eventOffset, callback);
 }

@@ -2,13 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
-export enum LedPreviewPattern {
-  WifiDisconnected = 0,
-  WifiScanning = 1,
-  NoBackend = 2,
-  Connected = 3,
-  EStopped = 4,
-  EStopClearing = 5,
-  EStopAwaitingRelease = 6,
-  CriticalError = 7
+export enum LedSignal {
+  Normal = 0,
+  Critical = 1
 }

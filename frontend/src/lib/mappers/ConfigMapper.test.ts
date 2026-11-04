@@ -1,9 +1,9 @@
-import { LedBrightness } from '#lib/_fbs/open-shock/serialization/local/led-brightness.js';
-import { LedMode } from '#lib/_fbs/open-shock/serialization/local/led-mode.js';
 import { LedSettings } from '#lib/_fbs/open-shock/serialization/local/led-settings.js';
 import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import { OtaSettings } from '#lib/_fbs/open-shock/serialization/local/ota-settings.js';
 import { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
+import { LedBrightness } from '#lib/_fbs/open-shock/serialization/types/led-brightness.js';
+import { LedMode } from '#lib/_fbs/open-shock/serialization/types/led-mode.js';
 import { Builder, ByteBuffer } from 'flatbuffers';
 import { describe, expect, it } from 'vitest';
 import { mapConfig } from './ConfigMapper';
@@ -20,7 +20,6 @@ function buildLed(b: Builder): number {
   LedSettings.addMode(b, LedMode.CriticalOnly);
   LedSettings.addRgb(b, rgb);
   LedSettings.addRgbWarnAbove(b, 19661);
-  LedSettings.addPreviewMs(b, 10000);
   return LedSettings.endLedSettings(b);
 }
 
@@ -66,7 +65,6 @@ describe('mapConfig', () => {
         mono: { present: false, critical: 0, normal: 0 },
         rgb: { present: true, critical: 40000, normal: 5140 },
         rgbWarnAbove: 19661,
-        previewMs: 10000,
       },
     });
   });

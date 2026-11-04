@@ -13,15 +13,12 @@ const char* const TAG = "CaptivePortalApi";
 #include "CommandHandler.h"
 #include "Convert.h"
 #include "enums/OtaUpdateChannel.h"
-#include "enums/StatusLed.h"
 #include "GatewayConnectionManager.h"
 #include "http/ContentTypes.h"
 #include "Logging.h"
 #include "OtaUpdateConfig.h"
 #include "RateLimiter.h"
 #include "util/TaskUtils.h"
-#include "visual/LedConfig.h"
-#include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -46,7 +43,6 @@ static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLon
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
 static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
-static const char* const JSON_ERR_NO_SUCH_LED     = "{\"error\":\"NoSuchLed\"}";
 
 using namespace OpenShock;
 using namespace OpenShock::CaptivePortal;
@@ -389,79 +385,6 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
   return sendResp(req, S200, nullptr, {});
 }
 
-// Reads an optional 0-100 percent query parameter; false (after responding) on an invalid value
-// A 16-bit brightness, 0-65535
-static bool parseBrightnessParam(httpd_req_t* req, const char* key, std::optional<uint16_t>& out, esp_err_t& response)
-{
-  auto str = getQueryParam(req, key);
-  if (!str) {
-    if (str.error() == ParamError::Missing) return true;
-    response = sendParamError(req, str.error());
-    return false;
-  }
-  auto value = Convert::ToUint16(*str);
-  if (!value) {
-    response = sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
-    return false;
-  }
-  out = *value;
-  return true;
-}
-
-// PUT /api/led?mode=&monoCritical=&monoNormal=&rgbCritical=&rgbNormal=
-// Any subset of the LED settings, saved in one config write.
-static esp_err_t apiLedPut(httpd_req_t* req)
-{
-  std::optional<LedMode> mode;
-  auto modeStr = getQueryParam(req, "mode");
-  if (!modeStr && modeStr.error() != ParamError::Missing) {
-    return sendParamError(req, modeStr.error());
-  }
-  if (modeStr) {
-    mode = TryParseLedMode(*modeStr);
-    if (!mode) {
-      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
-    }
-  }
-
-  std::optional<uint16_t> monoCritical, monoNormal, rgbCritical, rgbNormal;
-  esp_err_t response = ESP_OK;
-  if (!parseBrightnessParam(req, "monoCritical", monoCritical, response) || !parseBrightnessParam(req, "monoNormal", monoNormal, response) || !parseBrightnessParam(req, "rgbCritical", rgbCritical, response)
-      || !parseBrightnessParam(req, "rgbNormal", rgbNormal, response))
-  {
-    return response;
-  }
-
-  if (!mode && !monoCritical && !monoNormal && !rgbCritical && !rgbNormal) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
-  }
-
-  // Settings only for the LEDs the board has; the portal never shows the others
-  if ((mode && !VisualStateManager::HasAnyLed()) || ((monoCritical || monoNormal) && !VisualStateManager::HasLed(LedType::Mono)) || ((rgbCritical || rgbNormal) && !VisualStateManager::HasLed(LedType::Rgb))) {
-    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_NO_SUCH_LED);
-  }
-
-  bool saved = VisualStateManager::UpdateLedConfig([&](Config::LedConfig& cfg) {
-    bool changed = false;
-    auto apply   = [&changed](auto& field, const auto& value) {
-      if (value && field != *value) {
-        field   = *value;
-        changed = true;
-      }
-    };
-    apply(cfg.mode, mode);
-    apply(cfg.monoCriticalBrightness, monoCritical);
-    apply(cfg.monoNormalBrightness, monoNormal);
-    apply(cfg.rgbCriticalBrightness, rgbCritical);
-    apply(cfg.rgbNormalBrightness, rgbNormal);
-    return changed;
-  });
-  if (!saved) {
-    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
-  }
-  return sendResp(req, S200, nullptr, {});
-}
-
 void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInstance* instance)
 {
   registerHandler(server, "/api/board", HTTP_GET, apiBoard, instance);
@@ -479,6 +402,4 @@ void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInst
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
   registerHandler(server, "/api/ota/settings", HTTP_PUT, apiOtaSettings, instance);
   registerHandler(server, "/api/ota/check", HTTP_POST, apiOtaCheck, instance);
-  // The LED settings reach the portal in its Ready message, and previews stream over the WebSocket
-  registerHandler(server, "/api/led", HTTP_PUT, apiLedPut, instance);
 }

@@ -13,7 +13,10 @@ namespace OpenShock::MessageHandlers::Local::_Private {
   HANDLER_FN(Common_ShockerCommandList);
   HANDLER_FN(LedPreviewPatternMessage);
   HANDLER_FN(LedPreviewColorMessage);
-  HANDLER_FN(LedPreviewStopMessage);
+  HANDLER_FN(LedDraftMessage);
+  HANDLER_FN(LedOverrideStopMessage);
+  HANDLER_FN(LedCommitDraftMessage);
+  HANDLER_FN(LedSetModeMessage);
   HANDLER_FN(InvalidMessage);
 }  // namespace OpenShock::MessageHandlers::Local::_Private
 

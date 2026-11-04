@@ -1,5 +1,5 @@
 import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
-import type { LedConfig, OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
+import type { OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
 import { hubState } from '#lib/stores/index.js';
 import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 import { toast } from 'svelte-sonner';
@@ -30,8 +30,6 @@ const _errorMessages: Record<string, string> = {
   PasswordTooLong: 'Password must be at most 63 characters',
   // OTA
   InvalidChannel: 'Invalid update channel',
-  // LEDs
-  NoSuchLed: 'This board does not have that LED',
   // Generic
   MissingParam: 'Missing parameter',
   InvalidParam: 'Invalid value',
@@ -299,30 +297,4 @@ export function checkOtaUpdates(channel: OtaChannel): Promise<boolean> {
     'POST',
     'Failed to check for OTA updates'
   );
-}
-
-// Status LEDs (previews stream over the WebSocket, see ledPreview.ts)
-
-export type LedSettingsPatch = Partial<
-  Record<'mode' | 'monoCritical' | 'monoNormal' | 'rgbCritical' | 'rgbNormal', string>
->;
-
-// Any subset in one config write (PUT /api/led). On success `apply` mirrors the change into hubState.config, which
-// is otherwise only sent once on connect.
-export async function setLedSettings(
-  params: LedSettingsPatch,
-  apply: (led: LedConfig) => void
-): Promise<boolean> {
-  try {
-    const res = await apiFetch('/api/led?' + new URLSearchParams(params), { method: 'PUT' });
-    if (!res.ok) {
-      toast.error('Failed to save LED settings: ' + (await getErrorMessage(res)));
-      return false;
-    }
-    if (hubState.config?.led) apply(hubState.config.led);
-    return true;
-  } catch {
-    toast.error('Failed to save LED settings');
-    return false;
-  }
 }
