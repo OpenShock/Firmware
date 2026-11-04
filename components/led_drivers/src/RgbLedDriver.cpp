@@ -9,6 +9,7 @@ const char* const TAG = "RGBLedDriver";
 #include "Logging.h"
 
 #include <esp_err.h>
+#include <hal/rmt_ll.h>  // RMT_LL_TX_CANDIDATES_PER_INST
 #include <soc/soc_caps.h>
 
 #include <algorithm>
@@ -16,6 +17,20 @@ const char* const TAG = "RGBLedDriver";
 #include <vector>
 
 using namespace OpenShock;
+
+// Dithering: the WS2812B takes 8 bits per color. The driver shows 10 by sending 4 frames that each round a channel
+// down or up to a neighbouring 8-bit level, so their average lands on the quarter step in between, and has the RMT
+// hardware repeat those 4 frames on its own (a looped transmission) for as long as the color holds: no CPU work after
+// apply(). A looped transmission must fit in the channel's RMT memory with an end marker, so the channel takes several
+// memory blocks. Blocks are contiguous and channels are taken lowest first, so this channel (created before the RF
+// transmitter's) occupies the blocks of the channels after it; that leaves the RF transmitter a channel only on chips
+// with more transmit channels than those blocks. On the others (ESP32-C3) the LED rounds to 8 bits.
+static constexpr std::size_t kLoopSymbols   = 4 * 24 + 1;  // 4 frames and the end marker
+static constexpr std::size_t kLoopMemBlocks = (kLoopSymbols + SOC_RMT_MEM_WORDS_PER_CHANNEL - 1) / SOC_RMT_MEM_WORDS_PER_CHANNEL;
+static constexpr bool kLoopDitherFits       = CONFIG_OPENSHOCK_RGB_LED_DITHERING && kLoopMemBlocks < RMT_LL_TX_CANDIDATES_PER_INST;
+
+// Low time after each frame so the LED latches it: over 280 us for the WS2812B-V5 (older parts need 50 us)
+static constexpr uint16_t kLatchTicks = 3000;  // 300 us at 10 MHz
 
 // Currently this assumes a single WS2812B LED
 // TODO: Support multiple LEDs ?
@@ -27,10 +42,9 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
   , m_brightness(65535)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
-  , m_frame()
-  , m_target()
-  , m_ditherError()
-  , m_txFailing(false)
+  , m_canLoop(false)
+  , m_looping(false)
+  , m_frames()
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
@@ -52,7 +66,20 @@ RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
     .intr_priority     = 0,                              // 0 => driver picks a low/medium priority
     .flags             = {},
   };
-  esp_err_t err = rmt_new_tx_channel(&channelConfig, &m_rmtChannel);
+  esp_err_t err = ESP_FAIL;
+  if constexpr (kLoopDitherFits) {
+    // Enough memory blocks for the dither frames; on failure, fall back to one block and 8-bit output
+    channelConfig.mem_block_symbols = kLoopMemBlocks * SOC_RMT_MEM_WORDS_PER_CHANNEL;
+    err                             = rmt_new_tx_channel(&channelConfig, &m_rmtChannel);
+    m_canLoop                       = err == ESP_OK;
+    if (!m_canLoop) {
+      OS_LOGW(TAG, "No room for the dithered RMT channel (%s), the RGB LED shows 8 bits per color", esp_err_to_name(err));
+      channelConfig.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
+    }
+  }
+  if (!m_canLoop) {
+    err = rmt_new_tx_channel(&channelConfig, &m_rmtChannel);
+  }
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to create RMT TX channel for pin %hhi: %s", gpioPin, esp_err_to_name(err));
     m_rmtChannel = nullptr;
@@ -119,55 +146,46 @@ void RgbLedDriver::SetPattern(const RgbLedState* pattern, std::size_t patternLen
   PatternPlayer<RgbLedState16>::SetPattern(wide.data(), wide.size());
 }
 
-// Temporal dithering: the WS2812B takes 8 bits per channel, but the color and brightness are 16. Each frame shows the
-// 8-bit step below the target or the one above, carrying the remainder (the low byte) into the next frame (a first-
-// order sigma-delta), so averaged over frames the LED shows the 16-bit value. That gives fine steps where 8 bits are
-// coarsest: low brightness, where 8% of a channel leaves only 21 steps. Frames go out every
-// CONFIG_OPENSHOCK_RGB_LED_DITHER_INTERVAL_MS while some channel has a fraction; a whole 8-bit color is sent once.
-
 void RgbLedDriver::apply(const RGBState16& state)
 {
   const uint32_t brightness = m_brightness.load();
   const uint16_t channels[] = {state.red, state.green, state.blue};
-  for (std::size_t i = 0; i < m_target.size(); ++i) {
+
+  // Each channel in quarter steps of the LED's 8-bit levels (0-1020): the 8-bit level and a 2-bit fraction
+  std::array<uint32_t, 3> quarters;
+  bool fractional = false;
+  for (std::size_t i = 0; i < quarters.size(); ++i) {
     const uint32_t value = channels[i] * brightness / 65535;  // 0-65535
-    // In 1/256ths of an 8-bit step: 65535 is 255 steps, so 255 * 256 = 65280 at most. Taking the high byte of the
-    // 0-65535 value instead would make every level about 0.4% too bright (65535 / 256 is 255.996 steps).
-    m_target[i] = static_cast<uint16_t>((value * 256 + 128) / 257);
+    quarters[i]          = (value * 1020 + 32767) / 65535;
+    fractional |= (quarters[i] & 3) != 0;
   }
-  refresh();
-}
 
-uint32_t RgbLedDriver::refreshIntervalMs() const
-{
-#if CONFIG_OPENSHOCK_RGB_LED_DITHERING
-  for (uint16_t target : m_target) {
-    if ((target & 0xFF) != 0) {
-      return CONFIG_OPENSHOCK_RGB_LED_DITHER_INTERVAL_MS;
+  if (!m_canLoop || !fractional) {
+    // A whole 8-bit color (or no room to loop): one frame, the nearest level
+    auto level = [](uint32_t q) { return static_cast<uint8_t>(std::min<uint32_t>((q + 2) >> 2, 255)); };
+    encodeFrame(0, level(quarters[0]), level(quarters[1]), level(quarters[2]), false);
+    transmit(1, false);
+    return;
+  }
+
+  // Spread each channel's fraction over the 4 frames: 1/4 is one frame a level up, 2/4 every other frame, 3/4 three
+  std::array<uint32_t, 3> error = {};
+  for (std::size_t frame = 0; frame < kDitherFrames; ++frame) {
+    std::array<uint8_t, 3> out;
+    for (std::size_t i = 0; i < out.size(); ++i) {
+      error[i] += quarters[i] & 3;
+      const uint32_t up = error[i] >= 4 ? 1 : 0;
+      error[i] -= up * 4;
+      out[i] = static_cast<uint8_t>((quarters[i] >> 2) + up);  // At most 254 + 1: a whole 255 has no fraction
     }
+    encodeFrame(frame, out[0], out[1], out[2], true);
   }
-#endif
-  return 0;  // Every channel is a whole 8-bit step: the LED holds it without refreshes
+  transmit(kDitherFrames, true);
 }
 
-void RgbLedDriver::refresh()
+void RgbLedDriver::encodeFrame(std::size_t index, uint8_t r, uint8_t g, uint8_t b, bool latchGap)
 {
-  std::array<uint8_t, 3> out;
-  for (std::size_t i = 0; i < m_target.size(); ++i) {
-#if CONFIG_OPENSHOCK_RGB_LED_DITHERING
-    const uint32_t sum = static_cast<uint32_t>(m_ditherError[i]) + (m_target[i] & 0xFF);
-    m_ditherError[i]   = static_cast<uint8_t>(sum & 0xFF);
-    out[i]             = static_cast<uint8_t>(std::min<uint32_t>((m_target[i] >> 8) + (sum >> 8), 255));
-#else
-    out[i] = static_cast<uint8_t>(std::min<uint32_t>((m_target[i] + 128) >> 8, 255));  // Nearest 8-bit step
-#endif
-  }
-  sendFrame(out[0], out[1], out[2]);
-}
-
-void RgbLedDriver::sendFrame(uint8_t r, uint8_t g, uint8_t b)
-{
-  auto& led_data = m_frame;
+  rmt_symbol_word_t* led_data = m_frames.data() + index * kSymbolsPerFrame;
 
   // WS2812B usually takes commands in GRB order
   // https://cdn-shop.adafruit.com/datasheets/WS2812B.pdf - Page 5
@@ -180,7 +198,7 @@ void RgbLedDriver::sendFrame(uint8_t r, uint8_t g, uint8_t b)
   const uint32_t colors = (static_cast<uint32_t>(g) << 16) | (static_cast<uint32_t>(r) << 8) | static_cast<uint32_t>(b);
 
   // Encode the data
-  for (std::size_t bit = 0; bit < 24; bit++) {
+  for (std::size_t bit = 0; bit < kSymbolsPerFrame; bit++) {
     if (colors & (1 << (23 - bit))) {
       led_data[bit].level0    = 1;
       led_data[bit].duration0 = 8;
@@ -194,19 +212,36 @@ void RgbLedDriver::sendFrame(uint8_t r, uint8_t g, uint8_t b)
     }
   }
 
-  // Send the data (blocking, wait up to 10ms per frame)
+  // Looped frames run back to back: hold the line low after the last bit so the LED latches each one
+  if (latchGap) {
+    led_data[kSymbolsPerFrame - 1].duration1 = kLatchTicks;
+  }
+}
+
+void RgbLedDriver::transmit(std::size_t frames, bool loop)
+{
+  // A looped transmission never finishes on its own; stopping the channel ends it (possibly mid-frame, which the next
+  // frame overwrites within a millisecond)
+  if (m_looping) {
+    rmt_disable(m_rmtChannel);
+    rmt_enable(m_rmtChannel);
+    m_looping = false;
+  }
+
   rmt_transmit_config_t txConfig = {};
+  txConfig.loop_count            = loop ? -1 : 0;  // -1: repeat until stopped
   txConfig.flags.eot_level       = 0;
-  esp_err_t err                  = rmt_transmit(m_rmtChannel, m_rmtEncoder, led_data.data(), led_data.size() * sizeof(rmt_symbol_word_t), &txConfig);
+  esp_err_t err                  = rmt_transmit(m_rmtChannel, m_rmtEncoder, m_frames.data(), frames * kSymbolsPerFrame * sizeof(rmt_symbol_word_t), &txConfig);
   if (err != ESP_OK) {
-    // Once per failure streak: dithering sends a frame every millisecond
-    if (!m_txFailing) {
-      OS_LOGW(TAG, "rmt_transmit failed: %s", esp_err_to_name(err));
-      m_txFailing = true;
-    }
+    OS_LOGW(TAG, "rmt_transmit failed: %s", esp_err_to_name(err));
     return;
   }
-  m_txFailing = false;
+  if (loop) {
+    m_looping = true;
+    return;
+  }
+
+  // Blocking, wait up to 10ms for the frame
   if (rmt_tx_wait_all_done(m_rmtChannel, 10) != ESP_OK) {
     // Abort the frame still in flight before the buffer is rewritten for the next one
     rmt_disable(m_rmtChannel);
