@@ -525,6 +525,9 @@ bool VisualStateManager::Init()
 
   const BoardDescriptor& board = Board::Get();
 
+  // Before the drivers, so they start at the configured brightness
+  loadLedConfig();
+
   // The pins come from the stamped descriptor, so they are data, not something the build checked. A pin this
   // chip cannot drive leaves that LED off rather than failing Init: that would restart-loop a normal boot and
   // roll back an OTA boot over an indicator. ValidateBoardDescriptor() has already logged the specifics.
@@ -532,7 +535,7 @@ bool VisualStateManager::Init()
     if (!OpenShock::IsValidOutputPin(board.ledGpio)) {
       OS_LOGW(TAG, "Built-in LED pin %hhi is not usable on this board, leaving the LED disabled", board.ledGpio);
     } else {
-      s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(board.ledGpio));
+      s_monoLedDriver = std::make_unique<MonoLedDriver>(static_cast<gpio_num_t>(board.ledGpio), toDriverBrightness(s_monoNormalBrightness.load()));
       if (!s_monoLedDriver->IsValid()) {
         OS_LOGE(TAG, "Failed to initialize built-in LED manager");
         return false;
@@ -545,7 +548,7 @@ bool VisualStateManager::Init()
     if (!OpenShock::IsValidOutputPin(board.ws2812bGpio)) {
       OS_LOGW(TAG, "RGB LED pin %hhi is not usable on this board, leaving the LED disabled", board.ws2812bGpio);
     } else {
-      s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(board.ws2812bGpio));
+      s_rgbLedDriver = std::make_unique<RgbLedDriver>(static_cast<gpio_num_t>(board.ws2812bGpio), s_rgbNormalBrightness.load());
       if (!s_rgbLedDriver->IsValid()) {
         OS_LOGE(TAG, "Failed to initialize RGB LED manager");
         return false;
@@ -558,8 +561,6 @@ bool VisualStateManager::Init()
     OS_LOGW(TAG, "No LED type is defined, aborting initialization of VisualStateManager");
     return true;
   }
-
-  loadLedConfig();
 
   const esp_timer_create_args_t previewTimerArgs = {
     .callback              = handlePreviewTimer,

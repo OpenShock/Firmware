@@ -2,6 +2,7 @@
 
 #include "enums/StatusLed.h"
 #include "util/FunctionRef.h"
+#include "util/PercentUtils.h"
 
 #include <cstdint>
 #include <optional>
@@ -21,7 +22,7 @@ namespace OpenShock::VisualStateManager {
   // The setters save to the `led` config section and apply the change at once. A save that raises an RGB brightness
   // above kRgbBrightnessWarn logs a warning: a WS2812B is glaring and runs warm well before full output.
 
-  inline constexpr uint16_t kRgbBrightnessWarn = 19661;  // 30% of 65535
+  inline constexpr uint16_t kRgbBrightnessWarn = PercentUtils::OfMax<uint16_t, 30.0>();
 
   [[nodiscard]] LedMode GetLedMode();
   bool SetLedMode(LedMode mode);

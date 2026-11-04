@@ -21,9 +21,9 @@ const char* const TAG = "MonoLedDriver";
 
 using namespace OpenShock;
 
-MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
+MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin, uint8_t brightness)
   : m_gpioPin(GPIO_NUM_NC)
-  , m_brightness(255)
+  , m_brightness(brightness)
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");

@@ -39,7 +39,8 @@ namespace OpenShock {
     using RGBState   = RgbLedState;
     using RGBState16 = RgbLedState16;
 
-    RgbLedDriver(gpio_num_t gpioPin);
+    /// @param brightness The starting brightness (0-65535), until SetBrightness16.
+    RgbLedDriver(gpio_num_t gpioPin, uint16_t brightness);
     ~RgbLedDriver() override;
 
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }

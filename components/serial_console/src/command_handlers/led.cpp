@@ -100,7 +100,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::LedH
   auto& setBrightnessCommand = group.addCommand("brightness", "Set the brightness of one LED type for critical (E-Stop, critical error) or normal patterns", handleLedBrightnessCommand);
   setBrightnessCommand.addArgument("type", "mono or rgb", "rgb");
   setBrightnessCommand.addArgument("signal", "critical or normal", "normal");
-  setBrightnessCommand.addArgument("brightness", "0-65535, of the LED's full output; RGB above 19661 (30%) logs a warning", "5140");
+  setBrightnessCommand.addArgument("brightness", "0-65535, of the LED's full output; a high RGB brightness logs a warning", "5140");
 
   return group;
 }

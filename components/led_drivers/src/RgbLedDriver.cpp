@@ -36,10 +36,10 @@ static constexpr uint16_t kLatchTicks = 3000;  // 300 us at 10 MHz
 // TODO: Support multiple LEDs ?
 // TODO: Support other LED types ?
 
-RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin)
+RgbLedDriver::RgbLedDriver(gpio_num_t gpioPin, uint16_t brightness)
   : m_gpioPin(GPIO_NUM_NC)
   , m_swapRg((Board::Get().flags & OPENSHOCK_BOARD_FLAG_LED_SWAP_RG) != 0)
-  , m_brightness(65535)
+  , m_brightness(brightness)
   , m_rmtChannel(nullptr)
   , m_rmtEncoder(nullptr)
   , m_canLoop(false)
