@@ -1,5 +1,6 @@
 import type { LedBrightness as LedBrightnessTable } from '#lib/_fbs/open-shock/serialization/local/led-brightness.js';
 import { LedMode as FbsLedMode } from '#lib/_fbs/open-shock/serialization/local/led-mode.js';
+import type { LedSettings } from '#lib/_fbs/open-shock/serialization/local/led-settings.js';
 import type { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import type { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
 
@@ -33,7 +34,7 @@ export interface Config {
   rf: { txPin: number };
   estop: { enabled: boolean; gpioPin: number };
   otaUpdate: OtaUpdateConfig;
-  led: LedConfig;
+  led: LedConfig | null; // Null from firmware older than this frontend (e.g. after an interrupted update)
   savedSSIDs: string[];
 }
 
@@ -43,10 +44,8 @@ const _ledModes: Record<FbsLedMode, LedMode> = {
   [FbsLedMode.Off]: 'off',
 };
 
-function mapLedConfig(ready: ReadyMessage): LedConfig {
-  const led = ready.led();
-  if (!led) throw new Error('ready.led is null');
-
+// From the Ready message, or a LedSettingsChangedEvent
+export function mapLedConfig(led: LedSettings): LedConfig {
   // The hub only sends the LEDs the board has
   const mapBrightness = (b: LedBrightnessTable | null): LedBrightness => ({
     present: b !== null,
@@ -60,6 +59,10 @@ function mapLedConfig(ready: ReadyMessage): LedConfig {
     rgbWarnAbove: led.rgbWarnAbove(),
     previewMs: led.previewMs(),
   };
+}
+
+function mapOptionalLed(led: LedSettings | null): LedConfig | null {
+  return led ? mapLedConfig(led) : null;
 }
 
 function mapOtaUpdateConfig(ready: ReadyMessage): OtaUpdateConfig {
@@ -89,7 +92,8 @@ export function mapConfig(ready: ReadyMessage): Config {
     rf: { txPin: ready.rfTxPin() },
     estop: { enabled: ready.estopEnabled(), gpioPin: ready.estopGpioPin() },
     otaUpdate: mapOtaUpdateConfig(ready),
-    led: mapLedConfig(ready),
+    // Optional, so the other settings still load from firmware that has no LED settings
+    led: mapOptionalLed(ready.led()),
     savedSSIDs,
   };
 }

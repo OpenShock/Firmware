@@ -232,3 +232,12 @@ bool Local::SerializeAccountLinkStatusEvent(bool linked, Common::SerializationCa
   auto eventOffset = Local::CreateAccountLinkStatusEvent(builder, linked);
   return finishMessage(builder, Local::HubToLocalMessagePayload::AccountLinkStatusEvent, eventOffset, callback);
 }
+
+bool Local::SerializeLedSettingsChangedEvent(Common::SerializationCallbackFn callback)
+{
+  flatbuffers::FlatBufferBuilder builder(128);
+
+  auto ledOffset   = createLedSettings(builder);
+  auto eventOffset = Local::CreateLedSettingsChangedEvent(builder, ledOffset);
+  return finishMessage(builder, Local::HubToLocalMessagePayload::LedSettingsChangedEvent, eventOffset, callback);
+}

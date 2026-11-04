@@ -19,4 +19,5 @@ namespace OpenShock::Serialization::Local {
   bool SerializeWiFiNetworksEvent(Types::WifiNetworkEventType eventType, const std::vector<WiFiNetwork>& networks, Common::SerializationCallbackFn callback);
   bool SerializeWiFiGotIpEvent(const char* ip, Common::SerializationCallbackFn callback);
   bool SerializeAccountLinkStatusEvent(bool linked, Common::SerializationCallbackFn callback);
+  bool SerializeLedSettingsChangedEvent(Common::SerializationCallbackFn callback);
 }  // namespace OpenShock::Serialization::Local

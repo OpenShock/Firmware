@@ -62,21 +62,24 @@
   const fromSlider = (v: number) => Math.round((v * 65535) / SLIDER_MAX);
   const percentText = (b: number) => `${((b * 100) / 65535).toFixed(1)}%`;
 
-  // A brightness (0-65535) being dragged, shown instead of the saved value until it is saved
-  let dragging = $state<{ type: LedType; signal: LedSignal; value: number } | null>(null);
+  type SettingKey = ReturnType<typeof settingKey>;
+
+  // Brightnesses (0-65535) moved but not saved: shown instead of the saved values, and only previewed on the LEDs until
+  // Save writes them all at once
+  let edits = $state<Partial<Record<SettingKey, number>>>({});
+  let dirty = $derived(Object.keys(edits).length > 0);
   let saving = $state(false);
   let previewing = $state(false);
   let color = $state('ff0000');
 
-  // Hand the LEDs back when leaving the section rather than waiting for the preview to time out
+  // Hand the LEDs back when leaving the section rather than waiting for the preview to time out. Unsaved brightness
+  // changes are dropped.
   onDestroy(() => {
-    if (saveTimer !== null) void saveBrightness();
     if (previewing) stopLedPreview();
   });
 
   function brightness(type: LedType, signal: LedSignal): number {
-    if (dragging && dragging.type === type && dragging.signal === signal) return dragging.value;
-    return led?.[type][signal] ?? 0;
+    return edits[settingKey(type, signal)] ?? led?.[type][signal] ?? 0;
   }
 
   function settingKey(type: LedType, signal: LedSignal) {
@@ -94,45 +97,48 @@
     saving = false;
   }
 
-  // While dragging: light that LED alone, in the signal's color, at the slider's brightness. Saved on release.
-  function onBrightnessDrag(type: LedType, signal: LedSignal, sliderValue: number) {
+  // While moving a slider: light that LED alone, in the signal's color, at the slider's brightness
+  function onBrightnessChange(type: LedType, signal: LedSignal, sliderValue: number) {
     const value = fromSlider(sliderValue);
-    // Another slider's unsaved value is saved first, or it would snap back to the saved one
-    if (saveTimer !== null && dragging && (dragging.type !== type || dragging.signal !== signal)) {
-      void saveBrightness();
+    const key = settingKey(type, signal);
+    if (value === led?.[type][signal]) {
+      delete edits[key];
+    } else {
+      edits[key] = value;
     }
-    dragging = { type, signal, value };
     const target = ledTypes.find((t) => t.type === type)!.target;
     const signalColor = signals.find((s) => s.signal === signal)!.color;
     if (previewLedColor({ color: hexToRgb(signalColor), target, brightness: value }))
       previewing = true;
   }
 
-  // A release, but also every arrow-key press, commits; saving waits for them to stop so holding an arrow key is one
-  // flash write, not one per step
-  const SAVE_DELAY_MS = 500;
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function onBrightnessCommit(type: LedType, signal: LedSignal, sliderValue: number) {
-    dragging = { type, signal, value: fromSlider(sliderValue) };
-    if (saveTimer !== null) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => void saveBrightness(), SAVE_DELAY_MS);
+  async function saveBrightness() {
+    if (!dirty || saving) return;
+    const saved = { ...edits };
+    const params = Object.fromEntries(
+      Object.entries(saved).map(([key, value]) => [key, String(value)])
+    );
+    saving = true;
+    const ok = await setLedSettings(params, (l) => {
+      for (const t of ledTypes) {
+        for (const s of signals) {
+          const value = saved[settingKey(t.type, s.signal)];
+          if (value !== undefined) l[t.type][s.signal] = value;
+        }
+      }
+    });
+    saving = false;
+    if (!ok) return;
+    // Keep anything moved while the save was in flight
+    for (const [key, value] of Object.entries(saved) as [SettingKey, number][]) {
+      if (edits[key] === value) delete edits[key];
+    }
+    if (previewing && !dirty) stopPreview(); // Back to the LEDs as they now are
   }
 
-  async function saveBrightness() {
-    if (saveTimer !== null) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    if (!dragging) return;
-    const { type, signal, value } = dragging;
-    saving = true;
-    await setLedSettings({ [settingKey(type, signal)]: String(value) }, (l) => {
-      l[type][signal] = value;
-    });
-    if (dragging?.type === type && dragging.signal === signal && dragging.value === value)
-      dragging = null;
-    saving = false;
+  function discardBrightness() {
+    edits = {};
+    if (previewing) stopPreview();
   }
 
   function previewPattern(pattern: LedPreviewPattern) {
@@ -146,7 +152,12 @@
   }
 
   function stopPreview() {
-    stopLedPreview();
+    if (!stopLedPreview()) {
+      toast.error(
+        `Not connected to the hub, the preview ends on its own within ${previewSeconds}s`
+      );
+      return;
+    }
     previewing = false;
   }
 
@@ -202,8 +213,7 @@
               value={toSlider(value)}
               max={SLIDER_MAX}
               valuetext={percentText(value)}
-              onValueChange={(v) => onBrightnessDrag(type, s.signal, v)}
-              onValueCommit={(v) => onBrightnessCommit(type, s.signal, v)}
+              onValueChange={(v) => onBrightnessChange(type, s.signal, v)}
             />
             {#if type === 'rgb' && value > led.rgbWarnAbove}
               <p class="text-warning flex items-center gap-1.5 text-xs">
@@ -215,6 +225,13 @@
         {/each}
       </div>
     {/each}
+
+    <div class="flex gap-2">
+      <Button disabled={!dirty || saving} onclick={saveBrightness}>Save Brightness</Button>
+      <Button variant="outline" disabled={!dirty || saving} onclick={discardBrightness}>
+        Discard
+      </Button>
+    </div>
 
     <div class="flex flex-col gap-2">
       <Label>Test Patterns</Label>

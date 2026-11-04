@@ -93,14 +93,36 @@ describe('mapConfig', () => {
     expect(config.estop.gpioPin).toBe(-1);
   });
 
-  it('rejects a message without the LED settings', () => {
+  it('maps a mono LED table as present', () => {
+    const b = new Builder(64);
+    const domain = b.createString('fw.example.org');
+    const ota = OtaSettings.createOtaSettings(b, true, domain, OtaChannel.Stable, 30, true, false);
+    const mono = LedBrightness.createLedBrightness(b, 30000, 2000);
+    LedSettings.startLedSettings(b);
+    LedSettings.addMode(b, LedMode.All);
+    LedSettings.addMono(b, mono);
+    const led = LedSettings.endLedSettings(b);
+    ReadyMessage.startReadyMessage(b);
+    ReadyMessage.addOta(b, ota);
+    ReadyMessage.addLed(b, led);
+
+    const config = mapConfig(readBack(b, ReadyMessage.endReadyMessage(b)));
+
+    expect(config.led?.mono).toEqual({ present: true, critical: 30000, normal: 2000 });
+    expect(config.led?.rgb.present).toBe(false);
+  });
+
+  it('loads the other settings from firmware without LED settings', () => {
     const b = new Builder(64);
     const domain = b.createString('fw.example.org');
     const ota = OtaSettings.createOtaSettings(b, true, domain, OtaChannel.Stable, 30, true, false);
     ReadyMessage.startReadyMessage(b);
     ReadyMessage.addOta(b, ota);
 
-    expect(() => mapConfig(readBack(b, ReadyMessage.endReadyMessage(b)))).toThrow('ready.led');
+    const config = mapConfig(readBack(b, ReadyMessage.endReadyMessage(b)));
+
+    expect(config.led).toBeNull();
+    expect(config.otaUpdate.cdnDomain).toBe('fw.example.org');
   });
 
   it('rejects a message without the OTA settings', () => {

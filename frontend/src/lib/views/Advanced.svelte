@@ -41,9 +41,12 @@
 
   let { activeSection = $bindable<AdvancedSection>('menu') }: Props = $props();
 
-  // No LEDs section on a board without a status LED. Shown until the hub's config arrives, which says.
+  // No LEDs section on a board without a status LED, or on firmware without LED settings. Shown until the hub's config
+  // arrives, which says.
   let hasLeds = $derived(
-    !hubState.config || hubState.config.led.mono.present || hubState.config.led.rgb.present
+    !hubState.config ||
+      (hubState.config.led !== null &&
+        (hubState.config.led.mono.present || hubState.config.led.rgb.present))
   );
   let sections = $derived(advancedSections.filter((s) => s.id !== 'leds' || hasLeds));
 

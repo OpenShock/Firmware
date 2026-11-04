@@ -61,8 +61,9 @@ namespace OpenShock {
     virtual ~PatternPlayer() { stopTask(); }
 
     virtual void apply(const State& state) = 0;
-    /// @brief Turns the LED off and stops what drives it, so the hardware rests.
-    virtual void enterSleep() = 0;
+    /// @brief Turns the LED off and stops what drives it, so the hardware rests. False when the LED may still be lit:
+    ///        the hardware stays awake and enterSleep() is tried again.
+    virtual bool enterSleep() = 0;
     /// @brief Undoes enterSleep(); the next apply() then shows a state as usual.
     virtual void exitSleep() = 0;
 
@@ -96,7 +97,10 @@ namespace OpenShock {
         }
 
         if (sleep && !m_asleep) {
-          enterSleep();
+          if (!enterSleep()) {
+            TaskUtils::WaitForNotify(pdMS_TO_TICKS(kSleepRetryMs));  // Or sooner, for a new pattern or a stop
+            continue;
+          }
           m_asleep = true;
         } else if (!pattern.empty() && m_asleep) {
           exitSleep();
@@ -118,6 +122,8 @@ namespace OpenShock {
         }
       }
     }
+
+    static constexpr uint32_t kSleepRetryMs = 100;
 
     SimpleMutex m_patternMutex;
     std::vector<State> m_pattern;   // Guarded by m_patternMutex

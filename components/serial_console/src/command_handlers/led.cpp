@@ -59,15 +59,18 @@ static void handleLedBrightnessCommand(std::string_view arg, bool isAutomated)
     return;
   }
 
-  auto parts = OpenShock::TryStringSplit<3>(arg, ' ');
-  if (!parts) {
+  // Token by token, trimming in between, so runs of spaces between the arguments are fine
+  auto [typeStr, afterType]     = OpenShock::StringSplitByFirst(arg, ' ');
+  auto [signalStr, afterSignal] = OpenShock::StringSplitByFirst(OpenShock::StringTrimLeft(afterType), ' ');
+  auto valueStr                 = OpenShock::StringTrim(afterSignal);
+  if (typeStr.empty() || signalStr.empty() || valueStr.empty()) {
     SERPR_ERROR("Invalid arguments (expected <mono|rgb> <critical|normal> <0-65535>)");
     return;
   }
 
-  auto type   = OpenShock::TryParseLedType((*parts)[0]);
-  auto signal = OpenShock::TryParseLedSignal((*parts)[1]);
-  auto value  = OpenShock::Convert::ToUint16(OpenShock::StringTrim((*parts)[2]));
+  auto type   = OpenShock::TryParseLedType(typeStr);
+  auto signal = OpenShock::TryParseLedSignal(signalStr);
+  auto value  = OpenShock::Convert::ToUint16(valueStr);
   if (!type) {
     SERPR_ERROR("Invalid LED type (must be mono or rgb)");
     return;

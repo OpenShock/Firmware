@@ -84,11 +84,20 @@ MonoLedDriver::~MonoLedDriver()
   }
 }
 
-void MonoLedDriver::enterSleep()
+bool MonoLedDriver::enterSleep()
 {
   // Output off and held low, then the timer's counter stopped: nothing toggles until exitSleep
-  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);
-  ledc_timer_pause(OS_LEDC_SPEED, OS_LEDC_TIMER);
+  esp_err_t err = ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to stop the LED output for sleep: %s", esp_err_to_name(err));
+    return false;
+  }
+  err = ledc_timer_pause(OS_LEDC_SPEED, OS_LEDC_TIMER);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to pause the LED timer for sleep: %s", esp_err_to_name(err));
+    return false;
+  }
+  return true;
 }
 
 void MonoLedDriver::exitSleep()

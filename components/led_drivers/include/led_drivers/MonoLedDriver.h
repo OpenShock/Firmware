@@ -32,7 +32,7 @@ namespace OpenShock {
 
   protected:
     void apply(const State& state) override;
-    void enterSleep() override;
+    bool enterSleep() override;
     void exitSleep() override;
 
   private:

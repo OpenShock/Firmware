@@ -29,6 +29,7 @@ function send(
 }
 
 export function previewLedPattern(pattern: LedPreviewPattern): boolean {
+  cancelPendingColor(); // A queued color would flush after the pattern and replace it
   return send(LocalToHubMessagePayload.LedPreviewPatternMessage, (fbb) =>
     LedPreviewPatternMessage.createLedPreviewPatternMessage(fbb, pattern)
   );

@@ -190,13 +190,22 @@ void RgbLedDriver::apply(const RGBState16& state)
   transmit(kDitherFrames, true);
 }
 
-void RgbLedDriver::enterSleep()
+bool RgbLedDriver::enterSleep()
 {
   // One black frame so the LED latches off (it holds its last color), then the channel disabled: that stops any looped
-  // transmission and releases the RMT's clock and power management lock until exitSleep
+  // transmission and releases the RMT's clock and power management lock until exitSleep. Without the black frame the
+  // channel stays enabled, so the retry can send it.
   encodeFrame(0, 0, 0, 0, false);
-  transmit(1, false);
-  rmt_disable(m_rmtChannel);
+  if (!transmit(1, false)) {
+    OS_LOGW(TAG, "The black frame for sleep did not go out");
+    return false;
+  }
+  esp_err_t err = rmt_disable(m_rmtChannel);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to disable the RMT channel for sleep: %s", esp_err_to_name(err));
+    return false;
+  }
+  return true;
 }
 
 void RgbLedDriver::exitSleep()
@@ -242,7 +251,7 @@ void RgbLedDriver::encodeFrame(std::size_t index, uint8_t r, uint8_t g, uint8_t 
   }
 }
 
-void RgbLedDriver::transmit(std::size_t frames, bool loop)
+bool RgbLedDriver::transmit(std::size_t frames, bool loop)
 {
   // A looped transmission never finishes on its own; stopping the channel ends it (possibly mid-frame, which the next
   // frame overwrites within a millisecond)
@@ -258,11 +267,11 @@ void RgbLedDriver::transmit(std::size_t frames, bool loop)
   esp_err_t err                  = rmt_transmit(m_rmtChannel, m_rmtEncoder, m_frames.data(), frames * kSymbolsPerFrame * sizeof(rmt_symbol_word_t), &txConfig);
   if (err != ESP_OK) {
     OS_LOGW(TAG, "rmt_transmit failed: %s", esp_err_to_name(err));
-    return;
+    return false;
   }
   if (loop) {
     m_looping = true;
-    return;
+    return true;
   }
 
   // Blocking, wait up to 10ms for the frame
@@ -270,5 +279,7 @@ void RgbLedDriver::transmit(std::size_t frames, bool loop)
     // Abort the frame still in flight before the buffer is rewritten for the next one
     rmt_disable(m_rmtChannel);
     rmt_enable(m_rmtChannel);
+    return false;
   }
+  return true;
 }

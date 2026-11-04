@@ -2,10 +2,11 @@ import { AccountLinkStatusEvent } from '#lib/_fbs/open-shock/serialization/local
 import { ErrorMessage } from '#lib/_fbs/open-shock/serialization/local/error-message.js';
 import { HubToLocalMessagePayload } from '#lib/_fbs/open-shock/serialization/local/hub-to-local-message-payload.js';
 import { HubToLocalMessage } from '#lib/_fbs/open-shock/serialization/local/hub-to-local-message.js';
+import { LedSettingsChangedEvent } from '#lib/_fbs/open-shock/serialization/local/led-settings-changed-event.js';
 import { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
 import { WifiGotIpEvent } from '#lib/_fbs/open-shock/serialization/local/wifi-got-ip-event.js';
 import { WifiScanStatusMessage } from '#lib/_fbs/open-shock/serialization/local/wifi-scan-status-message.js';
-import { mapConfig } from '#lib/mappers/ConfigMapper.js';
+import { mapConfig, mapLedConfig } from '#lib/mappers/ConfigMapper.js';
 import { hubState } from '#lib/stores/index.js';
 import type { WebSocketClient } from '#lib/WebSocketClient.js';
 import { ByteBuffer } from 'flatbuffers';
@@ -91,6 +92,15 @@ PayloadHandlers[HubToLocalMessagePayload.AccountLinkStatusEvent] = (cli, msg) =>
   msg.payload(payload);
 
   hubState.accountLinked = payload.linked();
+};
+
+// A change from anywhere, this client included: the hub's settings as saved
+PayloadHandlers[HubToLocalMessagePayload.LedSettingsChangedEvent] = (cli, msg) => {
+  const payload = new LedSettingsChangedEvent();
+  msg.payload(payload);
+
+  const led = payload.led();
+  if (led && hubState.config) hubState.config.led = mapLedConfig(led);
 };
 
 export function WebSocketMessageBinaryHandler(cli: WebSocketClient, data: ArrayBuffer) {

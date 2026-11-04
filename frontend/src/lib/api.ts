@@ -319,7 +319,7 @@ export async function setLedSettings(
       toast.error('Failed to save LED settings: ' + (await getErrorMessage(res)));
       return false;
     }
-    if (hubState.config) apply(hubState.config.led);
+    if (hubState.config?.led) apply(hubState.config.led);
     return true;
   } catch {
     toast.error('Failed to save LED settings');

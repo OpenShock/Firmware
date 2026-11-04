@@ -76,6 +76,7 @@ struct Preview {
 };
 static std::optional<Preview> s_preview;
 static esp_timer_handle_t s_previewTimer = nullptr;  // Ends the preview kPreviewDurationMs after the last call
+static int64_t s_previewDeadlineUs       = 0;        // Guarded by s_applyMutex: when the current preview ends
 
 // The 16-bit brightness (0-65535) to the mono driver's 0-255 scale, rounded. The RGB driver takes it as is and
 // reduces it to its 10-bit output.
@@ -296,10 +297,12 @@ static void applyVisualState(uint32_t flags, bool showAll = false)
   }
 
   if (gpioActive && rgbActive) {
-    if (flags == kStatusOKMask) {
+    if (critical) {
+      updateVisualStateGPIO(flags);  // E-Stop and critical errors on both LEDs, at their critical brightness
+    } else if (flags == kStatusOKMask) {
       updateVisualStateGPIO(kSolidOnPattern);
     } else {
-      s_monoLedDriver->Sleep();  // The RGB LED shows every other state
+      s_monoLedDriver->Sleep();  // The RGB LED shows the other states
     }
     updateVisualStateRGB(flags);
     return;
@@ -380,9 +383,11 @@ static void startPreview(const Preview& preview)
   OpenShock::ScopedLock lock__(&s_applyMutex);
   s_preview = preview;
 
-  // Restarted by every preview call, so a client that keeps previewing (a dragged slider) keeps the LEDs
+  // Restarted by every preview call, so a client that keeps previewing (a dragged slider) keeps the LEDs. The deadline
+  // is taken before the timer starts, so it is never later than the expiry it belongs to.
   esp_timer_stop(s_previewTimer);  // ESP_ERR_INVALID_STATE when not running: fine
-  esp_err_t err = esp_timer_start_once(s_previewTimer, static_cast<uint64_t>(VisualStateManager::kPreviewDurationMs) * 1000);
+  s_previewDeadlineUs = esp_timer_get_time() + static_cast<int64_t>(VisualStateManager::kPreviewDurationMs) * 1000;
+  esp_err_t err       = esp_timer_start_once(s_previewTimer, static_cast<uint64_t>(VisualStateManager::kPreviewDurationMs) * 1000);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to start the preview timer: %s", esp_err_to_name(err));
     s_preview.reset();  // Never leave a preview up with nothing to end it
@@ -391,10 +396,15 @@ static void startPreview(const Preview& preview)
   applyCurrentLocked();
 }
 
-static void endPreview()
+// fromTimer: a timer expiry, which esp_timer_stop can't take back once dispatched. One that waited on s_applyMutex
+// while a new preview restarted the timer is stale, and leaves that preview up.
+static void endPreview(bool fromTimer)
 {
   OpenShock::ScopedLock lock__(&s_applyMutex);
   if (!s_preview.has_value()) {
+    return;
+  }
+  if (fromTimer && esp_timer_get_time() < s_previewDeadlineUs) {
     return;
   }
   s_preview.reset();
@@ -404,7 +414,7 @@ static void endPreview()
 static void handlePreviewTimer(void* arg)
 {
   (void)arg;
-  endPreview();
+  endPreview(true);
 }
 
 static void handleEspWiFiEvent(void* event_handler_arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -497,6 +507,9 @@ static void handleOpenShockEvent(void* event_handler_arg, esp_event_base_t event
       break;
     case OPENSHOCK_EVENT_WIFI_STATE_CHANGED:
       // WiFi state is tracked from the IDF WIFI_EVENT/IP_EVENT handlers above.
+      return;
+    case OPENSHOCK_EVENT_DEVICE_ACTIVITY:
+    case OPENSHOCK_EVENT_LED_CONFIG_CHANGED:  // Posted from here
       return;
     default:
       OS_LOGW(TAG, "Received unknown event ID: %d", static_cast<int>(event_id));
@@ -641,19 +654,28 @@ bool VisualStateManager::UpdateLedConfig(Util::FunctionRef<bool(Config::LedConfi
     return false;
   }
 
-  // Under s_applyMutex so two updates can't store their snapshots out of order
-  OpenShock::ScopedLock lock__(&s_applyMutex);
+  {
+    // Under s_applyMutex so two updates can't store their snapshots out of order
+    OpenShock::ScopedLock lock__(&s_applyMutex);
 
-  uint16_t rgbBefore[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
-  loadLedConfig();
-  uint16_t rgbAfter[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
-  for (std::size_t i = 0; i < std::size(rgbAfter); ++i) {
-    if (s_rgbLedDriver != nullptr && rgbAfter[i] > VisualStateManager::kRgbBrightnessWarn && rgbAfter[i] != rgbBefore[i]) {
-      OS_LOGW(TAG, "RGB LED %s brightness set to %u/65535: above %u a WS2812B is glaring and runs warm", i == 0 ? "critical" : "normal", rgbAfter[i], VisualStateManager::kRgbBrightnessWarn);
+    uint16_t rgbBefore[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
+    loadLedConfig();
+    uint16_t rgbAfter[] = {s_rgbCriticalBrightness.load(), s_rgbNormalBrightness.load()};
+    for (std::size_t i = 0; i < std::size(rgbAfter); ++i) {
+      if (s_rgbLedDriver != nullptr && rgbAfter[i] > VisualStateManager::kRgbBrightnessWarn && rgbAfter[i] != rgbBefore[i]) {
+        OS_LOGW(TAG, "RGB LED %s brightness set to %u/65535: above %u a WS2812B is glaring and runs warm", i == 0 ? "critical" : "normal", rgbAfter[i], VisualStateManager::kRgbBrightnessWarn);
+      }
     }
+
+    applyCurrentLocked();
   }
 
-  applyCurrentLocked();
+  // Tells open portals, which otherwise only get the settings on connect. Posted after s_applyMutex is released: a
+  // handler reads the settings back.
+  esp_err_t err = esp_event_post(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_LED_CONFIG_CHANGED, nullptr, 0, pdMS_TO_TICKS(10));
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to post the LED settings change: %s", esp_err_to_name(err));
+  }
   return true;
 }
 
@@ -705,7 +727,7 @@ void VisualStateManager::StopPreview()
   if (s_previewTimer != nullptr) {
     esp_timer_stop(s_previewTimer);
   }
-  endPreview();
+  endPreview(false);
 }
 
 void VisualStateManager::SetCriticalError()

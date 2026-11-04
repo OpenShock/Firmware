@@ -63,7 +63,7 @@ namespace OpenShock {
 
   protected:
     void apply(const RGBState16& state) override;
-    void enterSleep() override;
+    bool enterSleep() override;
     void exitSleep() override;
 
   private:
@@ -71,7 +71,7 @@ namespace OpenShock {
     static constexpr std::size_t kDitherFrames    = 4;   // Steps between two 8-bit levels: 4 is 2 bits more, 10-bit output
 
     void encodeFrame(std::size_t index, uint8_t red, uint8_t green, uint8_t blue, bool latchGap);
-    void transmit(std::size_t frames, bool loop);
+    bool transmit(std::size_t frames, bool loop);  // False when the frames may not have gone out
 
     gpio_num_t m_gpioPin;
     bool m_swapRg;  // Board wants RGB rather than GRB wire order; decided once, apply() runs on the pattern task
