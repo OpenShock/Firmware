@@ -29,19 +29,22 @@ static getSizePrefixedRootAsLedPreviewColorMessage(bb:flatbuffers.ByteBuffer, ob
   return (obj || new LedPreviewColorMessage()).__init(bb.readInt32(bb.position()) + bb.position(), bb);
 }
 
+/**
+ * 16 bits per channel (0-65535): the hub dithers the RGB LED, so it shows more than 8 bits.
+ */
 red():number {
   const offset = this.bb!.__offset(this.bb_pos, 4);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 green():number {
   const offset = this.bb!.__offset(this.bb_pos, 6);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 blue():number {
   const offset = this.bb!.__offset(this.bb_pos, 8);
-  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+  return offset ? this.bb!.readUint16(this.bb_pos + offset) : 0;
 }
 
 /**
@@ -65,15 +68,15 @@ static startLedPreviewColorMessage(builder:flatbuffers.Builder) {
 }
 
 static addRed(builder:flatbuffers.Builder, red:number) {
-  builder.addFieldInt8(0, red, 0);
+  builder.addFieldInt16(0, red, 0);
 }
 
 static addGreen(builder:flatbuffers.Builder, green:number) {
-  builder.addFieldInt8(1, green, 0);
+  builder.addFieldInt16(1, green, 0);
 }
 
 static addBlue(builder:flatbuffers.Builder, blue:number) {
-  builder.addFieldInt8(2, blue, 0);
+  builder.addFieldInt16(2, blue, 0);
 }
 
 static addTarget(builder:flatbuffers.Builder, target:LedTarget) {

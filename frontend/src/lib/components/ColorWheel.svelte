@@ -1,10 +1,13 @@
 <script lang="ts">
   // Hue around the ring, saturation from the center out; value is always full (brightness is set separately).
+  import type { Rgb16 } from '#lib/ledPreview.js';
+
   interface Props {
-    color?: string; // RRGGBB
+    color?: string; // RRGGBB, for showing the pick
     size?: number;
     disabled?: boolean;
-    onchange?: (color: string) => void;
+    /** The pick at 16 bits per channel, computed from the hue and saturation without rounding to 8 bits first. */
+    onchange?: (color: Rgb16) => void;
   }
 
   let { color = $bindable('ff0000'), size = 200, disabled = false, onchange }: Props = $props();
@@ -17,15 +20,26 @@
   let hue = $state(0); // degrees, 0 = red at the top, clockwise
   let saturation = $state(1);
 
-  function hsvToHex(h: number, s: number): string {
+  // Each channel 0-1 for a hue (degrees) and saturation, at full value
+  function hsvChannels(h: number, s: number): [number, number, number] {
     const f = (n: number) => {
       const k = (n + h / 60) % 6;
-      const v = 1 - s * Math.max(0, Math.min(k, 4 - k, 1));
-      return Math.round(v * 255)
-        .toString(16)
-        .padStart(2, '0');
+      return 1 - s * Math.max(0, Math.min(k, 4 - k, 1));
     };
-    return f(5) + f(3) + f(1);
+    return [f(5), f(3), f(1)];
+  }
+
+  function emit() {
+    const channels = hsvChannels(hue, saturation);
+    color = channels
+      .map((v) =>
+        Math.round(v * 255)
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('');
+    const [r, g, b] = channels.map((v) => Math.round(v * 65535));
+    onchange?.({ r, g, b });
   }
 
   function pick(e: PointerEvent) {
@@ -35,8 +49,7 @@
     const y = e.clientY - rect.top - rect.height / 2;
     hue = ((Math.atan2(x, -y) * 180) / Math.PI + 360) % 360;
     saturation = Math.min(1, Math.hypot(x, y) / (rect.width / 2));
-    color = hsvToHex(hue, saturation);
-    onchange?.(color);
+    emit();
   }
 
   function onpointerdown(e: PointerEvent) {
@@ -63,8 +76,7 @@
       return;
     }
     e.preventDefault();
-    color = hsvToHex(hue, saturation);
-    onchange?.(color);
+    emit();
   }
 
   let markerX = $derived(50 + Math.sin((hue * Math.PI) / 180) * saturation * 50);

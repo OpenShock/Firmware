@@ -71,7 +71,7 @@ static std::atomic<uint8_t>& brightnessSetting(OpenShock::LedType type, OpenShoc
 struct Preview {
   bool isColor;
   uint32_t flags;  // Pattern preview: the state flags whose pattern shows
-  uint8_t red, green, blue;
+  uint16_t red, green, blue;  // Color preview: 16 bits per channel
   std::optional<OpenShock::LedType> only;
   std::optional<uint8_t> brightness;
 };
@@ -343,8 +343,8 @@ static void applyColorPreview(const Preview& preview)
 
   if (s_rgbLedDriver != nullptr) {
     s_rgbLedDriver->SetBrightness16(toRgbDriverBrightness(preview.brightness.value_or(s_rgbNormalBrightness.load())));
-    const RgbLedDriver::RGBState color[] = {
-      rgbLit ? RgbLedDriver::RGBState {preview.red, preview.green, preview.blue, 100'000} : RgbLedDriver::RGBState {0, 0, 0, 100'000}
+    const RgbLedDriver::RGBState16 color[] = {
+      rgbLit ? RgbLedDriver::RGBState16 {preview.red, preview.green, preview.blue, 100'000} : RgbLedDriver::RGBState16 {0, 0, 0, 100'000}
     };
     s_rgbLedDriver->SetPattern(color);
   }
@@ -698,7 +698,7 @@ void VisualStateManager::PreviewPattern(LedPattern pattern)
   startPreview(Preview {.isColor = false, .flags = flags, .red = 0, .green = 0, .blue = 0, .only = std::nullopt, .brightness = std::nullopt});
 }
 
-void VisualStateManager::PreviewColor(uint8_t red, uint8_t green, uint8_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness)
+void VisualStateManager::PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness)
 {
   if (brightness.has_value()) {
     brightness = std::min(*brightness, Config::LedConfig::kMaxBrightness);

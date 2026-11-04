@@ -41,20 +41,38 @@ export function stopLedPreview(): boolean {
   });
 }
 
+/** 16 bits per channel, 0-65535. The hub dithers the RGB LED, so it shows more than 8 bits. */
+export interface Rgb16 {
+  r: number;
+  g: number;
+  b: number;
+}
+
+/** An 8-bit RRGGBB hex color widened to 16 bits per channel (ff -> 65535). */
+export function hexToRgb16(hex: string): Rgb16 {
+  const value = parseInt(hex, 16);
+  return {
+    r: ((value >> 16) & 0xff) * 257,
+    g: ((value >> 8) & 0xff) * 257,
+    b: (value & 0xff) * 257,
+  };
+}
+
 export interface LedColorPreview {
-  color: string; // RRGGBB
+  color: Rgb16;
   target?: LedTarget; // Default: every LED
   brightness?: number; // Percent for this preview only; default: each LED's saved normal brightness
 }
 
+const toUint16 = (v: number) => Math.min(65535, Math.max(0, Math.round(v)));
+
 function sendColor({ color, target = LedTarget.All, brightness }: LedColorPreview): boolean {
-  const value = parseInt(color, 16);
   return send(LocalToHubMessagePayload.LedPreviewColorMessage, (fbb) =>
     LedPreviewColorMessage.createLedPreviewColorMessage(
       fbb,
-      (value >> 16) & 0xff,
-      (value >> 8) & 0xff,
-      value & 0xff,
+      toUint16(color.r),
+      toUint16(color.g),
+      toUint16(color.b),
       target,
       brightness ?? null
     )

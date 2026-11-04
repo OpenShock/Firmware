@@ -6,9 +6,11 @@
   import {
     LedPreviewPattern,
     LedTarget,
+    hexToRgb16,
     previewLedColor,
     previewLedPattern,
     stopLedPreview,
+    type Rgb16,
   } from '#lib/ledPreview.js';
   import type { LedMode } from '#lib/mappers/ConfigMapper.js';
   import { hubState } from '#lib/stores/index.js';
@@ -95,7 +97,8 @@
     dragging = { type, signal, value };
     const target = ledTypes.find((t) => t.type === type)!.target;
     const signalColor = signals.find((s) => s.signal === signal)!.color;
-    if (previewLedColor({ color: signalColor, target, brightness: value })) previewing = true;
+    if (previewLedColor({ color: hexToRgb16(signalColor), target, brightness: value }))
+      previewing = true;
   }
 
   // A release, but also every arrow-key press, commits; saving waits for them to stop so holding an arrow key is one
@@ -130,7 +133,7 @@
     previewing = true;
   }
 
-  function onColorChange(value: string) {
+  function onColorChange(value: Rgb16) {
     if (!previewLedColor({ color: value })) return notConnected();
     previewing = true;
   }

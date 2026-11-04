@@ -55,10 +55,11 @@ namespace OpenShock::VisualStateManager {
 
   /// @brief Shows `pattern` whatever the LED mode, at the configured brightness.
   void PreviewPattern(LedPattern pattern);
-  /// @brief Shows a solid color: the RGB LED in `red`/`green`/`blue`, the mono LED on unless the color is black.
+  /// @brief Shows a solid color: the RGB LED in `red`/`green`/`blue` (16 bits per channel, 0-65535; the driver dithers
+  ///        what the LED's 8 bits can't show), the mono LED on unless the color is black.
   /// @param only Light only this LED; the other stays dark. All LEDs when unset.
   /// @param brightness Percent (capped at 100) for this preview only; each LED's normal brightness when unset.
-  void PreviewColor(uint8_t red, uint8_t green, uint8_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness);
+  void PreviewColor(uint16_t red, uint16_t green, uint16_t blue, std::optional<LedType> only, std::optional<uint8_t> brightness);
   /// @brief Ends a preview early.
   void StopPreview();
 
