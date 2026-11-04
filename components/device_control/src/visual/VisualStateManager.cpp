@@ -11,10 +11,10 @@ const char* const TAG = "VisualStateManager";
 #include "events/Events.h"
 #include "led_drivers/MonoLedDriver.h"
 #include "led_drivers/RgbLedDriver.h"
+#include "LedOverrideState.h"  // Private, next to this file
 #include "Logging.h"
 #include "SimpleMutex.h"
 #include "visual/LedConfig.h"
-#include "visual/LedOverrideState.h"
 
 #include <esp_netif.h>
 #include <esp_timer.h>
