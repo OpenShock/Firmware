@@ -1,7 +1,8 @@
 #pragma once
 
 // The `estop` config section: whether the E-Stop input is used and on which pin. Owned by device_control and kept in
-// NVS through the config framework (config/Section.h); NVS namespace "estop", keys enabled (u8) and gpio (i8).
+// NVS through the config framework (config/Section.h); NVS namespace "estop", keys enabled (u8), gpio (i8) and
+// latching (u8).
 
 #include "config/Section.h"
 
@@ -15,13 +16,16 @@ namespace OpenShock::JSON {
 }
 
 namespace OpenShock::Config {
-  // The schema's `active` and `latching` fields are not modelled: nothing reads them.
   struct EStopConfig {
-    EStopConfig();  // The defaults: the one place they are defined
-    EStopConfig(bool enabled, gpio_num_t gpioPin);
+    EStopConfig();                                  // The defaults: the one place they are defined
+    EStopConfig(bool enabled, gpio_num_t gpioPin);  // The switch type is the board's default
+    EStopConfig(bool enabled, gpio_num_t gpioPin, bool latching);
 
     bool enabled;
     gpio_num_t gpioPin;
+    // A latching switch (stays engaged, e.g. twist-to-release) clears the E-Stop when disengaged; a momentary button
+    // (false) clears it when held. Defaults to the board's OPENSHOCK_ESTOP_LATCHING.
+    bool latching;
 
     /// @brief Disables the E-Stop when its pin can't be used as an input. The section runs it on every value it takes in.
     void Normalize();
@@ -39,4 +43,6 @@ namespace OpenShock::Config {
   bool SetEStopEnabled(bool enabled);
   [[nodiscard]] gpio_num_t GetEStopGpioPin();
   bool SetEStopGpioPin(gpio_num_t gpioPin);
+  [[nodiscard]] bool GetEStopLatching();
+  bool SetEStopLatching(bool latching);
 }  // namespace OpenShock::Config

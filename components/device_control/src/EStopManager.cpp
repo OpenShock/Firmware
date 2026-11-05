@@ -27,6 +27,7 @@ static OpenShock::SimpleMutex s_estopMutex = {};
 // Guarded via Mutex
 static ManagedTask s_estopTask(TAG, "EStop task");
 static gpio_num_t s_estopPin = GPIO_NUM_NC;  // Captured by value when the task starts
+static bool s_estopLatching  = false;        // Captured by value when the task starts
 
 // Wrapped in atomics as they're read (or set via public methods) by Tasks potentially running on other cores.
 static std::atomic<int64_t> s_estopActivatedAt = 0;  // When == 0, EStop not active. When != 0, EStop is active.
@@ -59,9 +60,9 @@ static void estopmgr_publishState(EStopState state, EStopState& lastState, TickT
 static void estopmgr_latchWithoutTask();
 
 // Samples the estop at a fixed rate and updates internal state + events
-static void estopmgr_managerTask(gpio_num_t estopPin)
+static void estopmgr_managerTask(gpio_num_t estopPin, bool latching)
 {
-  EStopStateMachine machine;
+  EStopStateMachine machine(latching);
   EStopState lastPublishedState = EStopState::Idle;
 
   // Carry over an E-Stop latched while no task was running (software trigger); it must be cleared with the button.
@@ -175,9 +176,11 @@ static bool estopmgr_taskStart()
     s_estopPin = pin;
   }
 
-  // The pin is captured by value, so the task keeps sampling the pin it was started with even if s_estopPin changes.
+  // The pin and switch type are captured by value, so the task keeps running with what it was started with even if the
+  // globals change.
   gpio_num_t pin = s_estopPin;
-  if (!s_estopTask.start(TAG, CONFIG_OPENSHOCK_ESTOP_TASK_STACK_SIZE, CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, 1, [pin] { estopmgr_managerTask(pin); })) {
+  bool latching  = s_estopLatching;
+  if (!s_estopTask.start(TAG, CONFIG_OPENSHOCK_ESTOP_TASK_STACK_SIZE, CONFIG_OPENSHOCK_ESTOP_TASK_PRIORITY, 1, [pin, latching] { estopmgr_managerTask(pin, latching); })) {
     OS_LOGE(TAG, "Failed to create EStop event handler task");
     return false;
   }
@@ -211,11 +214,15 @@ bool EStopManager::Init()
   s_estopInitialized = true;
 
   const Config::EStopConfig cfg = OpenShock::Config::GetEStopConfig();
+
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  // Set regardless of enabled, so a later SetEStopEnabled(true) starts the task with the right switch type.
+  s_estopLatching = cfg.latching;
+
   if (!cfg.enabled) {
     return true;
   }
-
-  OpenShock::ScopedLock lock__(&s_estopMutex);
 
   if (!estopmgr_configurePin(cfg.gpioPin)) {
     return false;
@@ -306,6 +313,68 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
   return true;
 }
 
+// Requires s_estopMutex. Restarts the task with the new switch type; refuses while the E-Stop is active.
+static bool estopmgr_applyLatching(bool latching)
+{
+  // An active E-Stop carried into the other switch type could be cleared without the way its own type clears it.
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "Refusing to change EStop switch type while EStop is active");
+    return false;
+  }
+
+  if (!s_estopTask.running()) {
+    s_estopLatching = latching;
+    return true;
+  }
+
+  // The task captures the switch type when it starts, so restart it to apply the new one.
+  if (!estopmgr_taskStop()) {
+    return false;
+  }
+
+  // A press or software trigger can activate the E-Stop while the task stops; keep the old switch type then.
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "EStop activated while changing the switch type, keeping the old one");
+    if (!estopmgr_taskStart()) {
+      // Task is gone and we can't bring it back, so the pin isn't sampled. The E-Stop stays latched until reboot.
+      OS_LOGE(TAG, "Failed to restart EStop task, latching EStop until reboot");
+      estopmgr_latchWithoutTask();
+    }
+    return false;
+  }
+
+  bool oldLatching = s_estopLatching;
+  s_estopLatching  = latching;
+
+  if (!estopmgr_taskStart()) {
+    // Task is gone and we can't bring it back, so the pin isn't sampled. Fail safe: latch until reboot, which restarts
+    // the task with the switch type still in config.
+    OS_LOGE(TAG, "Failed to restart EStop task, latching EStop until reboot");
+    s_estopLatching = oldLatching;
+    estopmgr_latchWithoutTask();
+    return false;
+  }
+
+  return true;
+}
+
+bool EStopManager::SetEStopLatching(bool latching)
+{
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  // Saved even when the running switch type already matches, so a retry after a failed save still writes it.
+  if (s_estopLatching != latching && !estopmgr_applyLatching(latching)) {
+    return false;
+  }
+
+  if (!Config::SetEStopLatching(latching)) {
+    OS_LOGE(TAG, "Failed to save EStop switch type to config");
+    return false;
+  }
+
+  return true;
+}
+
 bool EStopManager::IsEStopped()
 {
   return s_estopActive.load() || s_externallyTriggered.load();
@@ -323,10 +392,11 @@ static void estopmgr_latchWithoutTask()
 {
   int64_t expected = 0;
   bool latched     = s_estopActivatedAt.compare_exchange_strong(expected, OpenShock::millis());
-  s_estopActive.store(true);           // Active either way: just latched, or already was
-  s_externallyTriggered.store(false);  // Taken over by the latch
+  // Active either way: just latched, or already was. The external trigger is taken over by the latch.
+  s_estopActive.store(true);
+  s_externallyTriggered.store(false);
   if (!latched) {
-    return;                            // Already active
+    return;  // Already active
   }
 
   // Bounded: the latch itself is already in effect, the event only informs listeners
