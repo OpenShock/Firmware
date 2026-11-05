@@ -83,6 +83,13 @@ static SemaphoreHandle_t s_apStarted = nullptr;
 static char s_apIfName[8]                   = {};
 static constexpr TickType_t kApStartTimeout = pdMS_TO_TICKS(2000);
 
+// A marker posted to the default event loop: once its handler runs, every event posted before it has been handled
+ESP_EVENT_DEFINE_BASE(CAPTIVEPORTAL_PRIVATE_EVENTS);
+enum {
+  CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH,
+};
+static SemaphoreHandle_t s_loopFlushed = nullptr;
+
 static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
 static void sendCommand(uint32_t command)
@@ -154,6 +161,21 @@ static void captiveportal_onapstart(void*, esp_event_base_t, int32_t, void*)
   xSemaphoreGive(s_apStarted);
 }
 
+static void captiveportal_onloopflush(void*, esp_event_base_t, int32_t, void*)
+{
+  xSemaphoreGive(s_loopFlushed);
+}
+
+// Waits until the default event loop has handled everything posted to it before this call
+static bool waitForEventLoop(TickType_t timeout)
+{
+  xSemaphoreTake(s_loopFlushed, 0);  // drop a flush left over from an earlier call that timed out
+  if (esp_event_post(CAPTIVEPORTAL_PRIVATE_EVENTS, CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH, nullptr, 0, timeout) != ESP_OK) {
+    return false;
+  }
+  return xSemaphoreTake(s_loopFlushed, timeout) == pdTRUE;
+}
+
 static bool captiveportal_start()
 {
   if (GetInstance() != nullptr) {
@@ -197,8 +219,11 @@ static bool captiveportal_start()
   static bool apStartHandlerRegistered = false;
   if (!apStartHandlerRegistered) {
     esp_err_t evtErr = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_AP_START, captiveportal_onapstart, nullptr);
+    if (evtErr == ESP_OK) {
+      evtErr = esp_event_handler_register(CAPTIVEPORTAL_PRIVATE_EVENTS, CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH, captiveportal_onloopflush, nullptr);
+    }
     if (evtErr != ESP_OK) {
-      OS_LOGE(TAG, "Failed to register the AP start handler: %s", esp_err_to_name(evtErr));
+      OS_LOGE(TAG, "Failed to register the AP start handlers: %s", esp_err_to_name(evtErr));
       return false;
     }
     apStartHandlerRegistered = true;
@@ -235,7 +260,6 @@ static bool captiveportal_start()
   apConfig.ap.beacon_interval = 100;
 
   s_apIfName[0] = '\0';
-  xSemaphoreTake(s_apStarted, 0);  // drop a start left over from an earlier run
 
   esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
   if (err != ESP_OK) {
@@ -252,10 +276,21 @@ static bool captiveportal_start()
 
   // The servers bind to the AP's lwIP interface, which only exists once the AP has started. Reading its name earlier
   // returns another interface's (the STA's), and would put the portal on the LAN.
-  if (!esp_netif_is_netif_up(s_apNetif) && xSemaphoreTake(s_apStarted, kApStartTimeout) != pdTRUE) {
-    OS_LOGE(TAG, "AP did not start");
-    esp_wifi_set_mode(WIFI_MODE_STA);
-    return false;
+  //
+  // Enabling the AP starts it with the config it had, and setting a different config (a new name or password, or the
+  // first start after boot) restarts it: stopped, its netif removed from lwIP, then started again under a new name.
+  // Both starts are queued on the event loop by now. Reading the name between them gets nothing (the netif is gone)
+  // or the first start's (which no longer exists), so let the loop handle them first, then take the start that stays.
+  if (!waitForEventLoop(kApStartTimeout)) {
+    OS_LOGW(TAG, "The event loop did not catch up with the AP start, the interface name may be stale");
+  }
+  if (!esp_netif_is_netif_up(s_apNetif)) {
+    xSemaphoreTake(s_apStarted, 0);  // a start that has since been stopped again
+    if (!esp_netif_is_netif_up(s_apNetif) && xSemaphoreTake(s_apStarted, kApStartTimeout) != pdTRUE) {
+      OS_LOGE(TAG, "AP did not start");
+      esp_wifi_set_mode(WIFI_MODE_STA);
+      return false;
+    }
   }
 
   err = esp_netif_get_netif_impl_name(s_apNetif, s_apIfName);
@@ -431,7 +466,8 @@ bool CaptivePortal::Init()
 
   s_forceCloseDone = xSemaphoreCreateBinary();
   s_apStarted      = xSemaphoreCreateBinary();
-  if (s_forceCloseDone == nullptr || s_apStarted == nullptr) {
+  s_loopFlushed    = xSemaphoreCreateBinary();
+  if (s_forceCloseDone == nullptr || s_apStarted == nullptr || s_loopFlushed == nullptr) {
     OS_LOGE(TAG, "Failed to create captive portal semaphores");
     delete initialState;
     return false;
