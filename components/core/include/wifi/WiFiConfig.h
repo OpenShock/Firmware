@@ -86,6 +86,12 @@ namespace OpenShock::Config {
   [[nodiscard]] std::string GetWiFiAccessPointPassword();
   /// @brief Refuses a password IsValidAccessPointPassword rejects. Takes effect the next time the captive portal starts.
   bool SetWiFiAccessPointPassword(std::string password);
+  /// @brief Sets the name and the password in one config write; an unset one is kept. Refuses the whole change if
+  ///        either is invalid. Takes effect the next time the captive portal starts.
+  bool SetWiFiAccessPoint(std::optional<std::string> ssid, std::optional<std::string> password);
+  /// @brief The name the access point broadcasts while its SSID is the default (CONFIG_OPENSHOCK_FW_AP_PREFIX): the
+  ///        prefix with this hub's STA MAC.
+  [[nodiscard]] std::string GetDefaultAccessPointSSID();
   [[nodiscard]] std::string GetWiFiHostname();
   bool SetWiFiHostname(std::string hostname);
 }  // namespace OpenShock::Config

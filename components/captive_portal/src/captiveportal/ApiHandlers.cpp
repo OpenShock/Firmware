@@ -19,6 +19,7 @@ const char* const TAG = "CaptivePortalApi";
 #include "OtaUpdateConfig.h"
 #include "RateLimiter.h"
 #include "util/TaskUtils.h"
+#include "wifi/WiFiConfig.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -43,6 +44,8 @@ static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLon
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
 static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_INVALID_AP_SSID = "{\"error\":\"InvalidApSsid\"}";
+static const char* const JSON_ERR_INVALID_AP_PASS = "{\"error\":\"InvalidApPassword\"}";
 
 using namespace OpenShock;
 using namespace OpenShock::CaptivePortal;
@@ -385,6 +388,71 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
   return sendResp(req, S200, nullptr, {});
 }
 
+// PUT /api/ap, form body: any of
+//   ssid=<name>                      the access point's name; empty for the default (the prefix with the hub's MAC)
+//   protection=default|open|custom   the build's default password, none, or `password`
+//   password=<8-63 printable ASCII>  with protection=custom
+// Saved in one config write, applied the next time the captive portal starts: applying it now would drop the client
+// that asked, which is most likely on this access point.
+static esp_err_t apiAccessPoint(httpd_req_t* req)
+{
+  auto body = recvBody(req);
+  if (!body) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  }
+
+  std::optional<std::string> ssid;
+  auto ssidParam = getFormParam(*body, "ssid");
+  if (!ssidParam && ssidParam.error() != ParamError::Missing) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_SSID);
+  }
+  if (ssidParam) {
+    ssid = ssidParam->empty() ? std::string(CONFIG_OPENSHOCK_FW_AP_PREFIX) : std::move(*ssidParam);
+    if (!Config::IsValidAccessPointSSID(*ssid)) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_SSID);
+    }
+  }
+
+  std::optional<std::string> password;
+  auto protection = getFormParam(*body, "protection");
+  if (!protection && protection.error() != ParamError::Missing) {
+    return sendParamError(req, protection.error());
+  }
+  if (protection) {
+    if (*protection == "default") {
+      password = std::string(CONFIG_OPENSHOCK_FW_AP_PASSWORD);
+    } else if (*protection == "open") {
+      password = std::string();
+    } else if (*protection == "custom") {
+      auto passwordParam = getFormParam(*body, "password");
+      if (!passwordParam) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, passwordParam.error() == ParamError::Missing ? JSON_ERR_PASSWORD_SHORT : JSON_ERR_INVALID_AP_PASS);
+      }
+      if (passwordParam->length() < 8) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_SHORT);
+      }
+      if (passwordParam->length() > 63) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_LONG);
+      }
+      if (!Config::IsValidAccessPointPassword(*passwordParam)) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_PASS);
+      }
+      password = std::move(*passwordParam);
+    } else {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+  }
+
+  if (!ssid && !password) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  }
+
+  if (!Config::SetWiFiAccessPoint(std::move(ssid), std::move(password))) {
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+  return sendResp(req, S200, nullptr, {});
+}
+
 void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInstance* instance)
 {
   registerHandler<apiBoard>(server, "/api/board", HTTP_GET, instance);
@@ -402,4 +470,5 @@ void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInst
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
   registerHandler<apiOtaSettings>(server, "/api/ota/settings", HTTP_PUT, instance);
   registerHandler<apiOtaCheck>(server, "/api/ota/check", HTTP_POST, instance);
+  registerHandler<apiAccessPoint>(server, "/api/ap", HTTP_PUT, instance);
 }

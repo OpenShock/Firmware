@@ -7,6 +7,7 @@ const char* const TAG = "Config::WiFiConfig";
 #include "config/Nvs.h"
 #include "config/Parse.h"
 #include "Convert.h"
+#include "FormatHelpers.h"
 #include "Logging.h"
 #include "StringHelpers.h"
 #include "util/HostnameUtils.h"
@@ -17,6 +18,8 @@ const char* const TAG = "Config::WiFiConfig";
 #include <bitset>
 #include <cstdio>
 #include <cstring>
+
+#include <esp_mac.h>
 
 using namespace OpenShock::Config;
 
@@ -481,6 +484,44 @@ bool OpenShock::Config::SetWiFiAccessPointPassword(std::string password)
     wifi.accessPointPassword = std::move(password);
     return true;
   });
+}
+
+bool OpenShock::Config::SetWiFiAccessPoint(std::optional<std::string> ssid, std::optional<std::string> password)
+{
+  if (ssid.has_value() && !IsValidAccessPointSSID(*ssid)) {
+    OS_LOGE(TAG, "Invalid access point SSID length %zu", ssid->size());
+    return false;
+  }
+  if (password.has_value() && !IsValidAccessPointPassword(*password)) {
+    OS_LOGE(TAG, "Invalid access point password length %zu", password->size());
+    return false;
+  }
+
+  return s_section.Update([&](WiFiConfig& wifi) {
+    bool changed = false;
+    if (ssid.has_value() && wifi.accessPointSSID != *ssid) {
+      wifi.accessPointSSID = std::move(*ssid);
+      changed              = true;
+    }
+    if (password.has_value() && wifi.accessPointPassword != *password) {
+      wifi.accessPointPassword = std::move(*password);
+      changed                  = true;
+    }
+    return changed;
+  });
+}
+
+// The MAC takes 17 characters ("AA:BB:CC:DD:EE:FF") of an SSID's 32, so the prefix gets the other 15
+static_assert(sizeof(CONFIG_OPENSHOCK_FW_AP_PREFIX) - 1 + 17 <= 32, "CONFIG_OPENSHOCK_FW_AP_PREFIX must be at most 15 characters");
+
+std::string OpenShock::Config::GetDefaultAccessPointSSID()
+{
+  uint8_t mac[6] = {};
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+
+  char ssid[33];  // An SSID's 32 bytes and the NUL
+  snprintf(ssid, sizeof(ssid), "%s" BSSID_FMT, CONFIG_OPENSHOCK_FW_AP_PREFIX, BSSID_ARG(mac));
+  return ssid;
 }
 
 std::string OpenShock::Config::GetWiFiHostname()

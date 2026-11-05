@@ -235,15 +235,9 @@ static bool captiveportal_start()
   const std::string apPassword = Config::GetWiFiAccessPointPassword();
 
   wifi_config_t apConfig = {};
-  if (apSsid == CONFIG_OPENSHOCK_FW_AP_PREFIX) {
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s" BSSID_FMT, CONFIG_OPENSHOCK_FW_AP_PREFIX, BSSID_ARG(mac));
-    apConfig.ap.ssid_len = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
-  } else {
-    apConfig.ap.ssid_len = std::min(apSsid.size(), sizeof(apConfig.ap.ssid));
-    memcpy(apConfig.ap.ssid, apSsid.data(), apConfig.ap.ssid_len);
-  }
+  const std::string ssid = apSsid == CONFIG_OPENSHOCK_FW_AP_PREFIX ? Config::GetDefaultAccessPointSSID() : apSsid;
+  apConfig.ap.ssid_len   = std::min(ssid.size(), sizeof(apConfig.ap.ssid));
+  memcpy(apConfig.ap.ssid, ssid.data(), apConfig.ap.ssid_len);
   apConfig.ap.channel = 1;
   if (apPassword.empty()) {
     apConfig.ap.authmode = WIFI_AUTH_OPEN;
