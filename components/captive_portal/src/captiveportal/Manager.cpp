@@ -20,6 +20,7 @@ const char* const TAG = "CaptivePortal";
 #include "visual/LedOverrides.h"
 #include "wifi/WiFiConfig.h"
 
+#include <esp_event.h>
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_timer.h>
@@ -77,6 +78,12 @@ static std::atomic<bool> s_instanceLive = false;
 // Instances taken down whose destruction waits for other tasks to drop their references; destroyed by the manager task.
 static RetiredList<CaptivePortalInstance> s_retiredInstances;
 static esp_netif_t* s_apNetif = nullptr;
+// Given once WIFI_EVENT_AP_START has added s_apNetif to lwIP, so its interface name can be read.
+static SemaphoreHandle_t s_apStarted = nullptr;
+// lwIP's name for s_apNetif, which the portal's servers bind to. Re-read on every start: lwIP only knows the netif
+// while the AP runs, and gives it a new number each time the AP starts again.
+static char s_apIfName[8]                   = {};
+static constexpr TickType_t kApStartTimeout = pdMS_TO_TICKS(2000);
 
 static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
@@ -142,6 +149,13 @@ static bool DestroyInstance()
   return false;
 }
 
+// Registered after esp_wifi's default WIFI_EVENT_AP_START handler, so it runs once that one has added the AP netif
+// to lwIP: only from then on does lwIP hand out the netif's real interface name.
+static void captiveportal_onapstart(void*, esp_event_base_t, int32_t, void*)
+{
+  xSemaphoreGive(s_apStarted);
+}
+
 static bool captiveportal_start()
 {
   if (GetInstance() != nullptr) {
@@ -181,6 +195,17 @@ static bool captiveportal_start()
     esp_netif_dhcps_start(s_apNetif);
   }
 
+  // esp_netif_create_default_wifi_ap() registered esp_wifi's default handlers, so this one runs after them.
+  static bool apStartHandlerRegistered = false;
+  if (!apStartHandlerRegistered) {
+    esp_err_t evtErr = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_AP_START, captiveportal_onapstart, nullptr);
+    if (evtErr != ESP_OK) {
+      OS_LOGE(TAG, "Failed to register the AP start handler: %s", esp_err_to_name(evtErr));
+      return false;
+    }
+    apStartHandlerRegistered = true;
+  }
+
   // AP SSID = prefix + this device's STA MAC (matches the old Arduino naming).
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
@@ -193,6 +218,9 @@ static bool captiveportal_start()
   apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
   apConfig.ap.beacon_interval = 100;
 
+  s_apIfName[0] = '\0';
+  xSemaphoreTake(s_apStarted, 0);  // drop a start left over from an earlier run
+
   esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
   if (err != ESP_OK) {
     OS_LOGE(TAG, "Failed to enable AP mode: %s", esp_err_to_name(err));
@@ -204,6 +232,22 @@ static bool captiveportal_start()
     OS_LOGE(TAG, "Failed to configure AP: %s", esp_err_to_name(err));
     esp_wifi_set_mode(WIFI_MODE_STA);
     return false;
+  }
+
+  // The servers bind to the AP's lwIP interface, which only exists once the AP has started. Reading its name earlier
+  // returns another interface's (the STA's), and would put the portal on the LAN.
+  if (!esp_netif_is_netif_up(s_apNetif) && xSemaphoreTake(s_apStarted, kApStartTimeout) != pdTRUE) {
+    OS_LOGE(TAG, "AP did not start");
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    return false;
+  }
+
+  err = esp_netif_get_netif_impl_name(s_apNetif, s_apIfName);
+  if (err != ESP_OK) {
+    s_apIfName[0] = '\0';
+    OS_LOGE(TAG, "Failed to get the AP interface name: %s", esp_err_to_name(err));
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    return false;  // the servers could not be bound to the AP, and must not listen on the LAN
   }
 
   if (!CreateInstance()) {
@@ -383,8 +427,9 @@ bool CaptivePortal::Init()
   }
 
   s_forceCloseDone = xSemaphoreCreateBinary();
-  if (s_forceCloseDone == nullptr) {
-    OS_LOGE(TAG, "Failed to create captive portal force-close semaphore");
+  s_apStarted      = xSemaphoreCreateBinary();
+  if (s_forceCloseDone == nullptr || s_apStarted == nullptr) {
+    OS_LOGE(TAG, "Failed to create captive portal semaphores");
     delete initialState;
     return false;
   }
@@ -478,6 +523,11 @@ bool CaptivePortal::IsRunning()
 const char* CaptivePortal::ApIPv4String()
 {
   return CONFIG_OPENSHOCK_PORTAL_AP_IP;
+}
+
+const char* CaptivePortal::ApInterfaceName()
+{
+  return s_apIfName;
 }
 
 bool CaptivePortal::SendMessageTXT(uint8_t socketId, std::string_view data)

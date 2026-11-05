@@ -48,6 +48,27 @@ static void handleEStopPinCommand(std::string_view arg, bool isAutomated)
   SERPR_SUCCESS("Saved config");
 }
 
+static void handleEStopLatchingCommand(std::string_view arg, bool isAutomated)
+{
+  if (arg.empty()) {
+    SERPR_RESPONSE("EStopLatching|%s", OpenShock::Config::GetEStopLatching() ? "true" : "false");
+    return;
+  }
+
+  auto latching = OpenShock::Convert::ToBool(arg);
+  if (!latching) {
+    SERPR_ERROR("Invalid argument (must be a boolean)");
+    return;
+  }
+
+  if (!OpenShock::EStopManager::SetEStopLatching(*latching)) {
+    SERPR_ERROR("Failed to set EStop latching (refused while the EStop is active)");
+    return;
+  }
+
+  SERPR_SUCCESS("Saved config");
+}
+
 OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::EStopHandler()
 {
   auto group = OpenShock::SerialCmds::CommandGroup("estop");
@@ -59,6 +80,10 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::ESto
   group.addCommand("pin", "Get the GPIO pin used for the E-Stop.", handleEStopPinCommand);
   auto& setPinCommand = group.addCommand("pin", "Set the GPIO pin used for the E-Stop.", handleEStopPinCommand);
   setPinCommand.addArgument("pin", "must be a number", "4");
+
+  group.addCommand("latching", "Get whether the E-Stop is a latching switch.", handleEStopLatchingCommand);
+  auto& setLatchingCommand = group.addCommand("latching", "Set whether the E-Stop is a latching switch (clears when disengaged) or a momentary button (hold to clear).", handleEStopLatchingCommand);
+  setLatchingCommand.addArgument("latching", "must be a boolean", "true");
 
   return group;
 }

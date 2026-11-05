@@ -35,7 +35,7 @@ namespace ConfigTest {
     config.backend       = Config::BackendConfig("api.example.org", "tok_0123456789abcdef");
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
-    config.estop         = Config::EStopConfig(true, GPIO_NUM_13);
+    config.estop         = Config::EStopConfig(true, GPIO_NUM_13, true);
     config.led           = Config::LedConfig(LedMode::CriticalOnly, 40000, 0, 5140, 300);
 
     return config;
@@ -137,6 +137,7 @@ namespace ConfigTest {
 
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
+    TEST_ASSERT_EQUAL_MESSAGE(expected.estop.latching, actual.estop.latching, "estop.latching");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(expected.led.mode), static_cast<int>(actual.led.mode), "led.mode");
     TEST_ASSERT_EQUAL_UINT16_MESSAGE(expected.led.monoCriticalBrightness, actual.led.monoCriticalBrightness, "led.monoCriticalBrightness");

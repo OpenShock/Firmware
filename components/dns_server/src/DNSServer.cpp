@@ -14,6 +14,7 @@ const char* const TAG = "DNSServer";
 #include <cerrno>
 #include <cstddef>
 #include <cstring>
+#include <string_view>
 
 using namespace OpenShock;
 
@@ -29,7 +30,7 @@ DNSServer::~DNSServer()
   stop();
 }
 
-bool DNSServer::start(const char* responseIpv4, uint16_t port)
+bool DNSServer::start(const char* responseIpv4, const char* bindIpv4, const char* bindIfName, uint16_t port)
 {
   if (m_task.running()) {
     return true;  // already running
@@ -45,6 +46,20 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
   }
   static_assert(sizeof(parsed.s_addr) == sizeof(m_ip), "s_addr and m_ip must be the same size");
   memcpy(m_ip, &parsed.s_addr, sizeof(m_ip));  // already in network order, i.e. a.b.c.d
+
+  struct in_addr bindAddr = {};
+  if (bindIpv4 == nullptr || inet_pton(AF_INET, bindIpv4, &bindAddr) != 1) {
+    OS_LOGE(TAG, "Invalid bind IPv4: %s", bindIpv4 != nullptr ? bindIpv4 : "(null)");
+    return false;
+  }
+
+  struct ifreq bindIf         = {};  // zeroed, so the copied name is NUL-terminated
+  std::string_view ifNameView = bindIfName != nullptr ? bindIfName : "";
+  if (ifNameView.empty() || ifNameView.size() >= sizeof(bindIf.ifr_name)) {
+    OS_LOGE(TAG, "Invalid bind interface: \"%.*s\"", static_cast<int>(ifNameView.size()), ifNameView.data());
+    return false;
+  }
+  ifNameView.copy(bindIf.ifr_name, ifNameView.size());
 
   m_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (m_socket < 0) {
@@ -65,13 +80,24 @@ bool DNSServer::start(const char* responseIpv4, uint16_t port)
     return false;
   }
 
+  // Bound to one interface and one address rather than INADDR_ANY: lwIP then delivers only datagrams that arrive on
+  // that interface addressed to that address, so the hub does not answer every name with the portal address to anyone
+  // on the LAN it is connected to. The address alone would not do: lwIP accepts a datagram for any local address on
+  // any interface, so a LAN client could route the AP address via the hub's STA address.
+  if (setsockopt(m_socket, SOL_SOCKET, SO_BINDTODEVICE, &bindIf, sizeof(bindIf)) < 0) {
+    OS_LOGE(TAG, "Failed to bind DNS socket to interface %s (errno %d)", bindIfName, errno);
+    close(m_socket);
+    m_socket = -1;
+    return false;
+  }
+
   struct sockaddr_in addr = {};
   addr.sin_family         = AF_INET;
-  addr.sin_addr.s_addr    = htonl(INADDR_ANY);
+  addr.sin_addr           = bindAddr;
   addr.sin_port           = htons(port);
 
   if (bind(m_socket, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
-    OS_LOGE(TAG, "Failed to bind DNS socket to port %u", port);
+    OS_LOGE(TAG, "Failed to bind DNS socket to %s:%u", bindIpv4, port);
     close(m_socket);
     m_socket = -1;
     return false;

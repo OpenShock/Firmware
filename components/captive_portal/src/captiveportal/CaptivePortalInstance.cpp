@@ -11,6 +11,9 @@ const char* const TAG = "CaptivePortalInstance";
 
 #include <lwip/sockets.h>
 
+#include <cstdint>
+#include <string_view>
+
 const uint16_t HTTP_PORT = 80;
 // httpd needs 3 lwIP sockets besides its client sockets; the DNS server, the gateway connection and an outbound HTTP request need one each
 static_assert(CONFIG_LWIP_MAX_SOCKETS >= CONFIG_OPENSHOCK_PORTAL_HTTPD_MAX_SOCKETS + 3 + 3, "httpd client sockets would leave no lwIP sockets for the DNS server and outbound connections");
@@ -23,8 +26,8 @@ void CaptivePortal::CaptivePortalInstance::registerHandlers()
   // API endpoints (registered before the static wildcard so they take priority).
   RegisterApiHandlers(m_server, this);
 
-  // OS captive-detection probes + RFC 8908 endpoint + 404 redirect (rfc8908 component).
-  // Registered before the static wildcard so the specific probe paths take priority.
+  // RFC 8908 endpoint (rfc8908 component); probes fall through to the static handler's redirect.
+  // Registered before the static wildcard so the API paths take priority.
   RFC8908::RegisterProbeHandlers(m_server, CaptivePortal::ApIPv4String());
 
   m_webSocket.registerHandler(m_server);
@@ -46,6 +49,18 @@ static esp_err_t onSessionOpen(httpd_handle_t /*server*/, int sockfd)
 
 bool CaptivePortal::CaptivePortalInstance::startHttpServer()
 {
+  // Bound to the AP interface (SO_BINDTODEVICE), so lwIP only hands it connections that arrive on the AP. Checking
+  // the local address is not enough: lwIP accepts a packet for any of the hub's addresses on any interface, so a LAN
+  // client that routes the AP address via the hub's STA address would get through. The portal's API is the local
+  // protocol, which has no compatibility rules: nothing on the LAN may come to depend on it.
+  ifreq apInterface         = {};  // zeroed, so the copied name is NUL-terminated
+  std::string_view apIfName = CaptivePortal::ApInterfaceName();
+  if (apIfName.empty() || apIfName.size() >= sizeof(apInterface.ifr_name)) {
+    OS_LOGE(TAG, "No usable AP interface name (\"%.*s\"), not starting the HTTP server", static_cast<int>(apIfName.size()), apIfName.data());
+    return false;
+  }
+  apIfName.copy(apInterface.ifr_name, apIfName.size());
+
   httpd_config_t config   = HTTPD_DEFAULT_CONFIG();
   config.server_port      = HTTP_PORT;
   config.max_uri_handlers = 40;
@@ -57,6 +72,7 @@ bool CaptivePortal::CaptivePortalInstance::startHttpServer()
   config.send_wait_timeout = CONFIG_OPENSHOCK_PORTAL_HTTPD_TIMEOUT_S;
   config.uri_match_fn      = httpd_uri_match_wildcard;
   config.open_fn           = onSessionOpen;
+  config.if_name           = &apInterface;  // only read during httpd_start
   // Same core as the WiFi/lwIP tasks, away from the E-Stop and RF tasks on core 1
   config.core_id = 0;
 
@@ -78,8 +94,9 @@ CaptivePortal::CaptivePortalInstance::CaptivePortalInstance()
     return;
   }
 
-  // Start the wildcard DNS responder (all A queries -> the portal AP IP).
-  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String());
+  // Start the wildcard DNS responder (all A queries -> the portal AP IP), on the AP interface only: the LAN must not
+  // get its answers.
+  m_dnsStarted = m_dnsServer.start(CaptivePortal::ApIPv4String(), CaptivePortal::ApIPv4String(), CaptivePortal::ApInterfaceName());
   if (!m_dnsStarted) {
     OS_LOGE(TAG, "Failed to start DNS server");
   }
