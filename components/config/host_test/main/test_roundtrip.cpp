@@ -1,6 +1,7 @@
 // Round trips: a config written by this firmware must read back unchanged after a reboot, through the NVS store
 // and through the jsonconfig (GetAsJSON / SaveFromJSON) path.
 #include <freertos/FreeRTOS.h>
+#include <utility>
 
 #include "unity.h"
 
@@ -39,8 +40,14 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetOtaUpdateStep(OtaUpdateStep::Updated));
   TEST_ASSERT_TRUE(Config::SetEStopGpioPin(GPIO_NUM_13));
   TEST_ASSERT_TRUE(Config::SetEStopEnabled(true));
+  TEST_ASSERT_TRUE(Config::UpdateLedConfig([](Config::LedConfig& led) {
+    led.mode                = LedMode::Off;
+    led.rgbNormalBrightness = 60000;  // Above 255: survives only as a u16
+    return true;
+  }));
 
   const Full before = Snapshot();
+  TEST_ASSERT_EQUAL_UINT16(60000, before.led.rgbNormalBrightness);
   TEST_ASSERT_EQUAL_UINT8_ARRAY(bssid, before.wifi.credentialsList[0].bssid.data(), 6);
 
   Reload();
@@ -72,10 +79,38 @@ TEST_CASE("Whole-section setters round trip through the store", "[config][roundt
   TEST_ASSERT_TRUE(Config::SetSerialInputConfig(sample.serialInput));
   TEST_ASSERT_TRUE(Config::SetOtaUpdateConfig(sample.otaUpdate));
   TEST_ASSERT_TRUE(Config::SetEStopConfig(sample.estop));
+  TEST_ASSERT_TRUE(Config::SetLedConfig(sample.led));
   AssertConfigEqual(sample, Snapshot());
 
   Reload();
   AssertConfigEqual(sample, Snapshot());
+}
+
+TEST_CASE("An unknown LED mode from a caller is reset to the default", "[config][roundtrip]")
+{
+  InitDefault();
+
+  // Not one of the LedMode values: a caller can hand the section anything
+  Config::LedConfig led = Config::GetLedConfig();
+  led.mode              = static_cast<LedMode>(7);
+  TEST_ASSERT_TRUE(Config::SetLedConfig(led));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(LedMode::All), std::to_underlying(Config::GetLedConfig().mode));
+
+  TEST_ASSERT_TRUE(Config::UpdateLedConfig([](Config::LedConfig& l) {
+    l.mode = static_cast<LedMode>(200);
+    return true;
+  }));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(LedMode::All), std::to_underlying(Config::GetLedConfig().mode));
+}
+
+TEST_CASE("An unknown OTA update channel from a caller is reset to stable", "[config][roundtrip]")
+{
+  InitDefault();
+
+  Config::OtaUpdateConfig ota = Config::GetOtaUpdateConfig();
+  ota.updateChannel           = static_cast<OtaUpdateChannel>(9);
+  TEST_ASSERT_TRUE(Config::SetOtaUpdateConfig(ota));
+  TEST_ASSERT_EQUAL_UINT8(std::to_underlying(OtaUpdateChannel::Stable), std::to_underlying(Config::GetOtaUpdateConfig().updateChannel));
 }
 
 TEST_CASE("Removed credentials are gone after a reload and their ids can be reused", "[config][roundtrip]")

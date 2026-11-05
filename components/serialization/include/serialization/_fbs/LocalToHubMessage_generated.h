@@ -14,40 +14,140 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
              "Non-compatible flatbuffers version included");
 
 #include "ShockerCommand_generated.h"
+#include "StatusLed_generated.h"
 
 namespace OpenShock {
 namespace Serialization {
 namespace Local {
 
+struct LedPreviewPatternMessage;
+struct LedPreviewPatternMessageBuilder;
+
+struct LedPreviewColorMessage;
+struct LedPreviewColorMessageBuilder;
+
+struct LedDraftMessage;
+struct LedDraftMessageBuilder;
+
+struct LedOverrideStopMessage;
+struct LedOverrideStopMessageBuilder;
+
+struct LedCommitDraftMessage;
+struct LedCommitDraftMessageBuilder;
+
+struct LedSetModeMessage;
+struct LedSetModeMessageBuilder;
+
 struct LocalToHubMessage;
 struct LocalToHubMessageBuilder;
+
+enum class LedTarget : uint8_t {
+  All = 0,
+  Mono = 1,
+  Rgb = 2,
+  MIN = All,
+  MAX = Rgb
+};
+
+inline const LedTarget (&EnumValuesLedTarget())[3] {
+  static const LedTarget values[] = {
+    LedTarget::All,
+    LedTarget::Mono,
+    LedTarget::Rgb
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLedTarget() {
+  static const char * const names[4] = {
+    "All",
+    "Mono",
+    "Rgb",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLedTarget(LedTarget e) {
+  if (::flatbuffers::IsOutRange(e, LedTarget::All, LedTarget::Rgb)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLedTarget()[index];
+}
+
+enum class LedSignal : uint8_t {
+  Normal = 0,
+  Critical = 1,
+  MIN = Normal,
+  MAX = Critical
+};
+
+inline const LedSignal (&EnumValuesLedSignal())[2] {
+  static const LedSignal values[] = {
+    LedSignal::Normal,
+    LedSignal::Critical
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLedSignal() {
+  static const char * const names[3] = {
+    "Normal",
+    "Critical",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLedSignal(LedSignal e) {
+  if (::flatbuffers::IsOutRange(e, LedSignal::Normal, LedSignal::Critical)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLedSignal()[index];
+}
 
 enum class LocalToHubMessagePayload : uint8_t {
   NONE = 0,
   Common_ShockerCommandList = 1,
+  LedPreviewPatternMessage = 2,
+  LedPreviewColorMessage = 3,
+  LedDraftMessage = 4,
+  LedOverrideStopMessage = 5,
+  LedCommitDraftMessage = 6,
+  LedSetModeMessage = 7,
   MIN = NONE,
-  MAX = Common_ShockerCommandList
+  MAX = LedSetModeMessage
 };
 
-inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[2] {
+inline const LocalToHubMessagePayload (&EnumValuesLocalToHubMessagePayload())[8] {
   static const LocalToHubMessagePayload values[] = {
     LocalToHubMessagePayload::NONE,
-    LocalToHubMessagePayload::Common_ShockerCommandList
+    LocalToHubMessagePayload::Common_ShockerCommandList,
+    LocalToHubMessagePayload::LedPreviewPatternMessage,
+    LocalToHubMessagePayload::LedPreviewColorMessage,
+    LocalToHubMessagePayload::LedDraftMessage,
+    LocalToHubMessagePayload::LedOverrideStopMessage,
+    LocalToHubMessagePayload::LedCommitDraftMessage,
+    LocalToHubMessagePayload::LedSetModeMessage
   };
   return values;
 }
 
 inline const char * const *EnumNamesLocalToHubMessagePayload() {
-  static const char * const names[3] = {
+  static const char * const names[9] = {
     "NONE",
     "Common_ShockerCommandList",
+    "LedPreviewPatternMessage",
+    "LedPreviewColorMessage",
+    "LedDraftMessage",
+    "LedOverrideStopMessage",
+    "LedCommitDraftMessage",
+    "LedSetModeMessage",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameLocalToHubMessagePayload(LocalToHubMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, LocalToHubMessagePayload::NONE, LocalToHubMessagePayload::Common_ShockerCommandList)) return "";
+  if (::flatbuffers::IsOutRange(e, LocalToHubMessagePayload::NONE, LocalToHubMessagePayload::LedSetModeMessage)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesLocalToHubMessagePayload()[index];
 }
@@ -60,10 +160,454 @@ template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Commo
   static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::Common_ShockerCommandList;
 };
 
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::LedPreviewPatternMessage> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::LedPreviewPatternMessage;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::LedPreviewColorMessage> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::LedPreviewColorMessage;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::LedDraftMessage> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::LedDraftMessage;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::LedOverrideStopMessage> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::LedOverrideStopMessage;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::LedCommitDraftMessage> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::LedCommitDraftMessage;
+};
+
+template<> struct LocalToHubMessagePayloadTraits<OpenShock::Serialization::Local::LedSetModeMessage> {
+  static const LocalToHubMessagePayload enum_value = LocalToHubMessagePayload::LedSetModeMessage;
+};
+
 template <bool B = false>
 bool VerifyLocalToHubMessagePayload(::flatbuffers::VerifierTemplate<B> &verifier, const void *obj, LocalToHubMessagePayload type);
 template <bool B = false>
 bool VerifyLocalToHubMessagePayloadVector(::flatbuffers::VerifierTemplate<B> &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<LocalToHubMessagePayload> *types);
+
+/// Shows a state's pattern whatever the LED mode, for about two of its cycles. Nothing is saved.
+struct LedPreviewPatternMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedPreviewPatternMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedPreviewPatternMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SEQ = 4,
+    VT_PATTERN = 6
+  };
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  OpenShock::Serialization::Types::LedPattern pattern() const {
+    return static_cast<OpenShock::Serialization::Types::LedPattern>(GetField<uint8_t>(VT_PATTERN, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           VerifyField<uint8_t>(verifier, VT_PATTERN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedPreviewPatternMessageBuilder {
+  typedef LedPreviewPatternMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedPreviewPatternMessage::VT_SEQ, seq, 0);
+  }
+  void add_pattern(OpenShock::Serialization::Types::LedPattern pattern) {
+    fbb_.AddElement<uint8_t>(LedPreviewPatternMessage::VT_PATTERN, static_cast<uint8_t>(pattern), 0);
+  }
+  explicit LedPreviewPatternMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedPreviewPatternMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedPreviewPatternMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedPreviewPatternMessage> CreateLedPreviewPatternMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t seq = 0,
+    OpenShock::Serialization::Types::LedPattern pattern = OpenShock::Serialization::Types::LedPattern::WifiDisconnected) {
+  LedPreviewPatternMessageBuilder builder_(_fbb);
+  builder_.add_seq(seq);
+  builder_.add_pattern(pattern);
+  return builder_.Finish();
+}
+
+struct LedPreviewPatternMessage::Traits {
+  using type = LedPreviewPatternMessage;
+  static auto constexpr Create = CreateLedPreviewPatternMessage;
+};
+
+/// Shows a solid color: the RGB LED in the color, the mono LED on unless it is black. Sent at a high rate while the
+/// user drags a color or brightness control; the hub ends it two seconds after the last one. Nothing is saved.
+struct LedPreviewColorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedPreviewColorMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedPreviewColorMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SEQ = 4,
+    VT_RED = 6,
+    VT_GREEN = 8,
+    VT_BLUE = 10,
+    VT_TARGET = 12,
+    VT_SIGNAL = 14
+  };
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  /// 16 bits per channel (0-65535); the hub reduces them to what the RGB LED shows.
+  uint16_t red() const {
+    return GetField<uint16_t>(VT_RED, 0);
+  }
+  uint16_t green() const {
+    return GetField<uint16_t>(VT_GREEN, 0);
+  }
+  uint16_t blue() const {
+    return GetField<uint16_t>(VT_BLUE, 0);
+  }
+  /// The LED to light; the other stays dark. A target the board doesn't have lights nothing.
+  OpenShock::Serialization::Local::LedTarget target() const {
+    return static_cast<OpenShock::Serialization::Local::LedTarget>(GetField<uint8_t>(VT_TARGET, 0));
+  }
+  /// Which brightness setting it shows at: the client's draft if it holds one, else the saved one.
+  OpenShock::Serialization::Local::LedSignal signal() const {
+    return static_cast<OpenShock::Serialization::Local::LedSignal>(GetField<uint8_t>(VT_SIGNAL, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           VerifyField<uint16_t>(verifier, VT_RED, 2) &&
+           VerifyField<uint16_t>(verifier, VT_GREEN, 2) &&
+           VerifyField<uint16_t>(verifier, VT_BLUE, 2) &&
+           VerifyField<uint8_t>(verifier, VT_TARGET, 1) &&
+           VerifyField<uint8_t>(verifier, VT_SIGNAL, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedPreviewColorMessageBuilder {
+  typedef LedPreviewColorMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_SEQ, seq, 0);
+  }
+  void add_red(uint16_t red) {
+    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_RED, red, 0);
+  }
+  void add_green(uint16_t green) {
+    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_GREEN, green, 0);
+  }
+  void add_blue(uint16_t blue) {
+    fbb_.AddElement<uint16_t>(LedPreviewColorMessage::VT_BLUE, blue, 0);
+  }
+  void add_target(OpenShock::Serialization::Local::LedTarget target) {
+    fbb_.AddElement<uint8_t>(LedPreviewColorMessage::VT_TARGET, static_cast<uint8_t>(target), 0);
+  }
+  void add_signal(OpenShock::Serialization::Local::LedSignal signal) {
+    fbb_.AddElement<uint8_t>(LedPreviewColorMessage::VT_SIGNAL, static_cast<uint8_t>(signal), 0);
+  }
+  explicit LedPreviewColorMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedPreviewColorMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedPreviewColorMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedPreviewColorMessage> CreateLedPreviewColorMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t seq = 0,
+    uint16_t red = 0,
+    uint16_t green = 0,
+    uint16_t blue = 0,
+    OpenShock::Serialization::Local::LedTarget target = OpenShock::Serialization::Local::LedTarget::All,
+    OpenShock::Serialization::Local::LedSignal signal = OpenShock::Serialization::Local::LedSignal::Normal) {
+  LedPreviewColorMessageBuilder builder_(_fbb);
+  builder_.add_blue(blue);
+  builder_.add_green(green);
+  builder_.add_red(red);
+  builder_.add_seq(seq);
+  builder_.add_signal(signal);
+  builder_.add_target(target);
+  return builder_.Finish();
+}
+
+struct LedPreviewColorMessage::Traits {
+  using type = LedPreviewColorMessage;
+  static auto constexpr Create = CreateLedPreviewColorMessage;
+};
+
+/// Unsaved brightness for the LEDs the board has, shown on whatever the LEDs show. Replaces the client's previous
+/// draft. The hub drops it (the LEDs return to the saved brightness) ten seconds after the last one unless it is saved
+/// with LedCommitDraftMessage.
+struct LedDraftMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedDraftMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedDraftMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SEQ = 4,
+    VT_MONO = 6,
+    VT_RGB = 8
+  };
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  const OpenShock::Serialization::Types::LedBrightness *mono() const {
+    return GetPointer<const OpenShock::Serialization::Types::LedBrightness *>(VT_MONO);
+  }
+  const OpenShock::Serialization::Types::LedBrightness *rgb() const {
+    return GetPointer<const OpenShock::Serialization::Types::LedBrightness *>(VT_RGB);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           VerifyOffset(verifier, VT_MONO) &&
+           verifier.VerifyTable(mono()) &&
+           VerifyOffset(verifier, VT_RGB) &&
+           verifier.VerifyTable(rgb()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedDraftMessageBuilder {
+  typedef LedDraftMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedDraftMessage::VT_SEQ, seq, 0);
+  }
+  void add_mono(::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> mono) {
+    fbb_.AddOffset(LedDraftMessage::VT_MONO, mono);
+  }
+  void add_rgb(::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> rgb) {
+    fbb_.AddOffset(LedDraftMessage::VT_RGB, rgb);
+  }
+  explicit LedDraftMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedDraftMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedDraftMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedDraftMessage> CreateLedDraftMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t seq = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> mono = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> rgb = 0) {
+  LedDraftMessageBuilder builder_(_fbb);
+  builder_.add_rgb(rgb);
+  builder_.add_mono(mono);
+  builder_.add_seq(seq);
+  return builder_.Finish();
+}
+
+struct LedDraftMessage::Traits {
+  using type = LedDraftMessage;
+  static auto constexpr Create = CreateLedDraftMessage;
+};
+
+/// Ends the client's own override on `layer` early.
+struct LedOverrideStopMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedOverrideStopMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedOverrideStopMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SEQ = 4,
+    VT_LAYER = 6
+  };
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  OpenShock::Serialization::Types::LedOverrideLayer layer() const {
+    return static_cast<OpenShock::Serialization::Types::LedOverrideLayer>(GetField<uint8_t>(VT_LAYER, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           VerifyField<uint8_t>(verifier, VT_LAYER, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedOverrideStopMessageBuilder {
+  typedef LedOverrideStopMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedOverrideStopMessage::VT_SEQ, seq, 0);
+  }
+  void add_layer(OpenShock::Serialization::Types::LedOverrideLayer layer) {
+    fbb_.AddElement<uint8_t>(LedOverrideStopMessage::VT_LAYER, static_cast<uint8_t>(layer), 0);
+  }
+  explicit LedOverrideStopMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedOverrideStopMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedOverrideStopMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedOverrideStopMessage> CreateLedOverrideStopMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t seq = 0,
+    OpenShock::Serialization::Types::LedOverrideLayer layer = OpenShock::Serialization::Types::LedOverrideLayer::Display) {
+  LedOverrideStopMessageBuilder builder_(_fbb);
+  builder_.add_seq(seq);
+  builder_.add_layer(layer);
+  return builder_.Finish();
+}
+
+struct LedOverrideStopMessage::Traits {
+  using type = LedOverrideStopMessage;
+  static auto constexpr Create = CreateLedOverrideStopMessage;
+};
+
+/// Saves the draft the hub holds for this client. It ends as Committed, and LedSettingsChangedEvent follows.
+struct LedCommitDraftMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedCommitDraftMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedCommitDraftMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SEQ = 4
+  };
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedCommitDraftMessageBuilder {
+  typedef LedCommitDraftMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedCommitDraftMessage::VT_SEQ, seq, 0);
+  }
+  explicit LedCommitDraftMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedCommitDraftMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedCommitDraftMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedCommitDraftMessage> CreateLedCommitDraftMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t seq = 0) {
+  LedCommitDraftMessageBuilder builder_(_fbb);
+  builder_.add_seq(seq);
+  return builder_.Finish();
+}
+
+struct LedCommitDraftMessage::Traits {
+  using type = LedCommitDraftMessage;
+  static auto constexpr Create = CreateLedCommitDraftMessage;
+};
+
+/// Saves the LED mode. LedSettingsChangedEvent follows.
+struct LedSetModeMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedSetModeMessageBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedSetModeMessage";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SEQ = 4,
+    VT_MODE = 6
+  };
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  OpenShock::Serialization::Types::LedMode mode() const {
+    return static_cast<OpenShock::Serialization::Types::LedMode>(GetField<uint8_t>(VT_MODE, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           VerifyField<uint8_t>(verifier, VT_MODE, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedSetModeMessageBuilder {
+  typedef LedSetModeMessage Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedSetModeMessage::VT_SEQ, seq, 0);
+  }
+  void add_mode(OpenShock::Serialization::Types::LedMode mode) {
+    fbb_.AddElement<uint8_t>(LedSetModeMessage::VT_MODE, static_cast<uint8_t>(mode), 0);
+  }
+  explicit LedSetModeMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedSetModeMessage> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedSetModeMessage>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedSetModeMessage> CreateLedSetModeMessage(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint16_t seq = 0,
+    OpenShock::Serialization::Types::LedMode mode = OpenShock::Serialization::Types::LedMode::All) {
+  LedSetModeMessageBuilder builder_(_fbb);
+  builder_.add_seq(seq);
+  builder_.add_mode(mode);
+  return builder_.Finish();
+}
+
+struct LedSetModeMessage::Traits {
+  using type = LedSetModeMessage;
+  static auto constexpr Create = CreateLedSetModeMessage;
+};
 
 struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef LocalToHubMessageBuilder Builder;
@@ -85,6 +629,24 @@ struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Common::ShockerCommandList *payload_as_Common_ShockerCommandList() const {
     return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::Common_ShockerCommandList ? static_cast<const OpenShock::Serialization::Common::ShockerCommandList *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::LedPreviewPatternMessage *payload_as_LedPreviewPatternMessage() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::LedPreviewPatternMessage ? static_cast<const OpenShock::Serialization::Local::LedPreviewPatternMessage *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::LedPreviewColorMessage *payload_as_LedPreviewColorMessage() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::LedPreviewColorMessage ? static_cast<const OpenShock::Serialization::Local::LedPreviewColorMessage *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::LedDraftMessage *payload_as_LedDraftMessage() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::LedDraftMessage ? static_cast<const OpenShock::Serialization::Local::LedDraftMessage *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::LedOverrideStopMessage *payload_as_LedOverrideStopMessage() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::LedOverrideStopMessage ? static_cast<const OpenShock::Serialization::Local::LedOverrideStopMessage *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::LedCommitDraftMessage *payload_as_LedCommitDraftMessage() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::LedCommitDraftMessage ? static_cast<const OpenShock::Serialization::Local::LedCommitDraftMessage *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::LedSetModeMessage *payload_as_LedSetModeMessage() const {
+    return payload_type() == OpenShock::Serialization::Local::LocalToHubMessagePayload::LedSetModeMessage ? static_cast<const OpenShock::Serialization::Local::LedSetModeMessage *>(payload()) : nullptr;
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -97,6 +659,30 @@ struct LocalToHubMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
 
 template<> inline const OpenShock::Serialization::Common::ShockerCommandList *LocalToHubMessage::payload_as<OpenShock::Serialization::Common::ShockerCommandList>() const {
   return payload_as_Common_ShockerCommandList();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedPreviewPatternMessage *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::LedPreviewPatternMessage>() const {
+  return payload_as_LedPreviewPatternMessage();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedPreviewColorMessage *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::LedPreviewColorMessage>() const {
+  return payload_as_LedPreviewColorMessage();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedDraftMessage *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::LedDraftMessage>() const {
+  return payload_as_LedDraftMessage();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedOverrideStopMessage *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::LedOverrideStopMessage>() const {
+  return payload_as_LedOverrideStopMessage();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedCommitDraftMessage *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::LedCommitDraftMessage>() const {
+  return payload_as_LedCommitDraftMessage();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedSetModeMessage *LocalToHubMessage::payload_as<OpenShock::Serialization::Local::LedSetModeMessage>() const {
+  return payload_as_LedSetModeMessage();
 }
 
 struct LocalToHubMessageBuilder {
@@ -143,6 +729,30 @@ inline bool VerifyLocalToHubMessagePayload(::flatbuffers::VerifierTemplate<B> &v
     }
     case LocalToHubMessagePayload::Common_ShockerCommandList: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Common::ShockerCommandList *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::LedPreviewPatternMessage: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedPreviewPatternMessage *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::LedPreviewColorMessage: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedPreviewColorMessage *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::LedDraftMessage: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedDraftMessage *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::LedOverrideStopMessage: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedOverrideStopMessage *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::LedCommitDraftMessage: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedCommitDraftMessage *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case LocalToHubMessagePayload::LedSetModeMessage: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedSetModeMessage *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

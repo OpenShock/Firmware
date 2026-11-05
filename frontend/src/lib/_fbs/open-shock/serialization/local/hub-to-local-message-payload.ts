@@ -4,6 +4,8 @@
 
 import { AccountLinkStatusEvent } from '../../../open-shock/serialization/local/account-link-status-event';
 import { ErrorMessage } from '../../../open-shock/serialization/local/error-message';
+import { LedSettingsChangedEvent } from '../../../open-shock/serialization/local/led-settings-changed-event';
+import { LedStatusEvent } from '../../../open-shock/serialization/local/led-status-event';
 import { ReadyMessage } from '../../../open-shock/serialization/local/ready-message';
 import { WifiGotIpEvent } from '../../../open-shock/serialization/local/wifi-got-ip-event';
 import { WifiLostIpEvent } from '../../../open-shock/serialization/local/wifi-lost-ip-event';
@@ -19,13 +21,15 @@ export enum HubToLocalMessagePayload {
   WifiNetworkEvent = 4,
   WifiGotIpEvent = 5,
   WifiLostIpEvent = 6,
-  AccountLinkStatusEvent = 7
+  AccountLinkStatusEvent = 7,
+  LedSettingsChangedEvent = 8,
+  LedStatusEvent = 9
 }
 
 export function unionToHubToLocalMessagePayload(
   type: HubToLocalMessagePayload,
-  accessor: (obj:AccountLinkStatusEvent|ErrorMessage|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkStatusEvent|ErrorMessage|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null
-): AccountLinkStatusEvent|ErrorMessage|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
+  accessor: (obj:AccountLinkStatusEvent|ErrorMessage|LedSettingsChangedEvent|LedStatusEvent|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkStatusEvent|ErrorMessage|LedSettingsChangedEvent|LedStatusEvent|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null
+): AccountLinkStatusEvent|ErrorMessage|LedSettingsChangedEvent|LedStatusEvent|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
   switch(HubToLocalMessagePayload[type]) {
     case 'NONE': return null; 
     case 'ReadyMessage': return accessor(new ReadyMessage())! as ReadyMessage;
@@ -35,15 +39,17 @@ export function unionToHubToLocalMessagePayload(
     case 'WifiGotIpEvent': return accessor(new WifiGotIpEvent())! as WifiGotIpEvent;
     case 'WifiLostIpEvent': return accessor(new WifiLostIpEvent())! as WifiLostIpEvent;
     case 'AccountLinkStatusEvent': return accessor(new AccountLinkStatusEvent())! as AccountLinkStatusEvent;
+    case 'LedSettingsChangedEvent': return accessor(new LedSettingsChangedEvent())! as LedSettingsChangedEvent;
+    case 'LedStatusEvent': return accessor(new LedStatusEvent())! as LedStatusEvent;
     default: return null;
   }
 }
 
 export function unionListToHubToLocalMessagePayload(
   type: HubToLocalMessagePayload, 
-  accessor: (index: number, obj:AccountLinkStatusEvent|ErrorMessage|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkStatusEvent|ErrorMessage|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null, 
+  accessor: (index: number, obj:AccountLinkStatusEvent|ErrorMessage|LedSettingsChangedEvent|LedStatusEvent|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage) => AccountLinkStatusEvent|ErrorMessage|LedSettingsChangedEvent|LedStatusEvent|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null, 
   index: number
-): AccountLinkStatusEvent|ErrorMessage|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
+): AccountLinkStatusEvent|ErrorMessage|LedSettingsChangedEvent|LedStatusEvent|ReadyMessage|WifiGotIpEvent|WifiLostIpEvent|WifiNetworkEvent|WifiScanStatusMessage|null {
   switch(HubToLocalMessagePayload[type]) {
     case 'NONE': return null; 
     case 'ReadyMessage': return accessor(index, new ReadyMessage())! as ReadyMessage;
@@ -53,6 +59,8 @@ export function unionListToHubToLocalMessagePayload(
     case 'WifiGotIpEvent': return accessor(index, new WifiGotIpEvent())! as WifiGotIpEvent;
     case 'WifiLostIpEvent': return accessor(index, new WifiLostIpEvent())! as WifiLostIpEvent;
     case 'AccountLinkStatusEvent': return accessor(index, new AccountLinkStatusEvent())! as AccountLinkStatusEvent;
+    case 'LedSettingsChangedEvent': return accessor(index, new LedSettingsChangedEvent())! as LedSettingsChangedEvent;
+    case 'LedStatusEvent': return accessor(index, new LedStatusEvent())! as LedStatusEvent;
     default: return null;
   }
 }

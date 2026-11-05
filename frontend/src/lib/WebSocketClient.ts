@@ -127,6 +127,11 @@ export class WebSocketClient {
     }, delay);
   }
 
+  /** Bytes queued but not yet sent; 0 when there is no socket. */
+  public get BufferedAmount(): number {
+    return this.#socket?.bufferedAmount ?? 0;
+  }
+
   public Send(data: string | Blob | BufferSource): boolean {
     if (!this.#socket || this.#socket.readyState !== WebSocket.OPEN) {
       return false;

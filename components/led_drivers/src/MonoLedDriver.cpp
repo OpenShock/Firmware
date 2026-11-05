@@ -21,9 +21,9 @@ const char* const TAG = "MonoLedDriver";
 
 using namespace OpenShock;
 
-MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin)
+MonoLedDriver::MonoLedDriver(gpio_num_t gpioPin, uint8_t brightness)
   : m_gpioPin(GPIO_NUM_NC)
-  , m_brightness(255)
+  , m_brightness(brightness)
 {
   if (gpioPin == GPIO_NUM_NC) {
     OS_LOGE(TAG, "Pin is not set");
@@ -78,7 +78,32 @@ MonoLedDriver::~MonoLedDriver()
   // Before the LEDC channel goes away
   stopTask();
 
-  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);  // TODO: Error handling
+  ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);       // TODO: Error handling
+  if (isAsleep()) {
+    ledc_timer_resume(OS_LEDC_SPEED, OS_LEDC_TIMER);  // Leave the timer as it was configured
+  }
+}
+
+bool MonoLedDriver::enterSleep()
+{
+  // Output off and held low, then the timer's counter stopped: nothing toggles until exitSleep
+  esp_err_t err = ledc_stop(OS_LEDC_SPEED, OS_LEDC_CHANNEL, 0);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to stop the LED output for sleep: %s", esp_err_to_name(err));
+    return false;
+  }
+  err = ledc_timer_pause(OS_LEDC_SPEED, OS_LEDC_TIMER);
+  if (err != ESP_OK) {
+    OS_LOGW(TAG, "Failed to pause the LED timer for sleep: %s", esp_err_to_name(err));
+    return false;
+  }
+  return true;
+}
+
+void MonoLedDriver::exitSleep()
+{
+  // The output comes back with the next apply(): ledc_update_duty enables it again
+  ledc_timer_resume(OS_LEDC_SPEED, OS_LEDC_TIMER);
 }
 
 void MonoLedDriver::apply(const State& state)

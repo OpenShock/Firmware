@@ -22,7 +22,8 @@ namespace OpenShock {
   public:
     using State = MonoLedState;
 
-    MonoLedDriver(gpio_num_t gpioPin);
+    /// @param brightness The starting brightness (0-255), until SetBrightness.
+    MonoLedDriver(gpio_num_t gpioPin, uint8_t brightness);
     ~MonoLedDriver() override;
 
     bool IsValid() const { return m_gpioPin != GPIO_NUM_NC; }
@@ -31,6 +32,8 @@ namespace OpenShock {
 
   protected:
     void apply(const State& state) override;
+    bool enterSleep() override;
+    void exitSleep() override;
 
   private:
     gpio_num_t m_gpioPin;

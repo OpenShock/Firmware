@@ -27,6 +27,12 @@ static std::array<Handlers::HandlerType, HANDLER_COUNT> s_localHandlers = []() {
   handlers.fill(Handlers::HandleInvalidMessage);
 
   SET_HANDLER(Common_ShockerCommandList);
+  SET_HANDLER(LedPreviewPatternMessage);
+  SET_HANDLER(LedPreviewColorMessage);
+  SET_HANDLER(LedDraftMessage);
+  SET_HANDLER(LedOverrideStopMessage);
+  SET_HANDLER(LedCommitDraftMessage);
+  SET_HANDLER(LedSetModeMessage);
 
   return handlers;
 }();

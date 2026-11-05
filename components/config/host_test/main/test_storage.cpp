@@ -20,7 +20,7 @@ TEST_CASE("The store is the cfg partition", "[config][storage]")
 
 TEST_CASE("Sections link themselves into the registry in document order", "[config][storage]")
 {
-  const char* expected[] = {"rf", "wifi", "captivePortal", "backend", "serialInput", "otaUpdate", "estop"};
+  const char* expected[] = {"rf", "wifi", "captivePortal", "backend", "serialInput", "otaUpdate", "estop", "led"};
   std::size_t i          = 0;
   for (auto* section = Config::SectionBase::First(); section != nullptr; section = section->Next(), ++i) {
     TEST_ASSERT_LESS_THAN_size_t(std::size(expected), i);
