@@ -387,19 +387,19 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
 
 void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInstance* instance)
 {
-  registerHandler(server, "/api/board", HTTP_GET, apiBoard, instance);
-  registerHandler(server, "/api/portal/close", HTTP_POST, apiPortalClose, instance);
-  registerHandler(server, "/api/wifi/scan", HTTP_POST, apiWifiScan, instance);
-  registerHandler(server, "/api/wifi/networks", HTTP_DELETE, apiWifiNetworksDelete, instance);
-  registerHandler(server, "/api/wifi/networks", HTTP_POST, apiWifiNetworksAdd, instance);
-  registerHandler(server, "/api/wifi/connect", HTTP_POST, apiWifiConnect, instance);
-  registerHandler(server, "/api/wifi/disconnect", HTTP_POST, apiWifiDisconnect, instance);
-  registerHandler(server, "/api/account/link", HTTP_POST, apiAccountLink, instance);
-  registerHandler(server, "/api/account", HTTP_DELETE, apiAccountDelete, instance);
-  registerHandler(server, "/api/config/rf/pin", HTTP_PUT, apiConfigRfPin, instance);
+  registerHandler<apiBoard>(server, "/api/board", HTTP_GET, instance);
+  registerHandler<apiPortalClose>(server, "/api/portal/close", HTTP_POST, instance);
+  registerHandler<apiWifiScan>(server, "/api/wifi/scan", HTTP_POST, instance);
+  registerHandler<apiWifiNetworksDelete>(server, "/api/wifi/networks", HTTP_DELETE, instance);
+  registerHandler<apiWifiNetworksAdd>(server, "/api/wifi/networks", HTTP_POST, instance);
+  registerHandler<apiWifiConnect>(server, "/api/wifi/connect", HTTP_POST, instance);
+  registerHandler<apiWifiDisconnect>(server, "/api/wifi/disconnect", HTTP_POST, instance);
+  registerHandler<apiAccountLink>(server, "/api/account/link", HTTP_POST, instance);
+  registerHandler<apiAccountDelete>(server, "/api/account", HTTP_DELETE, instance);
+  registerHandler<apiConfigRfPin>(server, "/api/config/rf/pin", HTTP_PUT, instance);
   // No /api/config/estop/*: the portal is an open, unauthenticated AP, so the E-Stop is configured over serial only.
   // No /api/ota/domain: the portal is an open, unauthenticated AP, and OTA trusts the hashes served by that domain, so
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
-  registerHandler(server, "/api/ota/settings", HTTP_PUT, apiOtaSettings, instance);
-  registerHandler(server, "/api/ota/check", HTTP_POST, apiOtaCheck, instance);
+  registerHandler<apiOtaSettings>(server, "/api/ota/settings", HTTP_PUT, instance);
+  registerHandler<apiOtaCheck>(server, "/api/ota/check", HTTP_POST, instance);
 }
