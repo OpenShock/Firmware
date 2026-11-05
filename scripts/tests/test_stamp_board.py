@@ -42,7 +42,9 @@ def test_fragment_defaults_to_no_pins(tmp_path):
 
 
 def test_fragment_sets_the_estop_latching_flag(tmp_path):
-    spec = boards.read_board_fragment(write_fragment(tmp_path, 'Twist', 'CONFIG_IDF_TARGET="esp32"\nOPENSHOCK_ESTOP_LATCHING=y\n'))
+    spec = boards.read_board_fragment(
+        write_fragment(tmp_path, 'Twist', 'CONFIG_IDF_TARGET="esp32"\nOPENSHOCK_ESTOP_LATCHING=y\n')
+    )
     assert spec.estop_latching is True
     assert spec.flags == boards.FLAG_ESTOP_LATCHING
 
