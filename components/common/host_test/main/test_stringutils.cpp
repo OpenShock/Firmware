@@ -17,6 +17,7 @@ TEST_CASE("StringTrim variants", "[common][strhelpers]")
   TEST_ASSERT_TRUE(StringTrim("   ") == "");
   TEST_ASSERT_TRUE(StringTrim("nospace") == "nospace");
   TEST_ASSERT_TRUE(StringTrim("\t\n x \r\n") == "x");
+  static_assert(StringTrim(" x ") == "x");
 }
 
 TEST_CASE("StringHasPrefix / HasSuffix", "[common][strhelpers]")
