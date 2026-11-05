@@ -48,6 +48,8 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   Reload();
   AssertConfigEqual(before, Snapshot());
 
+  TEST_ASSERT_EQUAL_STRING("MyHubAP", Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_EQUAL_STRING("ap-s3cret!", Config::GetWiFiAccessPointPassword().c_str());
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
   TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", Config::GetBackendAuthToken().c_str());
 
@@ -268,9 +270,12 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
 
   TEST_ASSERT_NOT_EQUAL(std::string::npos, full.find("hunter22"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, full.find("tok_0123456789abcdef"));
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, full.find("ap-s3cret!"));
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("hunter22"));
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("password"));
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("authToken"));
+  TEST_ASSERT_EQUAL(std::string::npos, redacted.find("accessPointPassword"));
+  TEST_ASSERT_EQUAL(std::string::npos, redacted.find("ap-s3cret!"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"HomeNet\""));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
 }
@@ -334,6 +339,7 @@ TEST_CASE("Access point setters refuse what WPA2 can't use", "[config][roundtrip
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
 
   TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("12345678"));
+  TEST_ASSERT_EQUAL_STRING("12345678", Config::GetWiFiAccessPointPassword().c_str());
   TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword(""));  // back to an open access point
   Reload();
   TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
