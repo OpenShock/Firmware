@@ -48,6 +48,7 @@ PayloadHandlers[HubToLocalMessagePayload.ReadyMessage] = (cli, msg) => {
   hubState.config = mapConfig(payload);
   // A new connection holds no LED override: the hub ended the old one's when it went away
   hubState.clientId = payload.clientId();
+  hubState.connectionEpoch++;
   const ledStatus = payload.ledStatus();
   hubState.ledStatus = ledStatus ? mapLedStatus(ledStatus) : null;
 

@@ -65,8 +65,11 @@ export class HubStateStore {
   config = $state<Config | null>(null);
   // What the status LEDs show; null from firmware that doesn't report it
   ledStatus = $state<LedStatus | null>(null);
-  // This connection's id on the hub, which LED overrides name as their owner; new on every reconnect
+  // This connection's id on the hub, which LED overrides name as their owner.
+  // It is the hub's socket slot, so a reconnect often gets the same id back.
   clientId = $state<number | null>(null);
+  // Counts Ready messages, so a reconnect is noticed even when it gets the same clientId.
+  connectionEpoch = $state(0);
   gpioValidInputs = $state<Int8Array>(new Int8Array());
   gpioValidOutputs = $state<Int8Array>(new Int8Array());
 

@@ -165,18 +165,19 @@
     myDisplay && status?.display ? remaining(displaySentAt, status.display.timeoutMs) : null
   );
 
-  // A reconnect is a new client: the hub dropped the old one's overrides, and its answers won't come
-  let lastClientId: number | null = null;
+  // A reconnect is a new client: the hub dropped the old one's overrides, and its answers won't come.
+  // Tracked by epoch, since the hub can hand the reconnect the same clientId.
+  let lastEpoch: number | null = null;
   $effect(() => {
-    const id = clientId;
-    if (lastClientId !== null && id !== lastClientId) {
+    const epoch = hubState.connectionEpoch;
+    if (lastEpoch !== null && epoch !== lastEpoch) {
       if (Object.keys(edits).length > 0)
         showNote('Reconnected: unsaved brightness was dropped.', 'warning');
       edits = {};
       commit = null;
       pendingMode = null;
     }
-    lastClientId = id;
+    lastEpoch = epoch;
   });
 
   // The mode is saved when the hub's settings say so
