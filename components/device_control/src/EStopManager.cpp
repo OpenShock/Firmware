@@ -313,36 +313,57 @@ bool EStopManager::SetEStopPin(gpio_num_t pin)
   return true;
 }
 
-bool EStopManager::SetEStopLatching(bool latching)
+// Requires s_estopMutex. Restarts the task with the new switch type; refuses while the E-Stop is active.
+static bool estopmgr_applyLatching(bool latching)
 {
-  OpenShock::ScopedLock lock__(&s_estopMutex);
-
-  if (s_estopLatching == latching) {
-    return true;
-  }
-
-  // Restarting the task resets the activation, which would release an active EStop without clearing it.
+  // An active E-Stop carried into the other switch type could be cleared without the way its own type clears it.
   if (EStopManager::IsEStopped()) {
     OS_LOGW(TAG, "Refusing to change EStop switch type while EStop is active");
     return false;
   }
 
-  bool oldLatching = s_estopLatching;
-  bool wasRunning  = s_estopTask.running();
+  if (!s_estopTask.running()) {
+    s_estopLatching = latching;
+    return true;
+  }
 
   // The task captures the switch type when it starts, so restart it to apply the new one.
-  if (wasRunning && !estopmgr_taskStop()) {
+  if (!estopmgr_taskStop()) {
     return false;
   }
 
-  s_estopLatching = latching;
+  // A press or software trigger can activate the E-Stop while the task stops; keep the old switch type then.
+  if (EStopManager::IsEStopped()) {
+    OS_LOGW(TAG, "EStop activated while changing the switch type, keeping the old one");
+    if (!estopmgr_taskStart()) {
+      // Task is gone and we can't bring it back, so the pin isn't sampled. The E-Stop stays latched until reboot.
+      OS_LOGE(TAG, "Failed to restart EStop task, latching EStop until reboot");
+      estopmgr_latchWithoutTask();
+    }
+    return false;
+  }
 
-  if (wasRunning && !estopmgr_taskStart()) {
+  bool oldLatching = s_estopLatching;
+  s_estopLatching  = latching;
+
+  if (!estopmgr_taskStart()) {
     // Task is gone and we can't bring it back, so the pin isn't sampled. Fail safe: latch until reboot, which restarts
     // the task with the switch type still in config.
     OS_LOGE(TAG, "Failed to restart EStop task, latching EStop until reboot");
     s_estopLatching = oldLatching;
     estopmgr_latchWithoutTask();
+    return false;
+  }
+
+  return true;
+}
+
+bool EStopManager::SetEStopLatching(bool latching)
+{
+  OpenShock::ScopedLock lock__(&s_estopMutex);
+
+  // Saved even when the running switch type already matches, so a retry after a failed save still writes it.
+  if (s_estopLatching != latching && !estopmgr_applyLatching(latching)) {
     return false;
   }
 
