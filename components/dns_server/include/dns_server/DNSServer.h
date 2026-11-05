@@ -26,10 +26,12 @@ namespace OpenShock {
     DNSServer();
     ~DNSServer();
 
-    /// Start answering A queries with responseIpv4 (dotted-decimal, e.g. "4.3.2.1").
+    /// Start answering A queries with responseIpv4 (dotted-decimal, e.g. "4.3.2.1"), listening only on bindIpv4 and only
+    /// for queries that arrive on the lwIP interface bindIfName (e.g. "ap1"): the interface whose clients should be
+    /// captured. The address alone is not enough, as lwIP accepts a datagram for any local address on any interface.
     /// Idempotent, first call wins: if the server is already running this returns
-    /// true and keeps the address and port it was originally started with.
-    bool start(const char* responseIpv4, uint16_t port = 53);
+    /// true and keeps the addresses, interface and port it was originally started with.
+    bool start(const char* responseIpv4, const char* bindIpv4, const char* bindIfName, uint16_t port = 53);
     void stop();
 
     bool isRunning() const { return m_task.running(); }

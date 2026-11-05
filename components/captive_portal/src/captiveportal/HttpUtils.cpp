@@ -21,7 +21,7 @@ esp_err_t CaptivePortal::sendResp(httpd_req_t* req, const char* status, const ch
   return httpd_resp_send(req, body.data(), body.size());
 }
 
-void CaptivePortal::registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*), void* userCtx)
+void CaptivePortal::detail::registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*), void* userCtx)
 {
   httpd_uri_t def = {};
   def.uri         = uri;

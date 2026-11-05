@@ -50,6 +50,7 @@ namespace OpenShock::CaptivePortal {
       std::vector<uint8_t> reasm;      // reassembly buffer for continuation frames
     };
 
+    static esp_err_t wsPreHandshake(httpd_req_t* req);
     static esp_err_t wsPostHandshake(httpd_req_t* req);
     static esp_err_t wsHandler(httpd_req_t* req);
 
