@@ -331,7 +331,7 @@ TEST_CASE("Access point setters refuse what WPA2 can't use", "[config][roundtrip
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword("1234567"));
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword(std::string(64, 'a')));
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
-  TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
 
   TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("12345678"));
   TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword(""));  // back to an open access point

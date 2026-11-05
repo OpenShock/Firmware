@@ -11,12 +11,19 @@ static void handleAccessPointGetCommand(std::string_view arg, bool isAutomated)
 {
   (void)arg;
 
-  std::string ssid = OpenShock::Config::GetWiFiAccessPointSSID();
-  bool isDefault   = ssid == CONFIG_OPENSHOCK_FW_AP_PREFIX;
-  bool hasPassword = !OpenShock::Config::GetWiFiAccessPointPassword().empty();
+  std::string ssid     = OpenShock::Config::GetWiFiAccessPointSSID();
+  std::string password = OpenShock::Config::GetWiFiAccessPointPassword();
+  bool isDefault       = ssid == CONFIG_OPENSHOCK_FW_AP_PREFIX;
+
+  const char* protection = "custom-password";
+  if (password.empty()) {
+    protection = "open";
+  } else if (password == CONFIG_OPENSHOCK_FW_AP_PASSWORD) {
+    protection = "default-password";
+  }
 
   // A default SSID is shown as the prefix; the hub appends its MAC to it when the access point starts
-  SERPR_RESPONSE("AccessPoint|%s|%s|%s", ssid.c_str(), isDefault ? "default" : "custom", hasPassword ? "protected" : "open");
+  SERPR_RESPONSE("AccessPoint|%s|%s|%s", ssid.c_str(), isDefault ? "default" : "custom", protection);
 }
 
 static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)
@@ -38,12 +45,14 @@ static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)
 
 static void handleAccessPointPasswordCommand(std::string_view arg, bool isAutomated)
 {
-  if (!OpenShock::Config::IsValidAccessPointPassword(arg) || arg.empty()) {
+  // "default" brings back the build's default password; it is too short to be a password itself
+  std::string password = OpenShock::StringIEquals(arg, "default") ? std::string(CONFIG_OPENSHOCK_FW_AP_PASSWORD) : std::string(arg);
+  if (!OpenShock::Config::IsValidAccessPointPassword(password) || arg.empty()) {
     SERPR_ERROR("Invalid password (must be 8-63 characters; use \"ap open\" to remove it)");
     return;
   }
 
-  if (!OpenShock::Config::SetWiFiAccessPointPassword(std::string(arg))) {
+  if (!OpenShock::Config::SetWiFiAccessPointPassword(std::move(password))) {
     SERPR_ERROR("Failed to save config");
     return;
   }
@@ -67,13 +76,13 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::Acce
 {
   auto group = OpenShock::SerialCmds::CommandGroup("ap");
 
-  group.addCommand("Get the captive portal's access point name and whether it has a password.", handleAccessPointGetCommand);
+  group.addCommand("Get the captive portal's access point name and whether it is open or uses the default or a custom password.", handleAccessPointGetCommand);
 
   auto& ssidCommand = group.addCommand("ssid", "Set the access point name; \"default\" restores the name with the hub's MAC.", handleAccessPointSsidCommand);
   ssidCommand.addArgument("ssid", "1-32 characters, or default", "MyHub");
 
-  auto& passwordCommand = group.addCommand("password", "Protect the access point with a WPA2 password. A factory reset removes it.", handleAccessPointPasswordCommand);
-  passwordCommand.addArgument("password", "8-63 characters", "hunter2hunter2");
+  auto& passwordCommand = group.addCommand("password", "Set the access point's WPA2/WPA3 password; \"default\" restores the build's default, as a factory reset does.", handleAccessPointPasswordCommand);
+  passwordCommand.addArgument("password", "8-63 characters, or default", "hunter2hunter2");
 
   group.addCommand("open", "Remove the access point password.", handleAccessPointOpenCommand);
 

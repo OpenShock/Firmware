@@ -198,8 +198,12 @@ static bool captiveportal_start()
   if (apPassword.empty()) {
     apConfig.ap.authmode = WIFI_AUTH_OPEN;
   } else {
-    apConfig.ap.authmode    = WIFI_AUTH_WPA2_PSK;
-    std::size_t passwordLen = std::min(apPassword.size(), sizeof(apConfig.ap.password) - 1);
+    // WPA3 clients use SAE, which a sniffer that knows the password still can't decrypt; WPA2 clients keep working.
+    // PMF stays optional because WPA2 clients may lack it, and the zeroed config would otherwise pick hunt-and-peck only.
+    apConfig.ap.authmode         = WIFI_AUTH_WPA2_WPA3_PSK;
+    apConfig.ap.pmf_cfg.required = false;
+    apConfig.ap.sae_pwe_h2e      = WPA3_SAE_PWE_BOTH;
+    std::size_t passwordLen      = std::min(apPassword.size(), sizeof(apConfig.ap.password) - 1);
     memcpy(apConfig.ap.password, apPassword.data(), passwordLen);
   }
   apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;

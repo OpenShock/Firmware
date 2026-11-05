@@ -24,14 +24,15 @@ namespace OpenShock::Config {
     // The captive portal's network name. The default (CONFIG_OPENSHOCK_FW_AP_PREFIX) gets the hub's MAC appended, so
     // hubs side by side stay apart; any other name is used as it is.
     std::string accessPointSSID;
-    // Empty: an open network. Otherwise its WPA2 passphrase, 8-63 characters. A factory reset clears it.
+    // Empty: an open network. Otherwise its WPA2/WPA3 passphrase, 8-63 characters.
+    // Defaults to CONFIG_OPENSHOCK_FW_AP_PASSWORD, which a factory reset restores.
     std::string accessPointPassword;
     std::string hostname;
     std::vector<OpenShock::Config::WiFiCredentials> credentialsList;  // in id order once loaded from NVS
 
     /// @brief The section runs it on every value it takes in: a hostname esp_netif would refuse (empty, over 32
     ///        characters, or not letters, digits and hyphens) becomes the default, as does an AP SSID that is empty or
-    ///        over 32 bytes; an AP password WPA2 can't use is dropped (an open AP); and a credential with no id (0) or a
+    ///        over 32 bytes; so does an AP password WPA2 can't use; and a credential with no id (0) or a
     ///        repeated one gets the lowest free id (or is dropped when none is left), whichever way it came in.
     void Normalize();
 
@@ -67,7 +68,7 @@ namespace OpenShock::Config {
   bool ClearWiFiCredentials();
   /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes.
   [[nodiscard]] bool IsValidAccessPointSSID(std::string_view ssid);
-  /// @brief Whether `password` can protect it: empty (open), or 8-63 characters for WPA2.
+  /// @brief Whether `password` can protect it: empty (open), or 8-63 characters for WPA2/WPA3.
   [[nodiscard]] bool IsValidAccessPointPassword(std::string_view password);
   [[nodiscard]] std::string GetWiFiAccessPointSSID();
   /// @brief Refuses an SSID IsValidAccessPointSSID rejects. Takes effect the next time the captive portal starts.

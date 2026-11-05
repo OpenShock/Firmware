@@ -20,6 +20,7 @@ const char* const TAG = "Config::WiFiConfig";
 using namespace OpenShock::Config;
 
 static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "CONFIG_OPENSHOCK_FW_HOSTNAME must be 1-32 letters, digits or hyphens, not starting or ending with a hyphen");
+static_assert(sizeof(CONFIG_OPENSHOCK_FW_AP_PASSWORD) == 1 || (sizeof(CONFIG_OPENSHOCK_FW_AP_PASSWORD) >= 9 && sizeof(CONFIG_OPENSHOCK_FW_AP_PASSWORD) <= 64), "CONFIG_OPENSHOCK_FW_AP_PASSWORD must be empty or 8-63 characters");
 
 static constexpr const char* kNamespaceCfg   = "wifi.cfg";
 static constexpr const char* kNamespaceCreds = "wifi";
@@ -32,14 +33,14 @@ static Section<WiFiConfig> s_section({.name = "wifi", .order = 1, .namespaces = 
 
 WiFiConfig::WiFiConfig()
   : accessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX)
-  , accessPointPassword()
+  , accessPointPassword(CONFIG_OPENSHOCK_FW_AP_PASSWORD)
   , hostname(CONFIG_OPENSHOCK_FW_HOSTNAME)
   , credentialsList()
 {
 }
 
 WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view hostname, const std::vector<WiFiCredentials>& credentialsList)
-  : WiFiConfig(accessPointSSID, {}, hostname, credentialsList)
+  : WiFiConfig(accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PASSWORD, hostname, credentialsList)
 {
 }
 
@@ -69,7 +70,7 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
 
   accessPointSSID = json["accessPointSSID"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PREFIX);
 
-  accessPointPassword = json["accessPointPassword"].tryGetStr().value_or("");
+  accessPointPassword = json["accessPointPassword"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PASSWORD);
 
   hostname = json["hostname"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_HOSTNAME);
 
@@ -149,8 +150,8 @@ void WiFiConfig::Normalize()
     accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
   }
   if (!IsValidAccessPointPassword(accessPointPassword)) {
-    OS_LOGW(TAG, "Access point password is not 8-63 characters, leaving the access point open");
-    accessPointPassword.clear();
+    OS_LOGW(TAG, "Access point password is not 8-63 characters, using the default");
+    accessPointPassword = CONFIG_OPENSHOCK_FW_AP_PASSWORD;
   }
 
   if (!HostnameUtils::IsValid(hostname)) {
@@ -183,7 +184,7 @@ void WiFiConfig::Normalize()
 bool WiFiConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::OpenForLoad(partition, kNamespaceCfg);
-  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyApPassword, accessPointPassword, "") || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
+  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyApPassword, accessPointPassword, CONFIG_OPENSHOCK_FW_AP_PASSWORD) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
     return false;
   }
 
