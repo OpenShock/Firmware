@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rfc8908/RFC8908Handler.h"
+
 #include <esp_http_server.h>
 
 #include <expected>
@@ -26,8 +28,29 @@ namespace OpenShock::CaptivePortal {
 
   esp_err_t sendResp(httpd_req_t* req, const char* status, const char* type, std::string_view body);
 
-  /// @brief Registers a route, logging a failure. With wildcard matching, routes registered earlier take priority.
-  void registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*), void* userCtx);
+  namespace detail {
+    void registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, esp_err_t (*handler)(httpd_req_t*), void* userCtx);
+
+    // httpd has no hook that runs before every request, so each route is wrapped in this. A request addressed to
+    // another host (a connectivity probe, a page on a hijacked or rebound name) never reaches a portal handler; it
+    // gets the captive redirect instead.
+    template<esp_err_t (*Handler)(httpd_req_t*)>
+    esp_err_t ownHostOnly(httpd_req_t* req)
+    {
+      if (RFC8908::IsForeignHost(req)) {
+        return RFC8908::EmitRedirect(req);
+      }
+      return Handler(req);
+    }
+  }  // namespace detail
+
+  /// @brief Registers a route that only answers requests addressed to us (see detail::ownHostOnly), logging a failure.
+  /// With wildcard matching, routes registered earlier take priority.
+  template<esp_err_t (*Handler)(httpd_req_t*)>
+  void registerHandler(httpd_handle_t server, const char* uri, httpd_method_t method, void* userCtx)
+  {
+    detail::registerHandler(server, uri, method, &detail::ownHostOnly<Handler>, userCtx);
+  }
 
   // Read and URL-decode a query-string parameter (key matched case-insensitively, as httpd does). The query is
   // parsed in place in the request URI: no copy, and no limit on the value's length.
