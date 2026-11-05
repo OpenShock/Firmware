@@ -8,7 +8,9 @@ const char* const TAG = "Config::EStopConfig";
 #include "Chipset.h"
 #include "config/Nvs.h"
 #include "config/Parse.h"
+#include "config/Store.h"
 #include "Logging.h"
+#include "SimpleMutex.h"
 
 #include "json/Json.h"
 
@@ -17,6 +19,7 @@ using namespace OpenShock::Config;
 static constexpr const char* kNamespace  = "estop";
 static constexpr const char* kKeyEnabled = "enabled";
 static constexpr const char* kKeyGpio    = "gpio";
+static constexpr const char* kKeyLatched = "latched";
 
 static constexpr const char* kNamespaces[] = {kNamespace};
 static Section<EStopConfig> s_section({.name = "estop", .order = 6, .namespaces = kNamespaces});
@@ -139,4 +142,51 @@ bool OpenShock::Config::SetEStopGpioPin(gpio_num_t gpioPin)
     estop.gpioPin = gpioPin;
     return true;
   });
+}
+
+bool OpenShock::Config::LoadEStopLatched()
+{
+  ScopedLock lock__(&Internal::WriteLock());  // No writer can touch the namespace under the read
+
+  const char* partition = StorageLabel();
+  if (partition == nullptr) {
+    return false;
+  }
+
+  auto handle = Nvs::Handle::OpenForLoad(partition, kNamespace);
+  if (!handle) {
+    return false;
+  }
+
+  uint8_t latched = 0;
+  switch (handle->GetU8(kKeyLatched, latched)) {
+    case Nvs::Result::Found:
+      return latched != 0;
+    case Nvs::Result::Missing:
+      return false;  // Also a namespace never written: never latched
+    case Nvs::Result::Error:
+    default:
+      OS_LOGE(TAG, "Failed to read the E-Stop latch, treating it as latched");
+      return true;
+  }
+}
+
+LatchSave OpenShock::Config::SaveEStopLatched(bool latched)
+{
+  ScopedTryLock lock__(&Internal::WriteLock(), 0);
+  if (!lock__.isLocked()) {
+    return LatchSave::Busy;
+  }
+
+  const char* partition = StorageLabel();
+  if (partition == nullptr) {
+    return LatchSave::Saved;
+  }
+
+  auto handle = Nvs::Handle::OpenForWrite(partition, kNamespace);
+  if (!handle || !handle->SetU8(kKeyLatched, latched ? 1 : 0) || !handle->Commit()) {
+    return LatchSave::Failed;
+  }
+
+  return LatchSave::Saved;
 }

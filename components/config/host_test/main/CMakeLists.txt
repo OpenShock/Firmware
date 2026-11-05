@@ -12,6 +12,7 @@ idf_component_register(
                "test_defaults.cpp"    # empty store / missing namespaces / missing keys
                "test_corrupt.cpp"     # malformed blobs and JSON
                "test_storage.cpp"     # the store is cfg, the registry, mistyped keys
+               "test_estop_latch.cpp" # the E-Stop latch kept beside the estop section
                # The framework
                "${_components}/config/src/Nvs.cpp"
                "${_components}/config/src/Parse.cpp"
