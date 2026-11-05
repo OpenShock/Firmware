@@ -31,7 +31,7 @@ static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)
   // "default" brings back the prefix + MAC name
   std::string ssid = OpenShock::StringIEquals(arg, "default") ? std::string(CONFIG_OPENSHOCK_FW_AP_PREFIX) : std::string(arg);
   if (!OpenShock::Config::IsValidAccessPointSSID(ssid)) {
-    SERPR_ERROR("Invalid SSID (must be 1-32 characters)");
+    SERPR_ERROR("Invalid SSID (must be 1-32 characters, without '|')");
     return;
   }
 
@@ -48,7 +48,7 @@ static void handleAccessPointPasswordCommand(std::string_view arg, bool isAutoma
   // "default" brings back the build's default password; it is too short to be a password itself
   std::string password = OpenShock::StringIEquals(arg, "default") ? std::string(CONFIG_OPENSHOCK_FW_AP_PASSWORD) : std::string(arg);
   if (!OpenShock::Config::IsValidAccessPointPassword(password) || arg.empty()) {
-    SERPR_ERROR("Invalid password (must be 8-63 characters; use \"ap open\" to remove it)");
+    SERPR_ERROR("Invalid password (must be 8-63 printable ASCII characters; use \"ap open\" to remove it)");
     return;
   }
 

@@ -54,12 +54,17 @@ WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view access
 
 bool OpenShock::Config::IsValidAccessPointSSID(std::string_view ssid)
 {
-  return !ssid.empty() && ssid.size() <= 32;
+  return !ssid.empty() && ssid.size() <= 32 && ssid.find('|') == std::string_view::npos;
 }
 
 bool OpenShock::Config::IsValidAccessPointPassword(std::string_view password)
 {
-  return password.empty() || (password.size() >= 8 && password.size() <= 63);
+  if (password.empty()) {
+    return true;
+  }
+
+  // A WPA passphrase is printable ASCII; the driver also reads it as a C string, so a NUL would cut it short.
+  return password.size() >= 8 && password.size() <= 63 && std::ranges::all_of(password, [](char c) { return c >= 0x20 && c <= 0x7E; });
 }
 
 bool WiFiConfig::FromJSON(JSON::JsonView json)
@@ -146,11 +151,11 @@ namespace {
 void WiFiConfig::Normalize()
 {
   if (!IsValidAccessPointSSID(accessPointSSID)) {
-    OS_LOGW(TAG, "Access point SSID is not 1-32 characters, using the default");
+    OS_LOGW(TAG, "Access point SSID is not 1-32 characters without '|', using the default");
     accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
   }
   if (!IsValidAccessPointPassword(accessPointPassword)) {
-    OS_LOGW(TAG, "Access point password is not 8-63 characters, using the default");
+    OS_LOGW(TAG, "Access point password is not 8-63 printable ASCII characters, using the default");
     accessPointPassword = CONFIG_OPENSHOCK_FW_AP_PASSWORD;
   }
 
@@ -184,8 +189,15 @@ void WiFiConfig::Normalize()
 bool WiFiConfig::LoadNvs(const char* partition)
 {
   auto handle = Nvs::Handle::OpenForLoad(partition, kNamespaceCfg);
-  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyApPassword, accessPointPassword, CONFIG_OPENSHOCK_FW_AP_PASSWORD) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
+  if (!handle || !Nvs::Load(*handle, kKeyApSsid, accessPointSSID, CONFIG_OPENSHOCK_FW_AP_PREFIX) || !Nvs::Load(*handle, kKeyHostname, hostname, CONFIG_OPENSHOCK_FW_HOSTNAME)) {
     return false;
+  }
+
+  // An unreadable AP password falls back to the default instead of failing the load.
+  // A failed load runs the section on an empty credentials list, and its next save would sweep every stored network.
+  if (!Nvs::Load(*handle, kKeyApPassword, accessPointPassword, CONFIG_OPENSHOCK_FW_AP_PASSWORD)) {
+    OS_LOGW(TAG, "Access point password is unreadable, using the default");
+    accessPointPassword = CONFIG_OPENSHOCK_FW_AP_PASSWORD;
   }
 
   credentialsList.clear();

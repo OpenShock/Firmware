@@ -24,7 +24,7 @@ namespace OpenShock::Config {
     // The captive portal's network name. The default (CONFIG_OPENSHOCK_FW_AP_PREFIX) gets the hub's MAC appended, so
     // hubs side by side stay apart; any other name is used as it is.
     std::string accessPointSSID;
-    // Empty: an open network. Otherwise its WPA2/WPA3 passphrase, 8-63 characters.
+    // Empty: an open network. Otherwise its WPA2/WPA3 passphrase, 8-63 printable ASCII characters.
     // Defaults to CONFIG_OPENSHOCK_FW_AP_PASSWORD, which a factory reset restores.
     std::string accessPointPassword;
     std::string hostname;
@@ -66,9 +66,9 @@ namespace OpenShock::Config {
   bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
-  /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes.
+  /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes, no '|' since `ap` prints it as a field.
   [[nodiscard]] bool IsValidAccessPointSSID(std::string_view ssid);
-  /// @brief Whether `password` can protect it: empty (open), or 8-63 characters for WPA2/WPA3.
+  /// @brief Whether `password` can protect it: empty (open), or 8-63 printable ASCII characters for WPA2/WPA3.
   [[nodiscard]] bool IsValidAccessPointPassword(std::string_view password);
   [[nodiscard]] std::string GetWiFiAccessPointSSID();
   /// @brief Refuses an SSID IsValidAccessPointSSID rejects. Takes effect the next time the captive portal starts.
