@@ -8,6 +8,7 @@ const char* const TAG = "Config::WiFiConfig";
 #include "config/Parse.h"
 #include "Convert.h"
 #include "Logging.h"
+#include "StringHelpers.h"
 #include "util/HostnameUtils.h"
 
 #include "json/Json.h"
@@ -64,7 +65,7 @@ bool OpenShock::Config::IsValidAccessPointPassword(std::string_view password)
   }
 
   // A WPA passphrase is printable ASCII; the driver also reads it as a C string, so a NUL would cut it short.
-  return password.size() >= 8 && password.size() <= 63 && std::ranges::all_of(password, [](char c) { return c >= 0x20 && c <= 0x7E; });
+  return password.size() >= 8 && password.size() <= 63 && OpenShock::StringIsPrintableAscii(password);
 }
 
 bool WiFiConfig::FromJSON(JSON::JsonView json)

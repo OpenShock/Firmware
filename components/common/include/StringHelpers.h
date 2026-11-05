@@ -20,9 +20,25 @@ namespace OpenShock {
   {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
   }
+  constexpr bool CharIsPrint(char c)
+  {
+    return c >= ' ' && c <= '~';
+  }
   constexpr char CharToLower(char c)
   {
     return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+  }
+
+  // Whether every byte is printable ASCII (space to '~'): no control characters, no NUL, no UTF-8.
+  constexpr bool StringIsPrintableAscii(std::string_view view)
+  {
+    for (char c : view) {
+      if (!CharIsPrint(c)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   constexpr std::string_view StringTrimLeft(std::string_view view)
