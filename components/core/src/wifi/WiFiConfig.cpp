@@ -63,6 +63,11 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
   accessPointSSID = json["accessPointSSID"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PREFIX);
 
   accessPointPassword = json["accessPointPassword"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PASSWORD);
+  // Refused here, not left to Normalize(), which would save the build default in place of a password the import meant to set.
+  if (!IsValidAccessPointPassword(accessPointPassword)) {
+    OS_LOGE(TAG, "accessPointPassword is not empty or 8-63 printable ASCII characters");
+    return false;
+  }
 
   hostname = json["hostname"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_HOSTNAME);
 
