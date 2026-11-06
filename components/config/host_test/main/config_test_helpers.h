@@ -49,8 +49,9 @@ namespace ConfigTest {
       inline constexpr const char* kKeepAlive = "keepalive";
     }  // namespace Rf
     namespace Estop {
-      inline constexpr const char* kEnabled = "enabled";
-      inline constexpr const char* kGpio    = "gpio";
+      inline constexpr const char* kEnabled  = "enabled";
+      inline constexpr const char* kGpio     = "gpio";
+      inline constexpr const char* kLatching = "latching";
     }  // namespace Estop
     namespace Ota {
       inline constexpr const char* kUpdateId = "update_id";

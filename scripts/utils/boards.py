@@ -1,7 +1,7 @@
 """Board fragments (boards/<name>.defaults) and the build variants they group into.
 
 A fragment's ``CONFIG_*`` lines are Kconfig. Its bare ``OPENSHOCK_*`` lines are the board's pins and
-LED flags, which are stamped into the image after linking rather than compiled in, so boards that
+flags (LED, E-Stop), which are stamped into the image after linking rather than compiled in, so boards that
 differ only in them can share one compile.
 """
 
@@ -18,7 +18,7 @@ from .paths import ROOT
 
 # The pin keys, in the order they sit in the descriptor.
 PIN_KEYS = ('OPENSHOCK_RF_TX_GPIO', 'OPENSHOCK_ESTOP_PIN', 'OPENSHOCK_LED_GPIO', 'OPENSHOCK_LED_WS2812B')
-BOOL_KEYS = ('OPENSHOCK_LED_SWAP_RG_CHANNELS',)
+BOOL_KEYS = ('OPENSHOCK_LED_SWAP_RG_CHANNELS', 'OPENSHOCK_ESTOP_LATCHING')
 LIST_KEYS = ('OPENSHOCK_GPIO_BYPASS',)
 KNOWN_KEYS = PIN_KEYS + BOOL_KEYS + LIST_KEYS
 
@@ -31,6 +31,7 @@ NAME_MAX_LEN = DESC_BOARD_LEN - 1
 
 # Descriptor flag bits (BoardDescriptor.h: OPENSHOCK_BOARD_FLAG_*).
 FLAG_LED_SWAP_RG = 1 << 0
+FLAG_ESTOP_LATCHING = 1 << 1
 
 
 @dataclass(frozen=True)
@@ -43,11 +44,12 @@ class BoardSpec:
     led_gpio: int = NO_PIN
     ws2812b_gpio: int = NO_PIN
     led_swap_rg: bool = False
+    estop_latching: bool = False
     gpio_bypass: tuple[int, ...] = ()
 
     @property
     def flags(self) -> int:
-        return FLAG_LED_SWAP_RG if self.led_swap_rg else 0
+        return (FLAG_LED_SWAP_RG if self.led_swap_rg else 0) | (FLAG_ESTOP_LATCHING if self.estop_latching else 0)
 
     @property
     def gpio_bypass_mask(self) -> int:
@@ -173,6 +175,7 @@ def read_board_fragment(fragment: Path) -> BoardSpec:
         led_gpio=values['OPENSHOCK_LED_GPIO'],
         ws2812b_gpio=values['OPENSHOCK_LED_WS2812B'],
         led_swap_rg=values['OPENSHOCK_LED_SWAP_RG_CHANNELS'],
+        estop_latching=values['OPENSHOCK_ESTOP_LATCHING'],
         gpio_bypass=values['OPENSHOCK_GPIO_BYPASS'],
     )
 

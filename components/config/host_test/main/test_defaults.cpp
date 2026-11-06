@@ -57,6 +57,7 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   // The host-test board has no E-Stop pin, so E-Stop defaults to off.
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_ESTOP_PIN, config.estop.gpioPin);
   TEST_ASSERT_FALSE(config.estop.enabled);
+  TEST_ASSERT_FALSE(config.estop.latching);  // OPENSHOCK_ESTOP_LATCHING is 0 on the host-test board
 }
 
 TEST_CASE("An empty store reads as the defaults and Init writes nothing", "[config][defaults]")
@@ -183,12 +184,14 @@ TEST_CASE("Invalid stored GPIO pins fall back safely", "[config][defaults]")
     auto estop = Open(Keys::Ns::kEstop);
     TEST_ASSERT_TRUE(estop.SetBool(Keys::Estop::kEnabled, true));
     TEST_ASSERT_TRUE(estop.SetI8(Keys::Estop::kGpio, 0));  // strapping pin: not a valid E-Stop input
+    TEST_ASSERT_TRUE(estop.SetBool(Keys::Estop::kLatching, true));
     TEST_ASSERT_TRUE(estop.Commit());
   }
   Reload();
 
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, Config::GetRFConfigTxPin());
   TEST_ASSERT_FALSE(Config::GetEStopEnabled());
+  TEST_ASSERT_TRUE(Config::GetEStopLatching());  // Disabling the E-Stop keeps its switch type
 
   // Negative pin (the old "invalid" marker) also falls back.
   WipeStore();
