@@ -8,6 +8,7 @@
 #include "config/Section.h"
 #include "StringHelpers.h"
 #include "util/FunctionRef.h"
+#include "wifi/WiFiConstants.h"
 #include "wifi/WiFiCredentials.h"
 
 #include <algorithm>
@@ -72,13 +73,13 @@ namespace OpenShock::Config {
   /// `ap` prints it as a field of a CRLF-framed record, so either would split the response.
   [[nodiscard]] constexpr bool IsValidAccessPointSSID(std::string_view ssid)
   {
-    return !ssid.empty() && ssid.size() <= 32 && std::ranges::none_of(ssid, [](char c) { return c == '|' || static_cast<unsigned char>(c) < 0x20 || c == 0x7F; });
+    return !ssid.empty() && ssid.size() <= WiFiConstants::kSsidMaxLength && std::ranges::none_of(ssid, [](char c) { return c == '|' || static_cast<unsigned char>(c) < 0x20 || c == 0x7F; });
   }
   /// @brief Whether `password` can protect it: empty (open), or 8-63 printable ASCII characters for WPA2/WPA3.
   /// The driver reads it as a C string, so a NUL would cut it short.
   [[nodiscard]] constexpr bool IsValidAccessPointPassword(std::string_view password)
   {
-    return password.empty() || (password.size() >= 8 && password.size() <= 63 && OpenShock::StringIsPrintableAscii(password));
+    return password.empty() || (password.size() >= WiFiConstants::kPassphraseMinLength && password.size() <= WiFiConstants::kPassphraseMaxLength && OpenShock::StringIsPrintableAscii(password));
   }
   [[nodiscard]] std::string GetWiFiAccessPointSSID();
   /// @brief Refuses an SSID IsValidAccessPointSSID rejects. Takes effect the next time the captive portal starts.
@@ -86,12 +87,6 @@ namespace OpenShock::Config {
   [[nodiscard]] std::string GetWiFiAccessPointPassword();
   /// @brief Refuses a password IsValidAccessPointPassword rejects. Takes effect the next time the captive portal starts.
   bool SetWiFiAccessPointPassword(std::string password);
-  /// @brief Sets the name and the password in one config write; an unset one is kept. Refuses the whole change if
-  ///        either is invalid. Takes effect the next time the captive portal starts.
-  bool SetWiFiAccessPoint(std::optional<std::string> ssid, std::optional<std::string> password);
-  /// @brief The name the access point broadcasts while its SSID is the default (CONFIG_OPENSHOCK_FW_AP_PREFIX): the
-  ///        prefix with this hub's STA MAC.
-  [[nodiscard]] std::string GetDefaultAccessPointSSID();
   [[nodiscard]] std::string GetWiFiHostname();
   bool SetWiFiHostname(std::string hostname);
 }  // namespace OpenShock::Config

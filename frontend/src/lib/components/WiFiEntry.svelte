@@ -197,7 +197,7 @@
               >
               <Button
                 type="submit"
-                disabled={!pendingPassword || pendingPassword.length > 63 || saving}
+                disabled={!pendingPassword || !isValidWifiPassword(pendingPassword) || saving}
               >
                 Connect
               </Button>
@@ -230,7 +230,10 @@
               <Button variant="outline" onclick={() => handleEditPasswordDialogOpenChange(false)}
                 >Cancel</Button
               >
-              <Button type="submit" disabled={!editPassword || editPassword.length > 63 || saving}>
+              <Button
+                type="submit"
+                disabled={!editPassword || !isValidWifiPassword(editPassword) || saving}
+              >
                 Save
               </Button>
             </DialogFooter>

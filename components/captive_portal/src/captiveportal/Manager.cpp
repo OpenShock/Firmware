@@ -11,14 +11,13 @@ const char* const TAG = "CaptivePortal";
 #include "captiveportal/CaptivePortalConfig.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "Temporal.h"
+#include "wifi/AccessPoint.h"
 #include "wifi/WiFiConfig.h"
 
 #include <esp_event.h>
-#include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
@@ -176,6 +175,32 @@ static bool waitForEventLoop(TickType_t timeout)
   return xSemaphoreTake(s_loopFlushed, timeout) == pdTRUE;
 }
 
+// The settings are validated by the wifi section (Normalize), so they fit the driver's fields
+static wifi_config_t buildApConfig()
+{
+  const std::string ssid     = AccessPoint::BroadcastSSID(Config::GetWiFiAccessPointSSID());
+  const std::string password = Config::GetWiFiAccessPointPassword();
+
+  wifi_config_t apConfig = {};
+  apConfig.ap.ssid_len   = std::min(ssid.size(), sizeof(apConfig.ap.ssid));
+  memcpy(apConfig.ap.ssid, ssid.data(), apConfig.ap.ssid_len);
+  apConfig.ap.channel = 1;
+  if (password.empty()) {
+    apConfig.ap.authmode = WIFI_AUTH_OPEN;
+  } else {
+    // WPA3 clients use SAE, which a sniffer that knows the password still can't decrypt; WPA2 clients keep working.
+    // PMF stays optional because WPA2 clients may lack it, and the zeroed config would otherwise pick hunt-and-peck only.
+    apConfig.ap.authmode         = WIFI_AUTH_WPA2_WPA3_PSK;
+    apConfig.ap.pmf_cfg.required = false;
+    apConfig.ap.sae_pwe_h2e      = WPA3_SAE_PWE_BOTH;
+    std::size_t passwordLen      = std::min(password.size(), sizeof(apConfig.ap.password) - 1);
+    memcpy(apConfig.ap.password, password.data(), passwordLen);
+  }
+  apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
+  apConfig.ap.beacon_interval = 100;
+  return apConfig;
+}
+
 static bool captiveportal_start()
 {
   if (GetInstance() != nullptr) {
@@ -229,29 +254,7 @@ static bool captiveportal_start()
     apStartHandlerRegistered = true;
   }
 
-  // The default SSID is the prefix + this device's STA MAC (matches the old Arduino naming); a name the user set is
-  // used as it is. Both are validated by the wifi section (Normalize), so they fit the config struct.
-  const std::string apSsid     = Config::GetWiFiAccessPointSSID();
-  const std::string apPassword = Config::GetWiFiAccessPointPassword();
-
-  wifi_config_t apConfig = {};
-  const std::string ssid = apSsid == CONFIG_OPENSHOCK_FW_AP_PREFIX ? Config::GetDefaultAccessPointSSID() : apSsid;
-  apConfig.ap.ssid_len   = std::min(ssid.size(), sizeof(apConfig.ap.ssid));
-  memcpy(apConfig.ap.ssid, ssid.data(), apConfig.ap.ssid_len);
-  apConfig.ap.channel = 1;
-  if (apPassword.empty()) {
-    apConfig.ap.authmode = WIFI_AUTH_OPEN;
-  } else {
-    // WPA3 clients use SAE, which a sniffer that knows the password still can't decrypt; WPA2 clients keep working.
-    // PMF stays optional because WPA2 clients may lack it, and the zeroed config would otherwise pick hunt-and-peck only.
-    apConfig.ap.authmode         = WIFI_AUTH_WPA2_WPA3_PSK;
-    apConfig.ap.pmf_cfg.required = false;
-    apConfig.ap.sae_pwe_h2e      = WPA3_SAE_PWE_BOTH;
-    std::size_t passwordLen      = std::min(apPassword.size(), sizeof(apConfig.ap.password) - 1);
-    memcpy(apConfig.ap.password, apPassword.data(), passwordLen);
-  }
-  apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
-  apConfig.ap.beacon_interval = 100;
+  wifi_config_t apConfig = buildApConfig();
 
   s_apIfName[0] = '\0';
 

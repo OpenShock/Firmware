@@ -3,6 +3,7 @@
 #include "serial_console/command_handlers/common.h"
 
 #include "StringHelpers.h"
+#include "wifi/AccessPoint.h"
 #include "wifi/WiFiConfig.h"
 
 #include <string>
@@ -13,17 +14,21 @@ static void handleAccessPointGetCommand(std::string_view arg, bool isAutomated)
 
   std::string ssid     = OpenShock::Config::GetWiFiAccessPointSSID();
   std::string password = OpenShock::Config::GetWiFiAccessPointPassword();
-  bool isDefault       = ssid == CONFIG_OPENSHOCK_FW_AP_PREFIX;
 
   const char* protection = "custom-password";
-  if (password.empty()) {
-    protection = "open";
-  } else if (password == CONFIG_OPENSHOCK_FW_AP_PASSWORD) {
-    protection = "default-password";
+  switch (OpenShock::AccessPoint::ProtectionOf(password)) {
+    case OpenShock::AccessPoint::Protection::Open:
+      protection = "open";
+      break;
+    case OpenShock::AccessPoint::Protection::DefaultPassword:
+      protection = "default-password";
+      break;
+    case OpenShock::AccessPoint::Protection::CustomPassword:
+      break;
   }
 
   // A default SSID is shown as the prefix; the hub appends its MAC to it when the access point starts
-  SERPR_RESPONSE("AccessPoint|%s|%s|%s", ssid.c_str(), isDefault ? "default" : "custom", protection);
+  SERPR_RESPONSE("AccessPoint|%s|%s|%s", ssid.c_str(), OpenShock::AccessPoint::IsDefaultSSID(ssid) ? "default" : "custom", protection);
 }
 
 static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)

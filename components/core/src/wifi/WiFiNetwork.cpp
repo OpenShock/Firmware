@@ -40,7 +40,7 @@ WiFiNetwork::WiFiNetwork(const wifi_ap_record_t* apRecord, uint8_t credentialsId
   memcpy(bssid, apRecord->bssid, sizeof(bssid));
 }
 
-WiFiNetwork::WiFiNetwork(const char (&ssid)[33], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId)
+WiFiNetwork::WiFiNetwork(const char (&ssid)[WiFiConstants::kSsidMaxLength + 1], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId)
   : ssid {0}
   , bssid {0}
   , channel(channel)
@@ -59,8 +59,8 @@ WiFiNetwork::WiFiNetwork(const char (&ssid)[33], const uint8_t (&bssid)[6], uint
   memcpy(this->bssid, bssid, sizeof(bssid));
 }
 
-WiFiNetwork::WiFiNetwork(const uint8_t (&ssid)[33], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId)
-  : WiFiNetwork(reinterpret_cast<const char (&)[33]>(ssid), bssid, channel, rssi, authMode, credentialsId)
+WiFiNetwork::WiFiNetwork(const uint8_t (&ssid)[WiFiConstants::kSsidMaxLength + 1], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId)
+  : WiFiNetwork(reinterpret_cast<const char (&)[WiFiConstants::kSsidMaxLength + 1]>(ssid), bssid, channel, rssi, authMode, credentialsId)
 {
 }
 

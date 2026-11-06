@@ -20,6 +20,7 @@ const char* const TAG = "CaptivePortalApi";
 #include "RateLimiter.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiConfig.h"
+#include "wifi/WiFiConstants.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -230,7 +231,7 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   if (!ssid && ssid.error() == ParamError::Invalid) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_SSID);
   }
-  if (!ssid || ssid->empty() || ssid->length() > 32) {
+  if (!ssid || ssid->empty() || ssid->length() > WiFiConstants::kSsidMaxLength) {
     return sendResp(req, S400, HTTP::ContentType::JSON, !ssid || ssid->empty() ? JSON_ERR_MISSING_SSID : JSON_ERR_INVALID_SSID);
   }
 
@@ -241,10 +242,10 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   }
   std::string password = std::move(passwordParam).value_or(std::string());
   if (!password.empty()) {
-    if (password.length() < 8) {
+    if (password.length() < WiFiConstants::kPassphraseMinLength) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_SHORT);
     }
-    if (password.length() > 63) {
+    if (password.length() > WiFiConstants::kPassphraseMaxLength) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_LONG);
     }
   }
@@ -392,8 +393,8 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
 //   ssid=<name>                      the access point's name; empty for the default (the prefix with the hub's MAC)
 //   protection=default|open|custom   the build's default password, none, or `password`
 //   password=<8-63 printable ASCII>  with protection=custom
-// Saved in one config write, applied the next time the captive portal starts: applying it now would drop the client
-// that asked, which is most likely on this access point.
+// Applied the next time the captive portal starts: applying it now would drop the client that asked, which is most
+// likely on this access point.
 static esp_err_t apiAccessPoint(httpd_req_t* req)
 {
   auto body = recvBody(req);
@@ -428,10 +429,10 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
       if (!passwordParam) {
         return sendResp(req, S400, HTTP::ContentType::JSON, passwordParam.error() == ParamError::Missing ? JSON_ERR_PASSWORD_SHORT : JSON_ERR_INVALID_AP_PASS);
       }
-      if (passwordParam->length() < 8) {
+      if (passwordParam->length() < WiFiConstants::kPassphraseMinLength) {
         return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_SHORT);
       }
-      if (passwordParam->length() > 63) {
+      if (passwordParam->length() > WiFiConstants::kPassphraseMaxLength) {
         return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_LONG);
       }
       if (!Config::IsValidAccessPointPassword(*passwordParam)) {
@@ -447,7 +448,11 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
   }
 
-  if (!Config::SetWiFiAccessPoint(std::move(ssid), std::move(password))) {
+  // Both passed the checks above, so a refusal here is the config store failing to save
+  if (ssid && !Config::SetWiFiAccessPointSSID(std::move(*ssid))) {
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+  if (password && !Config::SetWiFiAccessPointPassword(std::move(*password))) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});

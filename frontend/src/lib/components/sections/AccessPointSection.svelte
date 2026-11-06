@@ -8,13 +8,19 @@
   import { Label } from '@openshock/svelte-core/components/ui/label';
   import { Eye, EyeOff, Info, TriangleAlert } from '@lucide/svelte';
   import { toast } from 'svelte-sonner';
+  import {
+    accessPointPassphraseError,
+    accessPointSsidError,
+    PASSPHRASE_MAX_LENGTH,
+    PASSPHRASE_MIN_LENGTH,
+  } from '#lib/utils/wifiValidation.js';
 
   const protections: { value: AccessPointProtectionKind; label: string; description: string }[] = [
     {
       value: 'default',
       label: 'Default Password',
       description:
-        'The password from the setup guide (openshock on official builds). It is public, so it only keeps out passers-by.',
+        'The password from the setup guide. It is public, so it only keeps out passers-by.',
     },
     {
       value: 'custom',
@@ -41,18 +47,7 @@
   let ssid = $derived(ssidEdit ?? ap?.ssid ?? '');
   let protection = $derived(protectionEdit ?? ap?.protection ?? 'default');
 
-  // The hub's rules: a name of 1-32 bytes without '|' or control characters (empty here means
-  // the default), a password of 8-63 printable ASCII characters
-  let ssidBytes = $derived(new TextEncoder().encode(ssid.trim()).length);
-  let ssidError = $derived(
-    ssidBytes > 32
-      ? 'At most 32 bytes'
-      : ssid.includes('|')
-        ? "No '|' characters"
-        : /[\x00-\x1f\x7f]/.test(ssid)
-          ? 'No control characters'
-          : null
-  );
+  let ssidError = $derived(accessPointSsidError(ssid.trim()));
 
   let ssidChanged = $derived(ap != null && ssid.trim() !== (ap.ssid ?? ''));
   let protectionChanged = $derived(ap != null && protection !== ap.protection);
@@ -61,13 +56,7 @@
   let passwordNeeded = $derived(
     protection === 'custom' && (protectionChanged || password.length > 0)
   );
-  let passwordError = $derived.by(() => {
-    if (!passwordNeeded) return null;
-    if (password.length < 8) return 'At least 8 characters';
-    if (password.length > 63) return 'At most 63 characters';
-    if (!/^[\x20-\x7e]*$/.test(password)) return 'Only plain letters, digits, spaces and symbols';
-    return null;
-  });
+  let passwordError = $derived(passwordNeeded ? accessPointPassphraseError(password) : null);
 
   let dirty = $derived(ssidChanged || protectionChanged || passwordChanged);
   let canSave = $derived(dirty && !ssidError && !passwordError && !saving);
@@ -180,7 +169,7 @@
               class="flex-1"
               placeholder={ap.protection === 'custom' && !protectionChanged
                 ? 'Leave empty to keep the current password'
-                : '8-63 characters'}
+                : `${PASSPHRASE_MIN_LENGTH}-${PASSPHRASE_MAX_LENGTH} characters`}
               aria-label="Access point password"
               aria-invalid={passwordError !== null}
               aria-describedby="ap-password-hint"
