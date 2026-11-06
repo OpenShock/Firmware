@@ -41,11 +41,17 @@
   let ssid = $derived(ssidEdit ?? ap?.ssid ?? '');
   let protection = $derived(protectionEdit ?? ap?.protection ?? 'default');
 
-  // The hub's rules: a name of 1-32 bytes without '|' (empty here means the default), a password of 8-63 printable
-  // ASCII characters
+  // The hub's rules: a name of 1-32 bytes without '|' or control characters (empty here means
+  // the default), a password of 8-63 printable ASCII characters
   let ssidBytes = $derived(new TextEncoder().encode(ssid.trim()).length);
   let ssidError = $derived(
-    ssidBytes > 32 ? 'At most 32 bytes' : ssid.includes('|') ? "No '|' characters" : null
+    ssidBytes > 32
+      ? 'At most 32 bytes'
+      : ssid.includes('|')
+        ? "No '|' characters"
+        : /[\x00-\x1f\x7f]/.test(ssid)
+          ? 'No control characters'
+          : null
   );
 
   let ssidChanged = $derived(ap != null && ssid.trim() !== (ap.ssid ?? ''));

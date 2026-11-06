@@ -31,7 +31,7 @@ const _errorMessages: Record<string, string> = {
   // OTA
   InvalidChannel: 'Invalid update channel',
   // Access point
-  InvalidApSsid: "Network name must be 1-32 bytes, without '|'",
+  InvalidApSsid: "Network name must be 1-32 bytes, without '|' or control characters",
   InvalidApPassword: 'Password must be printable ASCII characters (no accents or emoji)',
   // Generic
   MissingParam: 'Missing parameter',
