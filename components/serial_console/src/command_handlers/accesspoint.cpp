@@ -31,7 +31,7 @@ static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)
   // "default" brings back the prefix + MAC name
   std::string ssid = OpenShock::StringIEquals(arg, "default") ? std::string(CONFIG_OPENSHOCK_FW_AP_PREFIX) : std::string(arg);
   if (!OpenShock::Config::IsValidAccessPointSSID(ssid)) {
-    SERPR_ERROR("Invalid SSID (must be 1-32 characters, without '|')");
+    SERPR_ERROR("Invalid SSID (must be 1-32 characters, without '|' or control characters)");
     return;
   }
 

@@ -317,4 +317,7 @@ TEST_CASE("A stored access point SSID with '|' falls back to the default", "[con
 
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My|Hub"));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My\r\nHub"));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My\tHub"));
+  TEST_ASSERT_TRUE(Config::IsValidAccessPointSSID("Caf\xC3\xA9 Hub"));
 }

@@ -21,7 +21,8 @@ const char* const TAG = "Config::WiFiConfig";
 using namespace OpenShock::Config;
 
 static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "CONFIG_OPENSHOCK_FW_HOSTNAME must be 1-32 letters, digits or hyphens, not starting or ending with a hyphen");
-static_assert(sizeof(CONFIG_OPENSHOCK_FW_AP_PASSWORD) == 1 || (sizeof(CONFIG_OPENSHOCK_FW_AP_PASSWORD) >= 9 && sizeof(CONFIG_OPENSHOCK_FW_AP_PASSWORD) <= 64), "CONFIG_OPENSHOCK_FW_AP_PASSWORD must be empty or 8-63 characters");
+static_assert(OpenShock::Config::IsValidAccessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX), "CONFIG_OPENSHOCK_FW_AP_PREFIX must be 1-32 characters without '|' or control characters");
+static_assert(OpenShock::Config::IsValidAccessPointPassword(CONFIG_OPENSHOCK_FW_AP_PASSWORD), "CONFIG_OPENSHOCK_FW_AP_PASSWORD must be empty or 8-63 printable ASCII characters");
 
 static constexpr const char* kNamespaceCfg   = "wifi.cfg";
 static constexpr const char* kNamespaceCreds = "wifi";
@@ -51,21 +52,6 @@ WiFiConfig::WiFiConfig(std::string_view accessPointSSID, std::string_view access
   , hostname(hostname)
   , credentialsList(credentialsList)
 {
-}
-
-bool OpenShock::Config::IsValidAccessPointSSID(std::string_view ssid)
-{
-  return !ssid.empty() && ssid.size() <= 32 && ssid.find('|') == std::string_view::npos;
-}
-
-bool OpenShock::Config::IsValidAccessPointPassword(std::string_view password)
-{
-  if (password.empty()) {
-    return true;
-  }
-
-  // A WPA passphrase is printable ASCII; the driver also reads it as a C string, so a NUL would cut it short.
-  return password.size() >= 8 && password.size() <= 63 && OpenShock::StringIsPrintableAscii(password);
 }
 
 bool WiFiConfig::FromJSON(JSON::JsonView json)
@@ -152,7 +138,7 @@ namespace {
 void WiFiConfig::Normalize()
 {
   if (!IsValidAccessPointSSID(accessPointSSID)) {
-    OS_LOGW(TAG, "Access point SSID is not 1-32 characters without '|', using the default");
+    OS_LOGW(TAG, "Access point SSID is not 1-32 characters without '|' or control characters, using the default");
     accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
   }
   if (!IsValidAccessPointPassword(accessPointPassword)) {

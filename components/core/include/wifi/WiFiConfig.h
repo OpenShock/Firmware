@@ -6,9 +6,11 @@
 //   namespace "wifi":     one blob per credential, key = its id in decimal ("1".."255"); enumerated, never counted
 
 #include "config/Section.h"
+#include "StringHelpers.h"
 #include "util/FunctionRef.h"
 #include "wifi/WiFiCredentials.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -66,10 +68,18 @@ namespace OpenShock::Config {
   bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
-  /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes, no '|' since `ap` prints it as a field.
-  [[nodiscard]] bool IsValidAccessPointSSID(std::string_view ssid);
+  /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes, no '|' or control characters.
+  /// `ap` prints it as a field of a CRLF-framed record, so either would split the response.
+  [[nodiscard]] constexpr bool IsValidAccessPointSSID(std::string_view ssid)
+  {
+    return !ssid.empty() && ssid.size() <= 32 && std::ranges::none_of(ssid, [](char c) { return c == '|' || static_cast<unsigned char>(c) < 0x20 || c == 0x7F; });
+  }
   /// @brief Whether `password` can protect it: empty (open), or 8-63 printable ASCII characters for WPA2/WPA3.
-  [[nodiscard]] bool IsValidAccessPointPassword(std::string_view password);
+  /// The driver reads it as a C string, so a NUL would cut it short.
+  [[nodiscard]] constexpr bool IsValidAccessPointPassword(std::string_view password)
+  {
+    return password.empty() || (password.size() >= 8 && password.size() <= 63 && OpenShock::StringIsPrintableAscii(password));
+  }
   [[nodiscard]] std::string GetWiFiAccessPointSSID();
   /// @brief Refuses an SSID IsValidAccessPointSSID rejects. Takes effect the next time the captive portal starts.
   bool SetWiFiAccessPointSSID(std::string ssid);
