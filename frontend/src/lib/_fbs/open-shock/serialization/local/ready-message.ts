@@ -4,6 +4,7 @@
 
 import * as flatbuffers from 'flatbuffers';
 
+import { AccessPointSettings } from '../../../open-shock/serialization/local/access-point-settings';
 import { OtaSettings } from '../../../open-shock/serialization/local/ota-settings';
 import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network';
 
@@ -111,8 +112,13 @@ ota(obj?:OtaSettings):OtaSettings|null {
   return offset ? (obj || new OtaSettings()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+accessPoint(obj?:AccessPointSettings):AccessPointSettings|null {
+  const offset = this.bb!.__offset(this.bb_pos, 26);
+  return offset ? (obj || new AccessPointSettings()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
 static startReadyMessage(builder:flatbuffers.Builder) {
-  builder.startObject(11);
+  builder.startObject(12);
 }
 
 static addPoggies(builder:flatbuffers.Builder, poggies:boolean) {
@@ -203,6 +209,10 @@ static startSavedSsidsVector(builder:flatbuffers.Builder, numElems:number) {
 
 static addOta(builder:flatbuffers.Builder, otaOffset:flatbuffers.Offset) {
   builder.addFieldOffset(10, otaOffset, 0);
+}
+
+static addAccessPoint(builder:flatbuffers.Builder, accessPointOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(11, accessPointOffset, 0);
 }
 
 static endReadyMessage(builder:flatbuffers.Builder):flatbuffers.Offset {

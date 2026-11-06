@@ -1,3 +1,5 @@
+import { AccessPointProtection } from '#lib/_fbs/open-shock/serialization/local/access-point-protection.js';
+import { AccessPointSettings } from '#lib/_fbs/open-shock/serialization/local/access-point-settings.js';
 import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
 import { OtaSettings } from '#lib/_fbs/open-shock/serialization/local/ota-settings.js';
 import { ReadyMessage } from '#lib/_fbs/open-shock/serialization/local/ready-message.js';
@@ -20,6 +22,12 @@ function buildReady(cdnDomain: string, ssids: string[]): ReadyMessage {
     b,
     ssids.map((ssid) => b.createString(ssid))
   );
+  const ap = AccessPointSettings.createAccessPointSettings(
+    b,
+    b.createString(''),
+    b.createString('OpenShock-30:30:F9:7B:80:58'),
+    AccessPointProtection.DefaultPassword
+  );
 
   ReadyMessage.startReadyMessage(b);
   ReadyMessage.addRfTxPin(b, 15);
@@ -27,6 +35,7 @@ function buildReady(cdnDomain: string, ssids: string[]): ReadyMessage {
   ReadyMessage.addEstopGpioPin(b, 13);
   ReadyMessage.addSavedSsids(b, saved);
   ReadyMessage.addOta(b, ota);
+  ReadyMessage.addAccessPoint(b, ap);
   return readBack(b, ReadyMessage.endReadyMessage(b));
 }
 
@@ -43,8 +52,23 @@ describe('mapConfig', () => {
         allowBackendManagement: false,
         requireManualApproval: true,
       },
+      accessPoint: {
+        ssid: null,
+        defaultSsid: 'OpenShock-30:30:F9:7B:80:58',
+        protection: 'default',
+      },
       savedSSIDs: ['HomeNet', 'Cafe'],
     });
+  });
+
+  it('maps no access point settings from older firmware to null', () => {
+    const b = new Builder(64);
+    const domain = b.createString('fw.example.org');
+    const ota = OtaSettings.createOtaSettings(b, true, domain, OtaChannel.Stable, 30, true, false);
+    ReadyMessage.startReadyMessage(b);
+    ReadyMessage.addOta(b, ota);
+
+    expect(mapConfig(readBack(b, ReadyMessage.endReadyMessage(b))).accessPoint).toBeNull();
   });
 
   it('accepts an empty domain and no saved networks', () => {

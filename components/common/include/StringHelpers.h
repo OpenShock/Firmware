@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -20,28 +21,30 @@ namespace OpenShock {
   {
     return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
   }
+  constexpr bool CharIsPrint(char c)
+  {
+    return c >= ' ' && c <= '~';
+  }
   constexpr char CharToLower(char c)
   {
     return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
   }
 
+  // Whether every byte is printable ASCII (space to '~'): no control characters, no NUL, no UTF-8.
+  constexpr bool StringIsPrintableAscii(std::string_view view)
+  {
+    return std::ranges::all_of(view, CharIsPrint);
+  }
+
   constexpr std::string_view StringTrimLeft(std::string_view view)
   {
-    std::size_t pos = 0;
-    while (pos < view.size() && CharIsSpace(view[pos])) {
-      ++pos;
-    }
-
-    return view.substr(pos);
+    auto first = std::ranges::find_if_not(view, CharIsSpace);
+    return view.substr(static_cast<std::size_t>(first - view.begin()));
   }
   constexpr std::string_view StringTrimRight(std::string_view view)
   {
-    std::size_t len = view.size();
-    while (len > 0 && CharIsSpace(view[len - 1])) {
-      --len;
-    }
-
-    return view.substr(0, len);
+    auto last = std::ranges::find_if_not(view.rbegin(), view.rend(), CharIsSpace);
+    return view.substr(0, static_cast<std::size_t>(last.base() - view.begin()));
   }
   constexpr std::string_view StringTrim(std::string_view view)
   {

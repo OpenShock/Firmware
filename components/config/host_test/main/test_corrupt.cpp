@@ -119,6 +119,8 @@ TEST_CASE("jsonconfig set rejects malformed JSON without touching the store", "[
     "{\"wifi\":{\"credentials\":[{\"id\":1,\"ssid\":\"x\"}]",
     "{\"estop\":{\"enabled\":\"yes\"}}",
     "{\"captivePortal\":[]}",
+    "{\"wifi\":{\"accessPointPassword\":\"1234567\",\"credentials\":[]}}",
+    "{\"wifi\":{\"accessPointPassword\":\"caf\\u00e9-latte\",\"credentials\":[]}}",
   };
 
   InitWith(MakeSampleConfig());

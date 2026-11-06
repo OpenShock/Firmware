@@ -11,14 +11,13 @@ const char* const TAG = "CaptivePortal";
 #include "captiveportal/CaptivePortalConfig.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
-#include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
 #include "Temporal.h"
+#include "wifi/AccessPoint.h"
 #include "wifi/WiFiConfig.h"
 
 #include <esp_event.h>
-#include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
@@ -29,6 +28,7 @@ const char* const TAG = "CaptivePortal";
 #include "util/RetiredList.h"
 #include "util/TaskUtils.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstring>
 #include <memory>
@@ -81,6 +81,13 @@ static SemaphoreHandle_t s_apStarted = nullptr;
 // while the AP runs, and gives it a new number each time the AP starts again.
 static char s_apIfName[8]                   = {};
 static constexpr TickType_t kApStartTimeout = pdMS_TO_TICKS(2000);
+
+// A marker posted to the default event loop: once its handler runs, every event posted before it has been handled
+ESP_EVENT_DEFINE_BASE(CAPTIVEPORTAL_PRIVATE_EVENTS);
+enum {
+  CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH,
+};
+static SemaphoreHandle_t s_loopFlushed = nullptr;
 
 static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
@@ -153,6 +160,47 @@ static void captiveportal_onapstart(void*, esp_event_base_t, int32_t, void*)
   xSemaphoreGive(s_apStarted);
 }
 
+static void captiveportal_onloopflush(void*, esp_event_base_t, int32_t, void*)
+{
+  xSemaphoreGive(s_loopFlushed);
+}
+
+// Waits until the default event loop has handled everything posted to it before this call
+static bool waitForEventLoop(TickType_t timeout)
+{
+  xSemaphoreTake(s_loopFlushed, 0);  // drop a flush left over from an earlier call that timed out
+  if (esp_event_post(CAPTIVEPORTAL_PRIVATE_EVENTS, CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH, nullptr, 0, timeout) != ESP_OK) {
+    return false;
+  }
+  return xSemaphoreTake(s_loopFlushed, timeout) == pdTRUE;
+}
+
+// The settings are validated by the wifi section (Normalize), so they fit the driver's fields
+static wifi_config_t buildApConfig()
+{
+  const std::string ssid     = AccessPoint::BroadcastSSID(Config::GetWiFiAccessPointSSID());
+  const std::string password = Config::GetWiFiAccessPointPassword();
+
+  wifi_config_t apConfig = {};
+  apConfig.ap.ssid_len   = std::min(ssid.size(), sizeof(apConfig.ap.ssid));
+  memcpy(apConfig.ap.ssid, ssid.data(), apConfig.ap.ssid_len);
+  apConfig.ap.channel = 1;
+  if (password.empty()) {
+    apConfig.ap.authmode = WIFI_AUTH_OPEN;
+  } else {
+    // WPA3 clients use SAE, which a sniffer that knows the password still can't decrypt; WPA2 clients keep working.
+    // PMF stays optional because WPA2 clients may lack it, and the zeroed config would otherwise pick hunt-and-peck only.
+    apConfig.ap.authmode         = WIFI_AUTH_WPA2_WPA3_PSK;
+    apConfig.ap.pmf_cfg.required = false;
+    apConfig.ap.sae_pwe_h2e      = WPA3_SAE_PWE_BOTH;
+    std::size_t passwordLen      = std::min(password.size(), sizeof(apConfig.ap.password) - 1);
+    memcpy(apConfig.ap.password, password.data(), passwordLen);
+  }
+  apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
+  apConfig.ap.beacon_interval = 100;
+  return apConfig;
+}
+
 static bool captiveportal_start()
 {
   if (GetInstance() != nullptr) {
@@ -196,27 +244,19 @@ static bool captiveportal_start()
   static bool apStartHandlerRegistered = false;
   if (!apStartHandlerRegistered) {
     esp_err_t evtErr = esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_AP_START, captiveportal_onapstart, nullptr);
+    if (evtErr == ESP_OK) {
+      evtErr = esp_event_handler_register(CAPTIVEPORTAL_PRIVATE_EVENTS, CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH, captiveportal_onloopflush, nullptr);
+    }
     if (evtErr != ESP_OK) {
-      OS_LOGE(TAG, "Failed to register the AP start handler: %s", esp_err_to_name(evtErr));
+      OS_LOGE(TAG, "Failed to register the AP start handlers: %s", esp_err_to_name(evtErr));
       return false;
     }
     apStartHandlerRegistered = true;
   }
 
-  // AP SSID = prefix + this device's STA MAC (matches the old Arduino naming).
-  uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
-
-  wifi_config_t apConfig = {};
-  snprintf(reinterpret_cast<char*>(apConfig.ap.ssid), sizeof(apConfig.ap.ssid), "%s" BSSID_FMT, CONFIG_OPENSHOCK_FW_AP_PREFIX, BSSID_ARG(mac));
-  apConfig.ap.ssid_len        = strlen(reinterpret_cast<char*>(apConfig.ap.ssid));
-  apConfig.ap.channel         = 1;
-  apConfig.ap.authmode        = WIFI_AUTH_OPEN;
-  apConfig.ap.max_connection  = CONFIG_OPENSHOCK_PORTAL_MAX_CLIENTS;
-  apConfig.ap.beacon_interval = 100;
+  wifi_config_t apConfig = buildApConfig();
 
   s_apIfName[0] = '\0';
-  xSemaphoreTake(s_apStarted, 0);  // drop a start left over from an earlier run
 
   esp_err_t err = esp_wifi_set_mode(WIFI_MODE_APSTA);
   if (err != ESP_OK) {
@@ -233,10 +273,21 @@ static bool captiveportal_start()
 
   // The servers bind to the AP's lwIP interface, which only exists once the AP has started. Reading its name earlier
   // returns another interface's (the STA's), and would put the portal on the LAN.
-  if (!esp_netif_is_netif_up(s_apNetif) && xSemaphoreTake(s_apStarted, kApStartTimeout) != pdTRUE) {
-    OS_LOGE(TAG, "AP did not start");
-    esp_wifi_set_mode(WIFI_MODE_STA);
-    return false;
+  //
+  // Enabling the AP starts it with the config it had, and setting a different config (a new name or password, or the
+  // first start after boot) restarts it: stopped, its netif removed from lwIP, then started again under a new name.
+  // Both starts are queued on the event loop by now. Reading the name between them gets nothing (the netif is gone)
+  // or the first start's (which no longer exists), so let the loop handle them first, then take the start that stays.
+  if (!waitForEventLoop(kApStartTimeout)) {
+    OS_LOGW(TAG, "The event loop did not catch up with the AP start, the interface name may be stale");
+  }
+  if (!esp_netif_is_netif_up(s_apNetif)) {
+    xSemaphoreTake(s_apStarted, 0);  // a start that has since been stopped again
+    if (!esp_netif_is_netif_up(s_apNetif) && xSemaphoreTake(s_apStarted, kApStartTimeout) != pdTRUE) {
+      OS_LOGE(TAG, "AP did not start");
+      esp_wifi_set_mode(WIFI_MODE_STA);
+      return false;
+    }
   }
 
   err = esp_netif_get_netif_impl_name(s_apNetif, s_apIfName);
@@ -412,7 +463,8 @@ bool CaptivePortal::Init()
 
   s_forceCloseDone = xSemaphoreCreateBinary();
   s_apStarted      = xSemaphoreCreateBinary();
-  if (s_forceCloseDone == nullptr || s_apStarted == nullptr) {
+  s_loopFlushed    = xSemaphoreCreateBinary();
+  if (s_forceCloseDone == nullptr || s_apStarted == nullptr || s_loopFlushed == nullptr) {
     OS_LOGE(TAG, "Failed to create captive portal semaphores");
     delete initialState;
     return false;

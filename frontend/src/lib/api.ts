@@ -1,5 +1,5 @@
 import { OtaChannel } from '#lib/_fbs/open-shock/serialization/local/ota-channel.js';
-import type { OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
+import type { AccessPointConfig, OtaUpdateConfig } from '#lib/mappers/ConfigMapper.js';
 import { hubState } from '#lib/stores/index.js';
 import { getApiBaseUrl } from '#lib/utils/localRedirect.js';
 import { toast } from 'svelte-sonner';
@@ -30,6 +30,9 @@ const _errorMessages: Record<string, string> = {
   PasswordTooLong: 'Password must be at most 63 characters',
   // OTA
   InvalidChannel: 'Invalid update channel',
+  // Access point
+  InvalidApSsid: "Network name must be 1-32 bytes, without '|' or control characters",
+  InvalidApPassword: 'Password must be printable ASCII characters (no accents or emoji)',
   // Generic
   MissingParam: 'Missing parameter',
   InvalidParam: 'Invalid value',
@@ -297,4 +300,40 @@ export function checkOtaUpdates(channel: OtaChannel): Promise<boolean> {
     'POST',
     'Failed to check for OTA updates'
   );
+}
+
+export interface AccessPointChange {
+  ssid?: string; // '' for the default name
+  protection?: AccessPointConfig['protection'];
+  password?: string; // With protection 'custom'
+}
+
+// The captive portal's access point (PUT /api/ap). Saved at once, applied the next time the portal starts. On success
+// the change is mirrored into hubState.config, which is otherwise only sent once on connect.
+export async function setAccessPoint(change: AccessPointChange): Promise<boolean> {
+  const params = new URLSearchParams();
+  if (change.ssid !== undefined) params.set('ssid', change.ssid);
+  if (change.protection !== undefined) params.set('protection', change.protection);
+  if (change.protection === 'custom' && change.password !== undefined)
+    params.set('password', change.password);
+  try {
+    const res = await apiFetch('/api/ap', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+    if (!res.ok) {
+      toast.error('Failed to save the access point: ' + (await getErrorMessage(res)));
+      return false;
+    }
+    const ap = hubState.config?.accessPoint;
+    if (ap) {
+      if (change.ssid !== undefined) ap.ssid = change.ssid || null;
+      if (change.protection !== undefined) ap.protection = change.protection;
+    }
+    return true;
+  } catch {
+    toast.error('Failed to save the access point');
+    return false;
+  }
 }

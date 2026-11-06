@@ -13,6 +13,7 @@ const char* const TAG = "WiFiManager";
 #include "util/FunctionRef.h"
 #include "util/TaskUtils.h"
 #include "wifi/WiFiConfig.h"
+#include "wifi/WiFiConstants.h"
 #include "wifi/WiFiNetwork.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -162,7 +163,7 @@ static bool strongerSignal(const WiFiNetwork& a, const WiFiNetwork& b)
 }
 
 // An event's SSID field is not guaranteed null-terminated, and ssid_len comes from the driver: clamp it to the field
-static void copyEventSSID(const uint8_t (&eventSsid)[32], uint8_t eventSsidLen, char (&ssid)[33])
+static void copyEventSSID(const uint8_t (&eventSsid)[WiFiConstants::kSsidMaxLength], uint8_t eventSsidLen, char (&ssid)[WiFiConstants::kSsidMaxLength + 1])
 {
   size_t ssidLen = std::min(static_cast<size_t>(eventSsidLen), sizeof(eventSsid));
   memcpy(ssid, eventSsid, ssidLen);
@@ -312,7 +313,7 @@ static void evWiFiConnected(const wifi_event_sta_connected_t& info)
   s_wifiState.store(WiFiState::Connected, std::memory_order_relaxed);
   postWiFiState(OPENSHOCK_WIFI_STATE_CONNECTED, kPostWaitFromEventLoop);
 
-  char ssid[33];
+  char ssid[WiFiConstants::kSsidMaxLength + 1];
   copyEventSSID(info.ssid, info.ssid_len, ssid);
 
   uint8_t credentialsId;
@@ -390,7 +391,7 @@ static void evWiFiDisconnected(const wifi_event_sta_disconnected_t& info)
   s_connectedCredentialsID.store(0, std::memory_order_relaxed);
   postWiFiState(OPENSHOCK_WIFI_STATE_DISCONNECTED, kPostWaitFromEventLoop);
 
-  char ssid[33];
+  char ssid[WiFiConstants::kSsidMaxLength + 1];
   copyEventSSID(info.ssid, info.ssid_len, ssid);
 
   OS_LOGI(TAG, "Disconnected from network %s (" BSSID_FMT ")", ssid, BSSID_ARG(info.bssid));

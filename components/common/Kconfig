@@ -38,6 +38,15 @@ menu "OpenShock defaults"
         help
             Prefix for the captive-portal SoftAP SSID (the device MAC is appended).
 
+    config OPENSHOCK_FW_AP_PASSWORD
+        string "Default SoftAP password"
+        default "openshock"
+        help
+            Default password for the captive-portal SoftAP, which runs WPA2/WPA3 transition mode.
+            It is public, but WPA3 (SAE) clients still get traffic a sniffer can't decrypt with it.
+            Empty for an open network, else 8-63 characters (checked at compile time).
+            Overridable at runtime; a factory reset restores it.
+
 endmenu
 
 # Every OpenShock task's stack and priority, in one place so the priority order between them

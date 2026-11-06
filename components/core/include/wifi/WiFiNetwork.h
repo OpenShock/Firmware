@@ -1,5 +1,7 @@
 #pragma once
 
+#include "wifi/WiFiConstants.h"
+
 #include <esp_wifi_types.h>
 
 #include <array>
@@ -9,13 +11,13 @@ namespace OpenShock {
   struct WiFiNetwork {
     WiFiNetwork();
     WiFiNetwork(const wifi_ap_record_t* apRecord, uint8_t credentialsId);
-    WiFiNetwork(const char (&ssid)[33], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId);
-    WiFiNetwork(const uint8_t (&ssid)[33], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId);
+    WiFiNetwork(const char (&ssid)[WiFiConstants::kSsidMaxLength + 1], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId);
+    WiFiNetwork(const uint8_t (&ssid)[WiFiConstants::kSsidMaxLength + 1], const uint8_t (&bssid)[6], uint8_t channel, int8_t rssi, wifi_auth_mode_t authMode, uint8_t credentialsId);
 
     std::array<char, 18> GetHexBSSID() const;
     bool IsSaved() const;
 
-    char ssid[33];
+    char ssid[WiFiConstants::kSsidMaxLength + 1];
     uint8_t bssid[6];
     uint8_t channel;
     int8_t rssi;

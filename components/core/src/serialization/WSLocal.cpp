@@ -7,6 +7,7 @@
 #include "OtaUpdateConfig.h"
 #include "radio/RFConfig.h"
 #include "util/HexUtils.h"
+#include "wifi/AccessPoint.h"
 #include "wifi/WiFiConfig.h"
 #include "wifi/WiFiNetwork.h"
 
@@ -75,6 +76,24 @@ static flatbuffers::Offset<Local::OtaSettings> createOtaSettings(flatbuffers::Fl
   return Local::CreateOtaSettings(builder, ota.isEnabled, cdnDomain, static_cast<Local::OtaChannel>(ota.updateChannel), ota.checkInterval, ota.allowBackendManagement, ota.requireManualApproval);
 }
 
+// The wire enum is the core one
+static_assert(static_cast<uint8_t>(Local::AccessPointProtection::Open) == static_cast<uint8_t>(OpenShock::AccessPoint::Protection::Open));
+static_assert(static_cast<uint8_t>(Local::AccessPointProtection::DefaultPassword) == static_cast<uint8_t>(OpenShock::AccessPoint::Protection::DefaultPassword));
+static_assert(static_cast<uint8_t>(Local::AccessPointProtection::CustomPassword) == static_cast<uint8_t>(OpenShock::AccessPoint::Protection::CustomPassword));
+
+// The access point's name and whether it is protected; never its password
+static flatbuffers::Offset<Local::AccessPointSettings> createAccessPointSettings(flatbuffers::FlatBufferBuilder& builder)
+{
+  const std::string ssid     = OpenShock::Config::GetWiFiAccessPointSSID();
+  const std::string password = OpenShock::Config::GetWiFiAccessPointPassword();
+
+  // Empty for the default name, which default_ssid carries with the MAC
+  auto ssidOffset    = builder.CreateString(OpenShock::AccessPoint::IsDefaultSSID(ssid) ? std::string_view() : std::string_view(ssid));
+  auto defaultOffset = builder.CreateString(OpenShock::AccessPoint::DefaultSSID());
+  auto protection    = static_cast<Local::AccessPointProtection>(OpenShock::AccessPoint::ProtectionOf(password));
+  return Local::CreateAccessPointSettings(builder, ssidOffset, defaultOffset, protection);
+}
+
 bool Local::SerializeErrorMessage(std::string_view message, Common::SerializationCallbackFn callback)
 {
   flatbuffers::FlatBufferBuilder builder(64 + message.length());
@@ -105,12 +124,14 @@ bool Local::SerializeReadyMessage(const WiFiNetwork* connectedNetwork, bool acco
   OpenShock::Config::ForEachWiFiSsid([&](std::string_view ssid) { savedSsids.push_back(builder.CreateString(ssid.data(), ssid.size())); });
   auto savedSsidsOffset = builder.CreateVector(savedSsids);
 
-  auto otaOffset = createOtaSettings(builder);
+  auto otaOffset         = createOtaSettings(builder);
+  auto accessPointOffset = createAccessPointSettings(builder);
 
   const auto rfTxPin = static_cast<int8_t>(OpenShock::Config::GetRFConfigTxPin());
   const auto estop   = OpenShock::Config::GetEStopConfig();
 
-  auto readyMessageOffset = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset);
+  auto readyMessageOffset
+    = Serialization::Local::CreateReadyMessage(builder, true, fbsNetwork, accountLinked, inputPinsOffset, outputPinsOffset, false, rfTxPin, estop.enabled, static_cast<int8_t>(estop.gpioPin), savedSsidsOffset, otaOffset, accessPointOffset);
 
   return finishMessage(builder, Local::HubToLocalMessagePayload::ReadyMessage, readyMessageOffset, callback);
 }
