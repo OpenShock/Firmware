@@ -6,6 +6,10 @@
 //   - an empty password is an open network, CONFIG_OPENSHOCK_FW_AP_PASSWORD is the build's default (which a factory
 //     reset restores), anything else is the user's own
 
+#include "StringHelpers.h"
+#include "wifi/WiFiConstants.h"
+
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -16,6 +20,19 @@ namespace OpenShock::AccessPoint {
     DefaultPassword = 1,
     CustomPassword  = 2,
   };
+
+  /// @brief Whether `ssid` can name the access point: 1-32 bytes, no '|' or control characters. The serial console's
+  ///        `ap` prints it as a field of a CRLF-framed record, so either would split the response.
+  [[nodiscard]] constexpr bool IsValidSSID(std::string_view ssid)
+  {
+    return !ssid.empty() && ssid.size() <= WiFiConstants::kSsidMaxLength && std::ranges::none_of(ssid, [](char c) { return c == '|' || static_cast<unsigned char>(c) < 0x20 || c == 0x7F; });
+  }
+  /// @brief Whether `password` can protect it: empty (open), or 8-63 printable ASCII characters for WPA2/WPA3.
+  ///        The driver reads it as a C string, so a NUL would cut it short.
+  [[nodiscard]] constexpr bool IsValidPassword(std::string_view password)
+  {
+    return password.empty() || (password.size() >= WiFiConstants::kPassphraseMinLength && password.size() <= WiFiConstants::kPassphraseMaxLength && StringIsPrintableAscii(password));
+  }
 
   [[nodiscard]] bool IsDefaultSSID(std::string_view configuredSsid);
   [[nodiscard]] Protection ProtectionOf(std::string_view password);

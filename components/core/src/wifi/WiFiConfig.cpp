@@ -10,6 +10,7 @@ const char* const TAG = "Config::WiFiConfig";
 #include "Logging.h"
 #include "StringHelpers.h"
 #include "util/HostnameUtils.h"
+#include "wifi/AccessPoint.h"
 
 #include "json/Json.h"
 
@@ -21,8 +22,8 @@ const char* const TAG = "Config::WiFiConfig";
 using namespace OpenShock::Config;
 
 static_assert(OpenShock::HostnameUtils::IsValid(CONFIG_OPENSHOCK_FW_HOSTNAME), "CONFIG_OPENSHOCK_FW_HOSTNAME must be 1-32 letters, digits or hyphens, not starting or ending with a hyphen");
-static_assert(OpenShock::Config::IsValidAccessPointSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX), "CONFIG_OPENSHOCK_FW_AP_PREFIX must be 1-32 characters without '|' or control characters");
-static_assert(OpenShock::Config::IsValidAccessPointPassword(CONFIG_OPENSHOCK_FW_AP_PASSWORD), "CONFIG_OPENSHOCK_FW_AP_PASSWORD must be empty or 8-63 printable ASCII characters");
+static_assert(OpenShock::AccessPoint::IsValidSSID(CONFIG_OPENSHOCK_FW_AP_PREFIX), "CONFIG_OPENSHOCK_FW_AP_PREFIX must be 1-32 characters without '|' or control characters");
+static_assert(OpenShock::AccessPoint::IsValidPassword(CONFIG_OPENSHOCK_FW_AP_PASSWORD), "CONFIG_OPENSHOCK_FW_AP_PASSWORD must be empty or 8-63 printable ASCII characters");
 
 static constexpr const char* kNamespaceCfg   = "wifi.cfg";
 static constexpr const char* kNamespaceCreds = "wifi";
@@ -64,7 +65,7 @@ bool WiFiConfig::FromJSON(JSON::JsonView json)
 
   accessPointPassword = json["accessPointPassword"].tryGetStr().value_or(CONFIG_OPENSHOCK_FW_AP_PASSWORD);
   // Refused here, not left to Normalize(), which would save the build default in place of a password the import meant to set.
-  if (!IsValidAccessPointPassword(accessPointPassword)) {
+  if (!AccessPoint::IsValidPassword(accessPointPassword)) {
     OS_LOGE(TAG, "accessPointPassword is not empty or 8-63 printable ASCII characters");
     return false;
   }
@@ -142,11 +143,11 @@ namespace {
 
 void WiFiConfig::Normalize()
 {
-  if (!IsValidAccessPointSSID(accessPointSSID)) {
+  if (!AccessPoint::IsValidSSID(accessPointSSID)) {
     OS_LOGW(TAG, "Access point SSID is not 1-32 characters without '|' or control characters, using the default");
     accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
   }
-  if (!IsValidAccessPointPassword(accessPointPassword)) {
+  if (!AccessPoint::IsValidPassword(accessPointPassword)) {
     OS_LOGW(TAG, "Access point password is not 8-63 printable ASCII characters, using the default");
     accessPointPassword = CONFIG_OPENSHOCK_FW_AP_PASSWORD;
   }
@@ -454,13 +455,21 @@ std::string OpenShock::Config::GetWiFiAccessPointSSID()
 
 bool OpenShock::Config::SetWiFiAccessPointSSID(std::string ssid)
 {
-  if (!IsValidAccessPointSSID(ssid)) {
+  if (!AccessPoint::IsValidSSID(ssid)) {
     OS_LOGE(TAG, "Invalid access point SSID length %zu", ssid.size());
     return false;
   }
 
   return s_section.Update([&](WiFiConfig& wifi) {
     wifi.accessPointSSID = std::move(ssid);
+    return true;
+  });
+}
+
+bool OpenShock::Config::ResetWiFiAccessPointSSID()
+{
+  return s_section.Update([](WiFiConfig& wifi) {
+    wifi.accessPointSSID = CONFIG_OPENSHOCK_FW_AP_PREFIX;
     return true;
   });
 }
@@ -472,13 +481,21 @@ std::string OpenShock::Config::GetWiFiAccessPointPassword()
 
 bool OpenShock::Config::SetWiFiAccessPointPassword(std::string password)
 {
-  if (!IsValidAccessPointPassword(password)) {
+  if (!AccessPoint::IsValidPassword(password)) {
     OS_LOGE(TAG, "Invalid access point password length %zu", password.size());
     return false;
   }
 
   return s_section.Update([&](WiFiConfig& wifi) {
     wifi.accessPointPassword = std::move(password);
+    return true;
+  });
+}
+
+bool OpenShock::Config::ResetWiFiAccessPointPassword()
+{
+  return s_section.Update([](WiFiConfig& wifi) {
+    wifi.accessPointPassword = CONFIG_OPENSHOCK_FW_AP_PASSWORD;
     return true;
   });
 }

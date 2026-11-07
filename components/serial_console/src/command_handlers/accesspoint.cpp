@@ -34,13 +34,18 @@ static void handleAccessPointGetCommand(std::string_view arg, bool isAutomated)
 static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)
 {
   // "default" brings back the prefix + MAC name
-  std::string ssid = OpenShock::StringIEquals(arg, "default") ? std::string(CONFIG_OPENSHOCK_FW_AP_PREFIX) : std::string(arg);
-  if (!OpenShock::Config::IsValidAccessPointSSID(ssid)) {
-    SERPR_ERROR("Invalid SSID (must be 1-32 characters, without '|' or control characters)");
-    return;
+  bool saved;
+  if (OpenShock::StringIEquals(arg, "default")) {
+    saved = OpenShock::Config::ResetWiFiAccessPointSSID();
+  } else {
+    if (!OpenShock::AccessPoint::IsValidSSID(arg)) {
+      SERPR_ERROR("Invalid SSID (must be 1-32 characters, without '|' or control characters)");
+      return;
+    }
+    saved = OpenShock::Config::SetWiFiAccessPointSSID(std::string(arg));
   }
 
-  if (!OpenShock::Config::SetWiFiAccessPointSSID(std::move(ssid))) {
+  if (!saved) {
     SERPR_ERROR("Failed to save config");
     return;
   }
@@ -51,13 +56,18 @@ static void handleAccessPointSsidCommand(std::string_view arg, bool isAutomated)
 static void handleAccessPointPasswordCommand(std::string_view arg, bool isAutomated)
 {
   // "default" brings back the build's default password; it is too short to be a password itself
-  std::string password = OpenShock::StringIEquals(arg, "default") ? std::string(CONFIG_OPENSHOCK_FW_AP_PASSWORD) : std::string(arg);
-  if (!OpenShock::Config::IsValidAccessPointPassword(password) || arg.empty()) {
-    SERPR_ERROR("Invalid password (must be 8-63 printable ASCII characters; use \"ap open\" to remove it)");
-    return;
+  bool saved;
+  if (OpenShock::StringIEquals(arg, "default")) {
+    saved = OpenShock::Config::ResetWiFiAccessPointPassword();
+  } else {
+    if (arg.empty() || !OpenShock::AccessPoint::IsValidPassword(arg)) {
+      SERPR_ERROR("Invalid password (must be 8-63 printable ASCII characters; use \"ap open\" to remove it)");
+      return;
+    }
+    saved = OpenShock::Config::SetWiFiAccessPointPassword(std::string(arg));
   }
 
-  if (!OpenShock::Config::SetWiFiAccessPointPassword(std::move(password))) {
+  if (!saved) {
     SERPR_ERROR("Failed to save config");
     return;
   }

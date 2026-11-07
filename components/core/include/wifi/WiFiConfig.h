@@ -6,12 +6,9 @@
 //   namespace "wifi":     one blob per credential, key = its id in decimal ("1".."255"); enumerated, never counted
 
 #include "config/Section.h"
-#include "StringHelpers.h"
 #include "util/FunctionRef.h"
-#include "wifi/WiFiConstants.h"
 #include "wifi/WiFiCredentials.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -69,24 +66,17 @@ namespace OpenShock::Config {
   bool PinWiFiCredentialsBSSID(uint8_t id, const uint8_t (&bssid)[6]);
   bool RemoveWiFiCredentials(uint8_t id);
   bool ClearWiFiCredentials();
-  /// @brief Whether `ssid` can name the captive portal's network: 1-32 bytes, no '|' or control characters.
-  /// `ap` prints it as a field of a CRLF-framed record, so either would split the response.
-  [[nodiscard]] constexpr bool IsValidAccessPointSSID(std::string_view ssid)
-  {
-    return !ssid.empty() && ssid.size() <= WiFiConstants::kSsidMaxLength && std::ranges::none_of(ssid, [](char c) { return c == '|' || static_cast<unsigned char>(c) < 0x20 || c == 0x7F; });
-  }
-  /// @brief Whether `password` can protect it: empty (open), or 8-63 printable ASCII characters for WPA2/WPA3.
-  /// The driver reads it as a C string, so a NUL would cut it short.
-  [[nodiscard]] constexpr bool IsValidAccessPointPassword(std::string_view password)
-  {
-    return password.empty() || (password.size() >= WiFiConstants::kPassphraseMinLength && password.size() <= WiFiConstants::kPassphraseMaxLength && OpenShock::StringIsPrintableAscii(password));
-  }
+  // The access point settings take effect the next time the captive portal starts.
   [[nodiscard]] std::string GetWiFiAccessPointSSID();
-  /// @brief Refuses an SSID IsValidAccessPointSSID rejects. Takes effect the next time the captive portal starts.
+  /// @brief Refuses an SSID AccessPoint::IsValidSSID rejects.
   bool SetWiFiAccessPointSSID(std::string ssid);
+  /// @brief Back to the default name (CONFIG_OPENSHOCK_FW_AP_PREFIX, broadcast with the hub's MAC appended).
+  bool ResetWiFiAccessPointSSID();
   [[nodiscard]] std::string GetWiFiAccessPointPassword();
-  /// @brief Refuses a password IsValidAccessPointPassword rejects. Takes effect the next time the captive portal starts.
+  /// @brief Refuses a password AccessPoint::IsValidPassword rejects. Empty makes the access point open.
   bool SetWiFiAccessPointPassword(std::string password);
+  /// @brief Back to the build's default password (CONFIG_OPENSHOCK_FW_AP_PASSWORD), as a factory reset does.
+  bool ResetWiFiAccessPointPassword();
   [[nodiscard]] std::string GetWiFiHostname();
   bool SetWiFiHostname(std::string hostname);
 }  // namespace OpenShock::Config

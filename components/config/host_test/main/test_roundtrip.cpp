@@ -344,3 +344,16 @@ TEST_CASE("Access point setters refuse what WPA2 can't use", "[config][roundtrip
   Reload();
   TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
 }
+
+TEST_CASE("Access point resets restore the build defaults", "[config][roundtrip]")
+{
+  InitDefault();
+
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointSSID("MyHubAP"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("ap-s3cret!"));
+  TEST_ASSERT_TRUE(Config::ResetWiFiAccessPointSSID());
+  TEST_ASSERT_TRUE(Config::ResetWiFiAccessPointPassword());
+  Reload();
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
+}

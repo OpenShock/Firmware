@@ -7,6 +7,7 @@
 #include "config_test_helpers.h"
 
 #include "BoardDescriptor.h"
+#include "wifi/AccessPoint.h"
 
 #include <nvs_flash.h>
 
@@ -299,7 +300,7 @@ TEST_CASE("A stored access point password that is not printable ASCII falls back
   Reload();
 
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
-  TEST_ASSERT_FALSE(Config::IsValidAccessPointPassword(std::string("abc\0defgh", 9)));
+  TEST_ASSERT_FALSE(AccessPoint::IsValidPassword(std::string("abc\0defgh", 9)));
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword("caf\xC3\xA9-latte"));
   TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("correct horse battery"));
 }
@@ -319,5 +320,5 @@ TEST_CASE("A stored access point SSID with '|' falls back to the default", "[con
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My|Hub"));
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My\r\nHub"));
   TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My\tHub"));
-  TEST_ASSERT_TRUE(Config::IsValidAccessPointSSID("Caf\xC3\xA9 Hub"));
+  TEST_ASSERT_TRUE(AccessPoint::IsValidSSID("Caf\xC3\xA9 Hub"));
 }

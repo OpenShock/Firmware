@@ -19,6 +19,7 @@ const char* const TAG = "CaptivePortalApi";
 #include "OtaUpdateConfig.h"
 #include "RateLimiter.h"
 #include "util/TaskUtils.h"
+#include "wifi/AccessPoint.h"
 #include "wifi/WiFiConfig.h"
 #include "wifi/WiFiConstants.h"
 #include "wifi/WiFiManager.h"
@@ -402,18 +403,23 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
   }
 
+  bool resetSsid = false;
   std::optional<std::string> ssid;
   auto ssidParam = getFormParam(*body, "ssid");
   if (!ssidParam && ssidParam.error() != ParamError::Missing) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_SSID);
   }
   if (ssidParam) {
-    ssid = ssidParam->empty() ? std::string(CONFIG_OPENSHOCK_FW_AP_PREFIX) : std::move(*ssidParam);
-    if (!Config::IsValidAccessPointSSID(*ssid)) {
+    if (ssidParam->empty()) {
+      resetSsid = true;
+    } else if (!AccessPoint::IsValidSSID(*ssidParam)) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_SSID);
+    } else {
+      ssid = std::move(*ssidParam);
     }
   }
 
+  bool resetPassword = false;
   std::optional<std::string> password;
   auto protection = getFormParam(*body, "protection");
   if (!protection && protection.error() != ParamError::Missing) {
@@ -421,7 +427,7 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
   }
   if (protection) {
     if (*protection == "default") {
-      password = std::string(CONFIG_OPENSHOCK_FW_AP_PASSWORD);
+      resetPassword = true;
     } else if (*protection == "open") {
       password = std::string();
     } else if (*protection == "custom") {
@@ -435,7 +441,7 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
       if (passwordParam->length() > WiFiConstants::kPassphraseMaxLength) {
         return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_LONG);
       }
-      if (!Config::IsValidAccessPointPassword(*passwordParam)) {
+      if (!AccessPoint::IsValidPassword(*passwordParam)) {
         return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_PASS);
       }
       password = std::move(*passwordParam);
@@ -444,15 +450,26 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
     }
   }
 
-  if (!ssid && !password) {
+  if (!resetSsid && !ssid && !resetPassword && !password) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
   }
 
   // Both passed the checks above, so a refusal here is the config store failing to save
-  if (ssid && !Config::SetWiFiAccessPointSSID(std::move(*ssid))) {
+  bool saved = true;
+  if (resetSsid) {
+    saved = Config::ResetWiFiAccessPointSSID();
+  } else if (ssid) {
+    saved = Config::SetWiFiAccessPointSSID(std::move(*ssid));
+  }
+  if (!saved) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
-  if (password && !Config::SetWiFiAccessPointPassword(std::move(*password))) {
+  if (resetPassword) {
+    saved = Config::ResetWiFiAccessPointPassword();
+  } else if (password) {
+    saved = Config::SetWiFiAccessPointPassword(std::move(*password));
+  }
+  if (!saved) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
   return sendResp(req, S200, nullptr, {});
