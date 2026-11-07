@@ -11,5 +11,5 @@ The portal's network is now protected by default with the password `openshock`, 
 - Use the stored `wifi.accessPointSSID` for the access point; it was saved but never applied. The default name still gets the hub's MAC appended
 - Add `wifi.accessPointPassword` (NVS key `ap_pass` in `wifi.cfg`, exported in jsonconfig only with sensitive data): defaulting to the new Kconfig option `OPENSHOCK_FW_AP_PASSWORD` (`openshock`, checked at compile time), empty for an open network, else 8-63 printable ASCII characters, with WPA2/WPA3-PSK transition mode (WPA3 clients use SAE, WPA2 clients still connect)
 - Add the `ap` serial command: `ap` shows the name and whether it is protected, `ap ssid <name|default>`, `ap password <password|default>` and `ap open`
-- Add `PUT /api/ap` to the captive portal API (form body: `ssid`, empty for the default; `protection` `default`, `open` or `custom` with `password`), and the access point's name and protection, never its password, to the portal's Ready message
+- Add `PUT /api/ap` to the captive portal API (form body: `ssid`, empty for the default; `protection` `default`, `open` or `custom` with `password`; answers with the saved `ssid` and `protection`), and the access point's name and protection, never its password, to the portal's Ready message
 - Changes apply the next time the captive portal starts

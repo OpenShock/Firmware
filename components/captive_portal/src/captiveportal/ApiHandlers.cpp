@@ -396,6 +396,36 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
 //   password=<8-63 printable ASCII>  with protection=custom
 // Applied the next time the captive portal starts: applying it now would drop the client that asked, which is most
 // likely on this access point.
+//
+// Answers {"ssid": <name, "" for the default>, "protection": "default"|"open"|"custom"} as the hub reads the saved
+// settings, since a name equal to the bare prefix or a password equal to the build's default are the defaults.
+static esp_err_t sendAccessPointSettings(httpd_req_t* req)
+{
+  std::string ssid     = Config::GetWiFiAccessPointSSID();
+  std::string password = Config::GetWiFiAccessPointPassword();
+
+  const char* protection = "custom";
+  switch (AccessPoint::ProtectionOf(password)) {
+    case AccessPoint::Protection::Open:
+      protection = "open";
+      break;
+    case AccessPoint::Protection::DefaultPassword:
+      protection = "default";
+      break;
+    case AccessPoint::Protection::CustomPassword:
+      break;
+  }
+
+  OpenShock::JSON::StringWriter writer;
+  json_gen_str_t* gen = writer.gen();
+  json_gen_start_object(gen);
+  OpenShock::JSON::objSetString(gen, "ssid", AccessPoint::IsDefaultSSID(ssid) ? std::string_view() : std::string_view(ssid));
+  OpenShock::JSON::objSetString(gen, "protection", protection);
+  json_gen_end_object(gen);
+  std::string json = writer.finish();
+  return sendResp(req, S200, HTTP::ContentType::JSON, json);
+}
+
 static esp_err_t apiAccessPoint(httpd_req_t* req)
 {
   auto body = recvBody(req);
@@ -472,7 +502,7 @@ static esp_err_t apiAccessPoint(httpd_req_t* req)
   if (!saved) {
     return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
   }
-  return sendResp(req, S200, nullptr, {});
+  return sendAccessPointSettings(req);
 }
 
 void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInstance* instance)

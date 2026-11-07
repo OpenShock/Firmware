@@ -308,8 +308,11 @@ export interface AccessPointChange {
   password?: string; // With protection 'custom'
 }
 
-// The captive portal's access point (PUT /api/ap). Saved at once, applied the next time the portal starts. On success
-// the change is mirrored into hubState.config, which is otherwise only sent once on connect.
+const _protectionKinds: readonly AccessPointConfig['protection'][] = ['default', 'open', 'custom'];
+
+// The captive portal's access point (PUT /api/ap). Saved at once, applied the next time the portal starts. The hub
+// answers with the settings as it reads them (a name equal to the bare prefix is the default, and so is the build's
+// default password), which replace them in hubState.config, otherwise only sent once on connect.
 export async function setAccessPoint(change: AccessPointChange): Promise<boolean> {
   const params = new URLSearchParams();
   if (change.ssid !== undefined) params.set('ssid', change.ssid);
@@ -328,8 +331,9 @@ export async function setAccessPoint(change: AccessPointChange): Promise<boolean
     }
     const ap = hubState.config?.accessPoint;
     if (ap) {
-      if (change.ssid !== undefined) ap.ssid = change.ssid || null;
-      if (change.protection !== undefined) ap.protection = change.protection;
+      const data = await res.json();
+      if (typeof data.ssid === 'string') ap.ssid = data.ssid || null;
+      if (_protectionKinds.includes(data.protection)) ap.protection = data.protection;
     }
     return true;
   } catch {

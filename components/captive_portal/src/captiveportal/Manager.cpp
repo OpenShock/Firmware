@@ -88,6 +88,8 @@ enum {
   CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH,
 };
 static SemaphoreHandle_t s_loopFlushed = nullptr;
+static std::atomic<uint32_t> s_loopFlushSeen {0};  // the latest marker the loop has handled
+static uint32_t s_loopFlushPosted = 0;             // markers posted so far; manager task only
 
 static_assert(IPv4Utils::IsSlash24Host(CONFIG_OPENSHOCK_PORTAL_AP_IP), "CONFIG_OPENSHOCK_PORTAL_AP_IP must be a dotted-decimal IPv4 address with a host octet of 1-254");
 
@@ -160,19 +162,31 @@ static void captiveportal_onapstart(void*, esp_event_base_t, int32_t, void*)
   xSemaphoreGive(s_apStarted);
 }
 
-static void captiveportal_onloopflush(void*, esp_event_base_t, int32_t, void*)
+static void captiveportal_onloopflush(void*, esp_event_base_t, int32_t, void* data)
 {
+  s_loopFlushSeen.store(*static_cast<const uint32_t*>(data));
   xSemaphoreGive(s_loopFlushed);
 }
 
 // Waits until the default event loop has handled everything posted to it before this call
 static bool waitForEventLoop(TickType_t timeout)
 {
-  xSemaphoreTake(s_loopFlushed, 0);  // drop a flush left over from an earlier call that timed out
-  if (esp_event_post(CAPTIVEPORTAL_PRIVATE_EVENTS, CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH, nullptr, 0, timeout) != ESP_OK) {
+  // Each call posts its own marker and waits for that one: a marker left over from a call that timed out can still be
+  // handled later, and must not pass for this call's.
+  uint32_t marker = ++s_loopFlushPosted;
+  xSemaphoreTake(s_loopFlushed, 0);
+  if (esp_event_post(CAPTIVEPORTAL_PRIVATE_EVENTS, CAPTIVEPORTAL_PRIVATE_EVENT_LOOP_FLUSH, &marker, sizeof(marker), timeout) != ESP_OK) {
     return false;
   }
-  return xSemaphoreTake(s_loopFlushed, timeout) == pdTRUE;
+
+  TickType_t deadline = xTaskGetTickCount() + timeout;
+  while (static_cast<int32_t>(s_loopFlushSeen.load() - marker) < 0) {
+    TickType_t remaining = deadline - xTaskGetTickCount();
+    if (static_cast<int32_t>(remaining) <= 0 || xSemaphoreTake(s_loopFlushed, remaining) != pdTRUE) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // The settings are validated by the wifi section (Normalize), so they fit the driver's fields

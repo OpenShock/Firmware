@@ -49,7 +49,10 @@
 
   let ssidError = $derived(accessPointSsidError(ssid.trim()));
 
-  let ssidChanged = $derived(ap != null && ssid.trim() !== (ap.ssid ?? ''));
+  // Compared untrimmed too: a saved name of only spaces is not changed by leaving it alone
+  let ssidChanged = $derived(
+    ap != null && ssid !== (ap.ssid ?? '') && ssid.trim() !== (ap.ssid ?? '')
+  );
   let protectionChanged = $derived(ap != null && protection !== ap.protection);
   // Choosing your own password again with a new one typed in changes it; left empty it keeps the current one
   let passwordChanged = $derived(protection === 'custom' && password.length > 0);
