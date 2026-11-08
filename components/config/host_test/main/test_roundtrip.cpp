@@ -31,6 +31,8 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   const uint8_t bssid[6] = {0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc};
   TEST_ASSERT_TRUE(Config::PinWiFiCredentialsBSSID(1, bssid));
   TEST_ASSERT_TRUE(Config::SetWiFiHostname("my-hub"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointSSID("MyHubAP"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("ap-s3cret!"));
   TEST_ASSERT_TRUE(Config::SetCaptivePortalConfig(Config::CaptivePortalConfig(true)));
   TEST_ASSERT_TRUE(Config::SetBackendDomain("api.example.org"));
   TEST_ASSERT_TRUE(Config::SetBackendAuthToken("tok_0123456789abcdef"));
@@ -46,6 +48,8 @@ TEST_CASE("Values set through the Config API survive a reload", "[config][roundt
   Reload();
   AssertConfigEqual(before, Snapshot());
 
+  TEST_ASSERT_EQUAL_STRING("MyHubAP", Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_EQUAL_STRING("ap-s3cret!", Config::GetWiFiAccessPointPassword().c_str());
   TEST_ASSERT_TRUE(Config::HasBackendAuthToken());
   TEST_ASSERT_EQUAL_STRING("tok_0123456789abcdef", Config::GetBackendAuthToken().c_str());
 
@@ -266,9 +270,12 @@ TEST_CASE("GetAsJSON without sensitive data omits secrets", "[config][roundtrip]
 
   TEST_ASSERT_NOT_EQUAL(std::string::npos, full.find("hunter22"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, full.find("tok_0123456789abcdef"));
+  TEST_ASSERT_NOT_EQUAL(std::string::npos, full.find("ap-s3cret!"));
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("hunter22"));
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("password"));
   TEST_ASSERT_EQUAL(std::string::npos, redacted.find("authToken"));
+  TEST_ASSERT_EQUAL(std::string::npos, redacted.find("accessPointPassword"));
+  TEST_ASSERT_EQUAL(std::string::npos, redacted.find("ap-s3cret!"));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"HomeNet\""));
   TEST_ASSERT_NOT_EQUAL(std::string::npos, redacted.find("\"api.example.org\""));
 }
@@ -318,4 +325,35 @@ TEST_CASE("Factory reset wipes every setting and survives a reload", "[config][r
   AssertConfigEqual(Full(), Snapshot());
   Reload();
   AssertConfigEqual(Full(), Snapshot());
+}
+
+TEST_CASE("Access point setters refuse what WPA2 can't use", "[config][roundtrip]")
+{
+  InitDefault();
+
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID(""));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID(std::string(33, 'a')));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword("1234567"));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword(std::string(64, 'a')));
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
+
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("12345678"));
+  TEST_ASSERT_EQUAL_STRING("12345678", Config::GetWiFiAccessPointPassword().c_str());
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword(""));  // back to an open access point
+  Reload();
+  TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
+}
+
+TEST_CASE("Access point resets restore the build defaults", "[config][roundtrip]")
+{
+  InitDefault();
+
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointSSID("MyHubAP"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("ap-s3cret!"));
+  TEST_ASSERT_TRUE(Config::ResetWiFiAccessPointSSID());
+  TEST_ASSERT_TRUE(Config::ResetWiFiAccessPointPassword());
+  Reload();
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
 }

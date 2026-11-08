@@ -19,6 +19,9 @@ const char* const TAG = "CaptivePortalApi";
 #include "OtaUpdateConfig.h"
 #include "RateLimiter.h"
 #include "util/TaskUtils.h"
+#include "wifi/AccessPoint.h"
+#include "wifi/WiFiConfig.h"
+#include "wifi/WiFiConstants.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -43,6 +46,8 @@ static const char* const JSON_ERR_PASSWORD_LONG   = "{\"error\":\"PasswordTooLon
 static const char* const JSON_ERR_CODE_REQUIRED   = "{\"error\":\"CodeRequired\"}";
 static const char* const JSON_ERR_INVALID_CHANNEL = "{\"error\":\"InvalidChannel\"}";
 static const char* const JSON_ERR_RATE_LIMITED    = "{\"error\":\"RateLimited\"}";
+static const char* const JSON_ERR_INVALID_AP_SSID = "{\"error\":\"InvalidApSsid\"}";
+static const char* const JSON_ERR_INVALID_AP_PASS = "{\"error\":\"InvalidApPassword\"}";
 
 using namespace OpenShock;
 using namespace OpenShock::CaptivePortal;
@@ -227,7 +232,7 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   if (!ssid && ssid.error() == ParamError::Invalid) {
     return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_SSID);
   }
-  if (!ssid || ssid->empty() || ssid->length() > 32) {
+  if (!ssid || ssid->empty() || ssid->length() > WiFiConstants::kSsidMaxLength) {
     return sendResp(req, S400, HTTP::ContentType::JSON, !ssid || ssid->empty() ? JSON_ERR_MISSING_SSID : JSON_ERR_INVALID_SSID);
   }
 
@@ -238,10 +243,10 @@ static esp_err_t apiWifiNetworksAdd(httpd_req_t* req)
   }
   std::string password = std::move(passwordParam).value_or(std::string());
   if (!password.empty()) {
-    if (password.length() < 8) {
+    if (password.length() < WiFiConstants::kPassphraseMinLength) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_SHORT);
     }
-    if (password.length() > 63) {
+    if (password.length() > WiFiConstants::kPassphraseMaxLength) {
       return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_LONG);
     }
   }
@@ -385,6 +390,121 @@ static esp_err_t apiOtaCheck(httpd_req_t* req)
   return sendResp(req, S200, nullptr, {});
 }
 
+// PUT /api/ap, form body: any of
+//   ssid=<name>                      the access point's name; empty for the default (the prefix with the hub's MAC)
+//   protection=default|open|custom   the build's default password, none, or `password`
+//   password=<8-63 printable ASCII>  with protection=custom
+// Applied the next time the captive portal starts: applying it now would drop the client that asked, which is most
+// likely on this access point.
+//
+// Answers {"ssid": <name, "" for the default>, "protection": "default"|"open"|"custom"} as the hub reads the saved
+// settings, since a name equal to the bare prefix or a password equal to the build's default are the defaults.
+static esp_err_t sendAccessPointSettings(httpd_req_t* req)
+{
+  std::string ssid     = Config::GetWiFiAccessPointSSID();
+  std::string password = Config::GetWiFiAccessPointPassword();
+
+  const char* protection = "custom";
+  switch (AccessPoint::ProtectionOf(password)) {
+    case AccessPoint::Protection::Open:
+      protection = "open";
+      break;
+    case AccessPoint::Protection::DefaultPassword:
+      protection = "default";
+      break;
+    case AccessPoint::Protection::CustomPassword:
+      break;
+  }
+
+  OpenShock::JSON::StringWriter writer;
+  json_gen_str_t* gen = writer.gen();
+  json_gen_start_object(gen);
+  OpenShock::JSON::objSetString(gen, "ssid", AccessPoint::IsDefaultSSID(ssid) ? std::string_view() : std::string_view(ssid));
+  OpenShock::JSON::objSetString(gen, "protection", protection);
+  json_gen_end_object(gen);
+  std::string json = writer.finish();
+  return sendResp(req, S200, HTTP::ContentType::JSON, json);
+}
+
+static esp_err_t apiAccessPoint(httpd_req_t* req)
+{
+  auto body = recvBody(req);
+  if (!body) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  }
+
+  bool resetSsid = false;
+  std::optional<std::string> ssid;
+  auto ssidParam = getFormParam(*body, "ssid");
+  if (!ssidParam && ssidParam.error() != ParamError::Missing) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_SSID);
+  }
+  if (ssidParam) {
+    if (ssidParam->empty()) {
+      resetSsid = true;
+    } else if (!AccessPoint::IsValidSSID(*ssidParam)) {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_SSID);
+    } else {
+      ssid = std::move(*ssidParam);
+    }
+  }
+
+  bool resetPassword = false;
+  std::optional<std::string> password;
+  auto protection = getFormParam(*body, "protection");
+  if (!protection && protection.error() != ParamError::Missing) {
+    return sendParamError(req, protection.error());
+  }
+  if (protection) {
+    if (*protection == "default") {
+      resetPassword = true;
+    } else if (*protection == "open") {
+      password = std::string();
+    } else if (*protection == "custom") {
+      auto passwordParam = getFormParam(*body, "password");
+      if (!passwordParam) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, passwordParam.error() == ParamError::Missing ? JSON_ERR_PASSWORD_SHORT : JSON_ERR_INVALID_AP_PASS);
+      }
+      if (passwordParam->length() < WiFiConstants::kPassphraseMinLength) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_SHORT);
+      }
+      if (passwordParam->length() > WiFiConstants::kPassphraseMaxLength) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_PASSWORD_LONG);
+      }
+      if (!AccessPoint::IsValidPassword(*passwordParam)) {
+        return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_AP_PASS);
+      }
+      password = std::move(*passwordParam);
+    } else {
+      return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_INVALID_PARAM);
+    }
+  }
+
+  if (!resetSsid && !ssid && !resetPassword && !password) {
+    return sendResp(req, S400, HTTP::ContentType::JSON, JSON_ERR_MISSING_PARAM);
+  }
+
+  // Both passed the checks above, so a refusal here is the config store failing to save
+  bool saved = true;
+  if (resetSsid) {
+    saved = Config::ResetWiFiAccessPointSSID();
+  } else if (ssid) {
+    saved = Config::SetWiFiAccessPointSSID(std::move(*ssid));
+  }
+  if (!saved) {
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+  if (resetPassword) {
+    saved = Config::ResetWiFiAccessPointPassword();
+  } else if (password) {
+    saved = Config::SetWiFiAccessPointPassword(std::move(*password));
+  }
+  if (!saved) {
+    return sendResp(req, S500, HTTP::ContentType::JSON, JSON_ERR_INTERNAL);
+  }
+  return sendAccessPointSettings(req);
+}
+
 void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInstance* instance)
 {
   registerHandler<apiBoard>(server, "/api/board", HTTP_GET, instance);
@@ -402,4 +522,5 @@ void CaptivePortal::RegisterApiHandlers(httpd_handle_t server, CaptivePortalInst
   // changing it would let anyone in range install firmware. It can only be changed over serial (jsonconfig).
   registerHandler<apiOtaSettings>(server, "/api/ota/settings", HTTP_PUT, instance);
   registerHandler<apiOtaCheck>(server, "/api/ota/check", HTTP_POST, instance);
+  registerHandler<apiAccessPoint>(server, "/api/ap", HTTP_PUT, instance);
 }

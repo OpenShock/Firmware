@@ -7,6 +7,7 @@
 #include "config_test_helpers.h"
 
 #include "BoardDescriptor.h"
+#include "wifi/AccessPoint.h"
 
 #include <nvs_flash.h>
 
@@ -40,6 +41,7 @@ TEST_CASE("Default values come from Kconfig and the board descriptor", "[config]
   TEST_ASSERT_EQUAL_INT(OPENSHOCK_RF_TX_GPIO, config.rf.txPin);
   TEST_ASSERT_TRUE(config.rf.keepAliveEnabled);
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, config.wifi.accessPointSSID.c_str());
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, config.wifi.accessPointPassword.c_str());
   TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_HOSTNAME, config.wifi.hostname.c_str());
   TEST_ASSERT_TRUE(config.wifi.credentialsList.empty());
   TEST_ASSERT_FALSE(config.captivePortal.alwaysEnabled);
@@ -256,4 +258,67 @@ TEST_CASE("jsonconfig set requires the wifi credentials array when wifi is given
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub"}})"));
   TEST_ASSERT_FALSE(Config::SaveFromJSON(R"({"wifi":{"hostname":"my-hub","credentials":{}}})"));
   TEST_ASSERT_EQUAL_size_t(before, UsedEntries());
+}
+
+TEST_CASE("A stored access point password WPA2 can't use falls back to the default", "[config][defaults]")
+{
+  WipeStore();
+  {
+    auto wifi = Open(Keys::Ns::kWifiCfg);
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_ssid", "MyHubAP"));
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_pass", "short"));  // under WPA2's 8 characters
+    TEST_ASSERT_TRUE(wifi.Commit());
+  }
+  Reload();
+
+  TEST_ASSERT_EQUAL_STRING("MyHubAP", Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
+}
+
+TEST_CASE("An open access point stays open across a reload", "[config][defaults]")
+{
+  WipeStore();
+  {
+    auto wifi = Open(Keys::Ns::kWifiCfg);
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_pass", ""));  // stored empty, not missing
+    TEST_ASSERT_TRUE(wifi.Commit());
+  }
+  Reload();
+
+  TEST_ASSERT_TRUE(Config::GetWiFiAccessPointPassword().empty());
+}
+
+TEST_CASE("A stored access point password that is not printable ASCII falls back to the default", "[config][defaults]")
+{
+  // The driver reads the password as a C string, so a NUL would cut it short.
+  WipeStore();
+  {
+    auto wifi = Open(Keys::Ns::kWifiCfg);
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_pass", "pass\tword"));
+    TEST_ASSERT_TRUE(wifi.Commit());
+  }
+  Reload();
+
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PASSWORD, Config::GetWiFiAccessPointPassword().c_str());
+  TEST_ASSERT_FALSE(AccessPoint::IsValidPassword(std::string("abc\0defgh", 9)));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointPassword("caf\xC3\xA9-latte"));
+  TEST_ASSERT_TRUE(Config::SetWiFiAccessPointPassword("correct horse battery"));
+}
+
+TEST_CASE("A stored access point SSID with '|' falls back to the default", "[config][defaults]")
+{
+  // `ap` prints the SSID as a '|'-separated field.
+  WipeStore();
+  {
+    auto wifi = Open(Keys::Ns::kWifiCfg);
+    TEST_ASSERT_TRUE(wifi.SetStr("ap_ssid", "My|Hub"));
+    TEST_ASSERT_TRUE(wifi.Commit());
+  }
+  Reload();
+
+  TEST_ASSERT_EQUAL_STRING(CONFIG_OPENSHOCK_FW_AP_PREFIX, Config::GetWiFiAccessPointSSID().c_str());
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My|Hub"));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My\r\nHub"));
+  TEST_ASSERT_FALSE(Config::SetWiFiAccessPointSSID("My\tHub"));
+  TEST_ASSERT_TRUE(AccessPoint::IsValidSSID("Caf\xC3\xA9 Hub"));
 }
