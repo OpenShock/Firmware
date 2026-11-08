@@ -1,9 +1,9 @@
 <script lang="ts" module>
-  import { Wifi, Zap, Cpu, User, Download, Lightbulb } from '@lucide/svelte';
+  import { Wifi, Zap, Cpu, User, Download, RadioTower, Lightbulb } from '@lucide/svelte';
   import type { Component } from 'svelte';
 
   export type AdvancedSection =
-    'menu' | 'wifi' | 'shocker' | 'hardware' | 'account' | 'ota' | 'leds';
+    'menu' | 'wifi' | 'accesspoint' | 'shocker' | 'hardware' | 'account' | 'ota' | 'leds';
 
   interface AdvancedSectionDef {
     id: AdvancedSection;
@@ -15,6 +15,12 @@
 
   const advancedSections: AdvancedSectionDef[] = [
     { id: 'wifi', label: 'WiFi', description: 'Network configuration', icon: Wifi },
+    {
+      id: 'accesspoint',
+      label: 'Access Point',
+      description: "This portal's network name and password",
+      icon: RadioTower,
+    },
     { id: 'shocker', label: 'Shocker', description: 'Test your shockers', icon: Zap },
     { id: 'hardware', label: 'Hardware', description: 'GPIO pin configuration', icon: Cpu },
     { id: 'account', label: 'Account', description: 'Link to OpenShock', icon: User },
@@ -29,6 +35,7 @@
   import TestStep from '#lib/components/steps/TestStep.svelte';
   import WiFiStep from '#lib/components/steps/WiFiStep.svelte';
   import OtaSection from '#lib/components/sections/OtaSection.svelte';
+  import AccessPointSection from '#lib/components/sections/AccessPointSection.svelte';
   import LedSection from '#lib/components/sections/LedSection.svelte';
   import SectionHeader from '#lib/components/SectionHeader.svelte';
   import { hubState, ViewModeStore } from '#lib/stores/index.js';
@@ -116,6 +123,8 @@
       <div class="flex-1 rounded-lg border p-4 md:flex-none md:p-6">
         {#if shownSection === 'wifi'}
           <WiFiStep />
+        {:else if shownSection === 'accesspoint'}
+          <AccessPointSection />
         {:else if shownSection === 'shocker'}
           <TestStep />
         {:else if shownSection === 'hardware'}

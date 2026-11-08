@@ -16,6 +16,7 @@ namespace OpenShock::SerialCmds::CommandHandlers {
   OpenShock::SerialCmds::CommandGroup AuthTokenHandler();
   OpenShock::SerialCmds::CommandGroup HostnameHandler();
   OpenShock::SerialCmds::CommandGroup NetworksHandler();
+  OpenShock::SerialCmds::CommandGroup AccessPointHandler();
   OpenShock::SerialCmds::CommandGroup KeepAliveHandler();
   OpenShock::SerialCmds::CommandGroup JsonConfigHandler();
   OpenShock::SerialCmds::CommandGroup RfTransmitHandler();
@@ -38,6 +39,7 @@ namespace OpenShock::SerialCmds::CommandHandlers {
       AuthTokenHandler(),
       HostnameHandler(),
       NetworksHandler(),
+      AccessPointHandler(),
       KeepAliveHandler(),
       JsonConfigHandler(),
       RfTransmitHandler(),

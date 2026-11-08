@@ -17,6 +17,7 @@ TEST_CASE("StringTrim variants", "[common][strhelpers]")
   TEST_ASSERT_TRUE(StringTrim("   ") == "");
   TEST_ASSERT_TRUE(StringTrim("nospace") == "nospace");
   TEST_ASSERT_TRUE(StringTrim("\t\n x \r\n") == "x");
+  static_assert(StringTrim(" x ") == "x");
 }
 
 TEST_CASE("StringHasPrefix / HasSuffix", "[common][strhelpers]")
@@ -79,6 +80,17 @@ TEST_CASE("StringIContains / StringHasPrefixIC", "[common][strhelpers]")
   TEST_ASSERT_FALSE(StringIContains("Hello", "xyz"));
   TEST_ASSERT_TRUE(StringHasPrefixIC("HELLO", "hel"));
   TEST_ASSERT_FALSE(StringHasPrefixIC("hello", "world"));
+}
+
+TEST_CASE("StringIsPrintableAscii", "[common][strhelpers]")
+{
+  TEST_ASSERT_TRUE(StringIsPrintableAscii(""));
+  TEST_ASSERT_TRUE(StringIsPrintableAscii(" correct horse ~battery!"));
+  TEST_ASSERT_FALSE(StringIsPrintableAscii("tab\there"));
+  TEST_ASSERT_FALSE(StringIsPrintableAscii(std::string_view("nul\0byte", 8)));
+  TEST_ASSERT_FALSE(StringIsPrintableAscii("del\x7F"));
+  TEST_ASSERT_FALSE(StringIsPrintableAscii("caf\xC3\xA9"));  // UTF-8, so bytes >= 0x80 on a signed char
+  static_assert(StringIsPrintableAscii("abc"));
 }
 
 TEST_CASE("StringTrimRight on all-whitespace input", "[util][string]")

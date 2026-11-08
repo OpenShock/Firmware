@@ -25,6 +25,9 @@ namespace Local {
 struct OtaSettings;
 struct OtaSettingsBuilder;
 
+struct AccessPointSettings;
+struct AccessPointSettingsBuilder;
+
 struct LedSettings;
 struct LedSettingsBuilder;
 
@@ -101,6 +104,39 @@ inline const char *EnumNameOtaChannel(OtaChannel e) {
   if (::flatbuffers::IsOutRange(e, OtaChannel::Stable, OtaChannel::Develop)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesOtaChannel()[index];
+}
+
+enum class AccessPointProtection : uint8_t {
+  Open = 0,
+  DefaultPassword = 1,
+  CustomPassword = 2,
+  MIN = Open,
+  MAX = CustomPassword
+};
+
+inline const AccessPointProtection (&EnumValuesAccessPointProtection())[3] {
+  static const AccessPointProtection values[] = {
+    AccessPointProtection::Open,
+    AccessPointProtection::DefaultPassword,
+    AccessPointProtection::CustomPassword
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesAccessPointProtection() {
+  static const char * const names[4] = {
+    "Open",
+    "DefaultPassword",
+    "CustomPassword",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameAccessPointProtection(AccessPointProtection e) {
+  if (::flatbuffers::IsOutRange(e, AccessPointProtection::Open, AccessPointProtection::CustomPassword)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesAccessPointProtection()[index];
 }
 
 /// What the status LEDs show right now.
@@ -459,6 +495,96 @@ inline ::flatbuffers::Offset<OtaSettings> CreateOtaSettingsDirect(
       check_interval,
       allow_backend_management,
       require_manual_approval);
+}
+
+/// The captive portal's access point as configured. The password never leaves the hub.
+struct AccessPointSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef AccessPointSettingsBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.AccessPointSettings";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SSID = 4,
+    VT_DEFAULT_SSID = 6,
+    VT_PROTECTION = 8
+  };
+  /// The name set for it; empty for the default, which is default_ssid.
+  const ::flatbuffers::String *ssid() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_SSID);
+  }
+  /// The default name: the prefix with this hub's MAC.
+  const ::flatbuffers::String *default_ssid() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DEFAULT_SSID);
+  }
+  OpenShock::Serialization::Local::AccessPointProtection protection() const {
+    return static_cast<OpenShock::Serialization::Local::AccessPointProtection>(GetField<uint8_t>(VT_PROTECTION, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_SSID) &&
+           verifier.VerifyString(ssid()) &&
+           VerifyOffset(verifier, VT_DEFAULT_SSID) &&
+           verifier.VerifyString(default_ssid()) &&
+           VerifyField<uint8_t>(verifier, VT_PROTECTION, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct AccessPointSettingsBuilder {
+  typedef AccessPointSettings Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_ssid(::flatbuffers::Offset<::flatbuffers::String> ssid) {
+    fbb_.AddOffset(AccessPointSettings::VT_SSID, ssid);
+  }
+  void add_default_ssid(::flatbuffers::Offset<::flatbuffers::String> default_ssid) {
+    fbb_.AddOffset(AccessPointSettings::VT_DEFAULT_SSID, default_ssid);
+  }
+  void add_protection(OpenShock::Serialization::Local::AccessPointProtection protection) {
+    fbb_.AddElement<uint8_t>(AccessPointSettings::VT_PROTECTION, static_cast<uint8_t>(protection), 0);
+  }
+  explicit AccessPointSettingsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<AccessPointSettings> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<AccessPointSettings>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<AccessPointSettings> CreateAccessPointSettings(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> ssid = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> default_ssid = 0,
+    OpenShock::Serialization::Local::AccessPointProtection protection = OpenShock::Serialization::Local::AccessPointProtection::Open) {
+  AccessPointSettingsBuilder builder_(_fbb);
+  builder_.add_default_ssid(default_ssid);
+  builder_.add_ssid(ssid);
+  builder_.add_protection(protection);
+  return builder_.Finish();
+}
+
+struct AccessPointSettings::Traits {
+  using type = AccessPointSettings;
+  static auto constexpr Create = CreateAccessPointSettings;
+};
+
+inline ::flatbuffers::Offset<AccessPointSettings> CreateAccessPointSettingsDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *ssid = nullptr,
+    const char *default_ssid = nullptr,
+    OpenShock::Serialization::Local::AccessPointProtection protection = OpenShock::Serialization::Local::AccessPointProtection::Open) {
+  auto ssid__ = ssid ? _fbb.CreateString(ssid) : 0;
+  auto default_ssid__ = default_ssid ? _fbb.CreateString(default_ssid) : 0;
+  return OpenShock::Serialization::Local::CreateAccessPointSettings(
+      _fbb,
+      ssid__,
+      default_ssid__,
+      protection);
 }
 
 /// The status LED settings the portal shows and edits. Only the LEDs the board has are present, so the portal shows
@@ -870,9 +996,10 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_ESTOP_GPIO_PIN = 20,
     VT_SAVED_SSIDS = 22,
     VT_OTA = 24,
-    VT_LED = 26,
-    VT_LED_STATUS = 28,
-    VT_CLIENT_ID = 30
+    VT_ACCESS_POINT = 26,
+    VT_LED = 28,
+    VT_LED_STATUS = 30,
+    VT_CLIENT_ID = 32
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -908,6 +1035,9 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Local::OtaSettings *ota() const {
     return GetPointer<const OpenShock::Serialization::Local::OtaSettings *>(VT_OTA);
   }
+  const OpenShock::Serialization::Local::AccessPointSettings *access_point() const {
+    return GetPointer<const OpenShock::Serialization::Local::AccessPointSettings *>(VT_ACCESS_POINT);
+  }
   const OpenShock::Serialization::Local::LedSettings *led() const {
     return GetPointer<const OpenShock::Serialization::Local::LedSettings *>(VT_LED);
   }
@@ -938,6 +1068,8 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyVectorOfStrings(saved_ssids()) &&
            VerifyOffset(verifier, VT_OTA) &&
            verifier.VerifyTable(ota()) &&
+           VerifyOffset(verifier, VT_ACCESS_POINT) &&
+           verifier.VerifyTable(access_point()) &&
            VerifyOffset(verifier, VT_LED) &&
            verifier.VerifyTable(led()) &&
            VerifyOffset(verifier, VT_LED_STATUS) &&
@@ -984,6 +1116,9 @@ struct ReadyMessageBuilder {
   void add_ota(::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota) {
     fbb_.AddOffset(ReadyMessage::VT_OTA, ota);
   }
+  void add_access_point(::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point) {
+    fbb_.AddOffset(ReadyMessage::VT_ACCESS_POINT, access_point);
+  }
   void add_led(::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led) {
     fbb_.AddOffset(ReadyMessage::VT_LED, led);
   }
@@ -1017,12 +1152,14 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     int8_t estop_gpio_pin = -1,
     ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> saved_ssids = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> led_status = 0,
     uint8_t client_id = 0) {
   ReadyMessageBuilder builder_(_fbb);
   builder_.add_led_status(led_status);
   builder_.add_led(led);
+  builder_.add_access_point(access_point);
   builder_.add_ota(ota);
   builder_.add_saved_ssids(saved_ssids);
   builder_.add_gpio_valid_outputs(gpio_valid_outputs);
@@ -1056,6 +1193,7 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
     int8_t estop_gpio_pin = -1,
     const std::vector<::flatbuffers::Offset<::flatbuffers::String>> *saved_ssids = nullptr,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> led_status = 0,
     uint8_t client_id = 0) {
@@ -1075,6 +1213,7 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
       estop_gpio_pin,
       saved_ssids__,
       ota,
+      access_point,
       led,
       led_status,
       client_id);
