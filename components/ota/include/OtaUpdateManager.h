@@ -20,7 +20,7 @@ namespace OpenShock::OtaUpdateManager {
   struct FirmwareRelease {
     std::string appBinaryUrl;
     uint8_t appBinaryHash[32];  // of the image, so it also checks what `appBinaryUrl` + ".gz" decompresses to
-    std::string wwwBinaryUrl;  // the `staticfs` artifact: the www image (www.bin)
+    std::string wwwBinaryUrl;   // the `staticfs` artifact: the www image (www.bin)
     uint8_t wwwBinaryHash[32];
   };
 

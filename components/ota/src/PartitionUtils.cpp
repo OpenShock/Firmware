@@ -48,7 +48,7 @@ bool OpenShock::FlashPartitionFromUrl(
   // Decided by the first byte of the body, when an inflater was handed in. Every test of it goes with kEnabled: the
   // compiler can't prove it stays false once the download callback has it by reference.
   bool gzip            = false;
-  int64_t inflateSpent = 0;      // us, excluding the flash work done from inside the inflater
+  int64_t inflateSpent = 0;  // us, excluding the flash work done from inside the inflater
 
   auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress, &spent](std::size_t size) -> bool {
     // A gzip body larger than the partition is not a sensible image either; the decompressed size is bounded by

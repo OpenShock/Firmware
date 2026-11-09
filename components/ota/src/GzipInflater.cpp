@@ -17,9 +17,9 @@ using namespace OpenShock;
 // out of the arena, so the arena must hold both: the window exactly, the state with some headroom since its size is
 // internal to zlib. The constructor checks the window still fits after init, so a short arena fails up front rather
 // than mid-download.
-static constexpr std::size_t kWindowSize    = std::size_t {1} << GzipInflater::kWindowBits;
-static constexpr std::size_t kStateReserve  = 8 * 1024;
-static constexpr std::size_t kArenaSize     = kStateReserve + kWindowSize;
+static constexpr std::size_t kWindowSize     = std::size_t {1} << GzipInflater::kWindowBits;
+static constexpr std::size_t kStateReserve   = 8 * 1024;
+static constexpr std::size_t kArenaSize      = kStateReserve + kWindowSize;
 static constexpr std::size_t kArenaAlignment = alignof(std::max_align_t);
 
 struct GzipInflater::Storage {
@@ -49,7 +49,9 @@ void* GzipInflater::zalloc(void* opaque, unsigned items, unsigned size)
   return storage->arena + start;
 }
 
-void GzipInflater::zfree(void* /*opaque*/, void* /*address*/) { }
+void GzipInflater::zfree(void* /*opaque*/, void* /*address*/)
+{
+}
 
 GzipInflater::GzipInflater() noexcept
   : m_storage(nullptr)
@@ -69,10 +71,10 @@ void GzipInflater::allocate() noexcept
     return;
   }
 
-  Storage* storage    = new (memory) Storage;
-  storage->arenaUsed  = 0;
-  storage->outputUsed = 0;
-  storage->stream     = {};
+  Storage* storage       = new (memory) Storage;
+  storage->arenaUsed     = 0;
+  storage->outputUsed    = 0;
+  storage->stream        = {};
   storage->stream.zalloc = &GzipInflater::zalloc;
   storage->stream.zfree  = &GzipInflater::zfree;
   storage->stream.opaque = storage;

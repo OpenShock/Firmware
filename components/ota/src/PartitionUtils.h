@@ -34,6 +34,6 @@ namespace OpenShock {
     const uint8_t (&remoteHash)[32],
     Util::FunctionRef<bool(std::size_t, std::size_t, float)> progressCallback,
     std::optional<Util::FunctionRef<bool(std::span<const uint8_t>)>> firstChunkCheck = std::nullopt,
-    GzipInflater* inflater                                                          = nullptr
+    GzipInflater* inflater                                                           = nullptr
   );
 }  // namespace OpenShock
