@@ -1,1 +1,8 @@
 blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/OpenShock/Firmware/security/advisories/new
+    about: Never report security vulnerabilities in public issues. Report them privately here, as described in SECURITY.md.
+  - name: Questions and support
+    url: https://discord.gg/OpenShock
+    about: Ask questions and get help from the community on Discord.

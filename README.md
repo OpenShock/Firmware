@@ -67,6 +67,14 @@ Building, flashing, testing and updating dependencies are covered in
 [docs/DEVELOPING.md](docs/DEVELOPING.md). You will need ESP-IDF v6.1, Python, Node with pnpm,
 and a compatible ESP32 board with a 433 MHz transmitter.
 
+The general rules for contributing to OpenShock are in the
+[organization-wide contributing guide](https://github.com/OpenShock/.github/blob/main/CONTRIBUTING.md).
+
+## Security
+
+Found a security vulnerability? **Please do not open a public issue.** Report it privately as
+described in [SECURITY.md](SECURITY.md).
+
 ## Support
 
 You can support the openshock dev team here: [Sponsor OpenShock](https://github.com/sponsors/OpenShock)

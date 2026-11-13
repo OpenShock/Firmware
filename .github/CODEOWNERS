@@ -1,0 +1,6 @@
+# Default owners: requested for review on every pull request.
+* @OpenShock/maintainer
+
+# Security policy and repository automation.
+/SECURITY.md       @OpenShock/maintainer
+/.github/          @OpenShock/maintainer
