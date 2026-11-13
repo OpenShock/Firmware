@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    "helpers:pinGitHubActionDigests",
+    "schedule:weekly"
+  ],
+  "minimumReleaseAge": "3 days",
+  "packageRules": [
+    {
+      "description": "One PR for all non-major npm updates",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm non-major"
+    },
+    {
+      "description": "One PR for all non-major Python updates",
+      "matchManagers": ["pip_requirements", "pep621"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python non-major"
+    },
+    {
+      "description": "One PR for all GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["action"],
+      "groupName": "github-actions"
+    },
+    {
+      "description": "pnpm overrides are security floors for transitive packages, not versions to bump",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["pnpm-workspace.overrides", "pnpm.overrides", "overrides"],
+      "enabled": false
+    },
+    {
+      "description": "Our own packages skip the release-age delay, as in pnpm-workspace.yaml",
+      "matchPackageNames": ["@openshock/**"],
+      "minimumReleaseAge": null
+    }
+  ]
+}

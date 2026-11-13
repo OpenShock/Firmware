@@ -30,7 +30,7 @@ NON_SOURCE = [
     re.compile(r'(^|/)\.gitkeep$'),
     re.compile(r'^\.claude/'),
     re.compile(r'^\.github/ISSUE_TEMPLATE/'),
-    re.compile(r'^\.github/dependabot\.yml$'),
+    re.compile(r'^renovate\.json$'),
     # Dev-only schema submodule and its codegen helpers; builds use the generated sources.
     re.compile(r'^schemas(/|$)'),
     re.compile(r'^scripts/(fetch_flatc\.py|generate_schemas\.py|flatc|flatc\.exe)$'),
