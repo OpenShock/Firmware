@@ -13,6 +13,7 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
               FLATBUFFERS_VERSION_REVISION == 19,
              "Non-compatible flatbuffers version included");
 
+#include "StatusLed_generated.h"
 #include "WifiNetwork_generated.h"
 #include "WifiNetworkEventType_generated.h"
 #include "WifiScanStatus_generated.h"
@@ -26,6 +27,21 @@ struct OtaSettingsBuilder;
 
 struct AccessPointSettings;
 struct AccessPointSettingsBuilder;
+
+struct LedSettings;
+struct LedSettingsBuilder;
+
+struct LedOverride;
+struct LedOverrideBuilder;
+
+struct LedStatus;
+struct LedStatusBuilder;
+
+struct LedOverrideEnded;
+struct LedOverrideEndedBuilder;
+
+struct LedRequestFailed;
+struct LedRequestFailedBuilder;
 
 struct ReadyMessage;
 struct ReadyMessageBuilder;
@@ -44,6 +60,12 @@ struct WifiGotIpEventBuilder;
 
 struct WifiLostIpEvent;
 struct WifiLostIpEventBuilder;
+
+struct LedSettingsChangedEvent;
+struct LedSettingsChangedEventBuilder;
+
+struct LedStatusEvent;
+struct LedStatusEventBuilder;
 
 struct AccountLinkStatusEvent;
 struct AccountLinkStatusEventBuilder;
@@ -117,6 +139,143 @@ inline const char *EnumNameAccessPointProtection(AccessPointProtection e) {
   return EnumNamesAccessPointProtection()[index];
 }
 
+/// What the status LEDs show right now.
+enum class LedShowing : uint8_t {
+  /// The hub's state, in LedStatus.pattern
+  Live = 0,
+  /// The hub's state, but the LED mode hides it, so the LEDs are dark
+  Hidden = 1,
+  /// A previewed pattern, in LedStatus.pattern
+  Pattern = 2,
+  /// A previewed color
+  Color = 3,
+  /// The LED test (serial console); overrides wait until it is done
+  Test = 4,
+  MIN = Live,
+  MAX = Test
+};
+
+inline const LedShowing (&EnumValuesLedShowing())[5] {
+  static const LedShowing values[] = {
+    LedShowing::Live,
+    LedShowing::Hidden,
+    LedShowing::Pattern,
+    LedShowing::Color,
+    LedShowing::Test
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLedShowing() {
+  static const char * const names[6] = {
+    "Live",
+    "Hidden",
+    "Pattern",
+    "Color",
+    "Test",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLedShowing(LedShowing e) {
+  if (::flatbuffers::IsOutRange(e, LedShowing::Live, LedShowing::Test)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLedShowing()[index];
+}
+
+enum class LedOverrideEnd : uint8_t {
+  /// Its owner sent nothing for it within its timeout
+  Expired = 0,
+  /// Its owner ended it (LedOverrideStopMessage)
+  Stopped = 1,
+  /// Another client took the layer over
+  Replaced = 2,
+  /// Its owner disconnected
+  OwnerLeft = 3,
+  /// Saved (a draft only)
+  Committed = 4,
+  /// The LED test took over the LEDs
+  LedTest = 5,
+  MIN = Expired,
+  MAX = LedTest
+};
+
+inline const LedOverrideEnd (&EnumValuesLedOverrideEnd())[6] {
+  static const LedOverrideEnd values[] = {
+    LedOverrideEnd::Expired,
+    LedOverrideEnd::Stopped,
+    LedOverrideEnd::Replaced,
+    LedOverrideEnd::OwnerLeft,
+    LedOverrideEnd::Committed,
+    LedOverrideEnd::LedTest
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLedOverrideEnd() {
+  static const char * const names[7] = {
+    "Expired",
+    "Stopped",
+    "Replaced",
+    "OwnerLeft",
+    "Committed",
+    "LedTest",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLedOverrideEnd(LedOverrideEnd e) {
+  if (::flatbuffers::IsOutRange(e, LedOverrideEnd::Expired, LedOverrideEnd::LedTest)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLedOverrideEnd()[index];
+}
+
+enum class LedRequestError : uint8_t {
+  /// The board has none of the LEDs the request is for
+  NoLed = 0,
+  /// The LED test holds the LEDs
+  LedTestRunning = 1,
+  /// Nothing to commit or stop: the client holds no override on that layer
+  NotHeld = 2,
+  /// The settings could not be saved
+  SaveFailed = 3,
+  /// A value the hub doesn't know
+  InvalidValue = 4,
+  MIN = NoLed,
+  MAX = InvalidValue
+};
+
+inline const LedRequestError (&EnumValuesLedRequestError())[5] {
+  static const LedRequestError values[] = {
+    LedRequestError::NoLed,
+    LedRequestError::LedTestRunning,
+    LedRequestError::NotHeld,
+    LedRequestError::SaveFailed,
+    LedRequestError::InvalidValue
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLedRequestError() {
+  static const char * const names[6] = {
+    "NoLed",
+    "LedTestRunning",
+    "NotHeld",
+    "SaveFailed",
+    "InvalidValue",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLedRequestError(LedRequestError e) {
+  if (::flatbuffers::IsOutRange(e, LedRequestError::NoLed, LedRequestError::InvalidValue)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLedRequestError()[index];
+}
+
 enum class HubToLocalMessagePayload : uint8_t {
   NONE = 0,
   ReadyMessage = 1,
@@ -126,11 +285,13 @@ enum class HubToLocalMessagePayload : uint8_t {
   WifiGotIpEvent = 5,
   WifiLostIpEvent = 6,
   AccountLinkStatusEvent = 7,
+  LedSettingsChangedEvent = 8,
+  LedStatusEvent = 9,
   MIN = NONE,
-  MAX = AccountLinkStatusEvent
+  MAX = LedStatusEvent
 };
 
-inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[8] {
+inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[10] {
   static const HubToLocalMessagePayload values[] = {
     HubToLocalMessagePayload::NONE,
     HubToLocalMessagePayload::ReadyMessage,
@@ -139,13 +300,15 @@ inline const HubToLocalMessagePayload (&EnumValuesHubToLocalMessagePayload())[8]
     HubToLocalMessagePayload::WifiNetworkEvent,
     HubToLocalMessagePayload::WifiGotIpEvent,
     HubToLocalMessagePayload::WifiLostIpEvent,
-    HubToLocalMessagePayload::AccountLinkStatusEvent
+    HubToLocalMessagePayload::AccountLinkStatusEvent,
+    HubToLocalMessagePayload::LedSettingsChangedEvent,
+    HubToLocalMessagePayload::LedStatusEvent
   };
   return values;
 }
 
 inline const char * const *EnumNamesHubToLocalMessagePayload() {
-  static const char * const names[9] = {
+  static const char * const names[11] = {
     "NONE",
     "ReadyMessage",
     "ErrorMessage",
@@ -154,13 +317,15 @@ inline const char * const *EnumNamesHubToLocalMessagePayload() {
     "WifiGotIpEvent",
     "WifiLostIpEvent",
     "AccountLinkStatusEvent",
+    "LedSettingsChangedEvent",
+    "LedStatusEvent",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameHubToLocalMessagePayload(HubToLocalMessagePayload e) {
-  if (::flatbuffers::IsOutRange(e, HubToLocalMessagePayload::NONE, HubToLocalMessagePayload::AccountLinkStatusEvent)) return "";
+  if (::flatbuffers::IsOutRange(e, HubToLocalMessagePayload::NONE, HubToLocalMessagePayload::LedStatusEvent)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesHubToLocalMessagePayload()[index];
 }
@@ -195,6 +360,14 @@ template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local
 
 template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::AccountLinkStatusEvent> {
   static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::AccountLinkStatusEvent;
+};
+
+template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::LedSettingsChangedEvent> {
+  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::LedSettingsChangedEvent;
+};
+
+template<> struct HubToLocalMessagePayloadTraits<OpenShock::Serialization::Local::LedStatusEvent> {
+  static const HubToLocalMessagePayload enum_value = HubToLocalMessagePayload::LedStatusEvent;
 };
 
 template <bool B = false>
@@ -414,6 +587,397 @@ inline ::flatbuffers::Offset<AccessPointSettings> CreateAccessPointSettingsDirec
       protection);
 }
 
+/// The status LED settings the portal shows and edits. Only the LEDs the board has are present, so the portal shows
+/// no option for an LED that isn't there.
+struct LedSettings FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedSettingsBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedSettings";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_MODE = 4,
+    VT_MONO = 6,
+    VT_RGB = 8,
+    VT_RGB_WARN_ABOVE = 10
+  };
+  OpenShock::Serialization::Types::LedMode mode() const {
+    return static_cast<OpenShock::Serialization::Types::LedMode>(GetField<uint8_t>(VT_MODE, 0));
+  }
+  /// The single-color built-in LED; absent when the board has none.
+  const OpenShock::Serialization::Types::LedBrightness *mono() const {
+    return GetPointer<const OpenShock::Serialization::Types::LedBrightness *>(VT_MONO);
+  }
+  /// The WS2812B RGB LED; absent when the board has none.
+  const OpenShock::Serialization::Types::LedBrightness *rgb() const {
+    return GetPointer<const OpenShock::Serialization::Types::LedBrightness *>(VT_RGB);
+  }
+  /// The hub warns about an RGB brightness above this (0-65535). Only meaningful with `rgb`.
+  uint16_t rgb_warn_above() const {
+    return GetField<uint16_t>(VT_RGB_WARN_ABOVE, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_MODE, 1) &&
+           VerifyOffset(verifier, VT_MONO) &&
+           verifier.VerifyTable(mono()) &&
+           VerifyOffset(verifier, VT_RGB) &&
+           verifier.VerifyTable(rgb()) &&
+           VerifyField<uint16_t>(verifier, VT_RGB_WARN_ABOVE, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedSettingsBuilder {
+  typedef LedSettings Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_mode(OpenShock::Serialization::Types::LedMode mode) {
+    fbb_.AddElement<uint8_t>(LedSettings::VT_MODE, static_cast<uint8_t>(mode), 0);
+  }
+  void add_mono(::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> mono) {
+    fbb_.AddOffset(LedSettings::VT_MONO, mono);
+  }
+  void add_rgb(::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> rgb) {
+    fbb_.AddOffset(LedSettings::VT_RGB, rgb);
+  }
+  void add_rgb_warn_above(uint16_t rgb_warn_above) {
+    fbb_.AddElement<uint16_t>(LedSettings::VT_RGB_WARN_ABOVE, rgb_warn_above, 0);
+  }
+  explicit LedSettingsBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedSettings> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedSettings>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedSettings> CreateLedSettings(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Types::LedMode mode = OpenShock::Serialization::Types::LedMode::All,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> mono = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Types::LedBrightness> rgb = 0,
+    uint16_t rgb_warn_above = 0) {
+  LedSettingsBuilder builder_(_fbb);
+  builder_.add_rgb(rgb);
+  builder_.add_mono(mono);
+  builder_.add_rgb_warn_above(rgb_warn_above);
+  builder_.add_mode(mode);
+  return builder_.Finish();
+}
+
+struct LedSettings::Traits {
+  using type = LedSettings;
+  static auto constexpr Create = CreateLedSettings;
+};
+
+/// An override on one layer, while it lasts.
+struct LedOverride FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedOverrideBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedOverride";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_OWNER = 4,
+    VT_TIMEOUT_MS = 6
+  };
+  /// The client that holds it (ReadyMessage.client_id)
+  uint8_t owner() const {
+    return GetField<uint8_t>(VT_OWNER, 0);
+  }
+  /// How long it lasts after the owner's last message for it (a pattern preview: from its start)
+  uint16_t timeout_ms() const {
+    return GetField<uint16_t>(VT_TIMEOUT_MS, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_OWNER, 1) &&
+           VerifyField<uint16_t>(verifier, VT_TIMEOUT_MS, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedOverrideBuilder {
+  typedef LedOverride Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_owner(uint8_t owner) {
+    fbb_.AddElement<uint8_t>(LedOverride::VT_OWNER, owner, 0);
+  }
+  void add_timeout_ms(uint16_t timeout_ms) {
+    fbb_.AddElement<uint16_t>(LedOverride::VT_TIMEOUT_MS, timeout_ms, 0);
+  }
+  explicit LedOverrideBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedOverride> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedOverride>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedOverride> CreateLedOverride(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint8_t owner = 0,
+    uint16_t timeout_ms = 0) {
+  LedOverrideBuilder builder_(_fbb);
+  builder_.add_timeout_ms(timeout_ms);
+  builder_.add_owner(owner);
+  return builder_.Finish();
+}
+
+struct LedOverride::Traits {
+  using type = LedOverride;
+  static auto constexpr Create = CreateLedOverride;
+};
+
+struct LedStatus FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedStatusBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedStatus";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SHOWING = 4,
+    VT_PATTERN = 6,
+    VT_DISPLAY = 8,
+    VT_DRAFT = 10
+  };
+  OpenShock::Serialization::Local::LedShowing showing() const {
+    return static_cast<OpenShock::Serialization::Local::LedShowing>(GetField<uint8_t>(VT_SHOWING, 0));
+  }
+  /// The pattern shown, for Live and Pattern
+  OpenShock::Serialization::Types::LedPattern pattern() const {
+    return static_cast<OpenShock::Serialization::Types::LedPattern>(GetField<uint8_t>(VT_PATTERN, 0));
+  }
+  /// Present while a preview holds the LEDs
+  const OpenShock::Serialization::Local::LedOverride *display() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedOverride *>(VT_DISPLAY);
+  }
+  /// Present while unsaved brightness is applied
+  const OpenShock::Serialization::Local::LedOverride *draft() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedOverride *>(VT_DRAFT);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_SHOWING, 1) &&
+           VerifyField<uint8_t>(verifier, VT_PATTERN, 1) &&
+           VerifyOffset(verifier, VT_DISPLAY) &&
+           verifier.VerifyTable(display()) &&
+           VerifyOffset(verifier, VT_DRAFT) &&
+           verifier.VerifyTable(draft()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedStatusBuilder {
+  typedef LedStatus Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_showing(OpenShock::Serialization::Local::LedShowing showing) {
+    fbb_.AddElement<uint8_t>(LedStatus::VT_SHOWING, static_cast<uint8_t>(showing), 0);
+  }
+  void add_pattern(OpenShock::Serialization::Types::LedPattern pattern) {
+    fbb_.AddElement<uint8_t>(LedStatus::VT_PATTERN, static_cast<uint8_t>(pattern), 0);
+  }
+  void add_display(::flatbuffers::Offset<OpenShock::Serialization::Local::LedOverride> display) {
+    fbb_.AddOffset(LedStatus::VT_DISPLAY, display);
+  }
+  void add_draft(::flatbuffers::Offset<OpenShock::Serialization::Local::LedOverride> draft) {
+    fbb_.AddOffset(LedStatus::VT_DRAFT, draft);
+  }
+  explicit LedStatusBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedStatus> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedStatus>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedStatus> CreateLedStatus(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Local::LedShowing showing = OpenShock::Serialization::Local::LedShowing::Live,
+    OpenShock::Serialization::Types::LedPattern pattern = OpenShock::Serialization::Types::LedPattern::WifiDisconnected,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedOverride> display = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedOverride> draft = 0) {
+  LedStatusBuilder builder_(_fbb);
+  builder_.add_draft(draft);
+  builder_.add_display(display);
+  builder_.add_pattern(pattern);
+  builder_.add_showing(showing);
+  return builder_.Finish();
+}
+
+struct LedStatus::Traits {
+  using type = LedStatus;
+  static auto constexpr Create = CreateLedStatus;
+};
+
+struct LedOverrideEnded FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedOverrideEndedBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedOverrideEnded";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_LAYER = 4,
+    VT_REASON = 6,
+    VT_OWNER = 8,
+    VT_SEQ = 10
+  };
+  OpenShock::Serialization::Types::LedOverrideLayer layer() const {
+    return static_cast<OpenShock::Serialization::Types::LedOverrideLayer>(GetField<uint8_t>(VT_LAYER, 0));
+  }
+  OpenShock::Serialization::Local::LedOverrideEnd reason() const {
+    return static_cast<OpenShock::Serialization::Local::LedOverrideEnd>(GetField<uint8_t>(VT_REASON, 0));
+  }
+  uint8_t owner() const {
+    return GetField<uint8_t>(VT_OWNER, 0);
+  }
+  /// The seq of the owner's last message for it
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_LAYER, 1) &&
+           VerifyField<uint8_t>(verifier, VT_REASON, 1) &&
+           VerifyField<uint8_t>(verifier, VT_OWNER, 1) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedOverrideEndedBuilder {
+  typedef LedOverrideEnded Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_layer(OpenShock::Serialization::Types::LedOverrideLayer layer) {
+    fbb_.AddElement<uint8_t>(LedOverrideEnded::VT_LAYER, static_cast<uint8_t>(layer), 0);
+  }
+  void add_reason(OpenShock::Serialization::Local::LedOverrideEnd reason) {
+    fbb_.AddElement<uint8_t>(LedOverrideEnded::VT_REASON, static_cast<uint8_t>(reason), 0);
+  }
+  void add_owner(uint8_t owner) {
+    fbb_.AddElement<uint8_t>(LedOverrideEnded::VT_OWNER, owner, 0);
+  }
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedOverrideEnded::VT_SEQ, seq, 0);
+  }
+  explicit LedOverrideEndedBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedOverrideEnded> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedOverrideEnded>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedOverrideEnded> CreateLedOverrideEnded(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    OpenShock::Serialization::Types::LedOverrideLayer layer = OpenShock::Serialization::Types::LedOverrideLayer::Display,
+    OpenShock::Serialization::Local::LedOverrideEnd reason = OpenShock::Serialization::Local::LedOverrideEnd::Expired,
+    uint8_t owner = 0,
+    uint16_t seq = 0) {
+  LedOverrideEndedBuilder builder_(_fbb);
+  builder_.add_seq(seq);
+  builder_.add_owner(owner);
+  builder_.add_reason(reason);
+  builder_.add_layer(layer);
+  return builder_.Finish();
+}
+
+struct LedOverrideEnded::Traits {
+  using type = LedOverrideEnded;
+  static auto constexpr Create = CreateLedOverrideEnded;
+};
+
+struct LedRequestFailed FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedRequestFailedBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedRequestFailed";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_OWNER = 4,
+    VT_SEQ = 6,
+    VT_ERROR = 8
+  };
+  uint8_t owner() const {
+    return GetField<uint8_t>(VT_OWNER, 0);
+  }
+  uint16_t seq() const {
+    return GetField<uint16_t>(VT_SEQ, 0);
+  }
+  OpenShock::Serialization::Local::LedRequestError error() const {
+    return static_cast<OpenShock::Serialization::Local::LedRequestError>(GetField<uint8_t>(VT_ERROR, 0));
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_OWNER, 1) &&
+           VerifyField<uint16_t>(verifier, VT_SEQ, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ERROR, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedRequestFailedBuilder {
+  typedef LedRequestFailed Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_owner(uint8_t owner) {
+    fbb_.AddElement<uint8_t>(LedRequestFailed::VT_OWNER, owner, 0);
+  }
+  void add_seq(uint16_t seq) {
+    fbb_.AddElement<uint16_t>(LedRequestFailed::VT_SEQ, seq, 0);
+  }
+  void add_error(OpenShock::Serialization::Local::LedRequestError error) {
+    fbb_.AddElement<uint8_t>(LedRequestFailed::VT_ERROR, static_cast<uint8_t>(error), 0);
+  }
+  explicit LedRequestFailedBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedRequestFailed> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedRequestFailed>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedRequestFailed> CreateLedRequestFailed(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    uint8_t owner = 0,
+    uint16_t seq = 0,
+    OpenShock::Serialization::Local::LedRequestError error = OpenShock::Serialization::Local::LedRequestError::NoLed) {
+  LedRequestFailedBuilder builder_(_fbb);
+  builder_.add_seq(seq);
+  builder_.add_error(error);
+  builder_.add_owner(owner);
+  return builder_.Finish();
+}
+
+struct LedRequestFailed::Traits {
+  using type = LedRequestFailed;
+  static auto constexpr Create = CreateLedRequestFailed;
+};
+
 struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef ReadyMessageBuilder Builder;
   struct Traits;
@@ -432,7 +996,10 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
     VT_ESTOP_GPIO_PIN = 20,
     VT_SAVED_SSIDS = 22,
     VT_OTA = 24,
-    VT_ACCESS_POINT = 26
+    VT_ACCESS_POINT = 26,
+    VT_LED = 28,
+    VT_LED_STATUS = 30,
+    VT_CLIENT_ID = 32
   };
   bool poggies() const {
     return GetField<uint8_t>(VT_POGGIES, 0) != 0;
@@ -471,6 +1038,16 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const OpenShock::Serialization::Local::AccessPointSettings *access_point() const {
     return GetPointer<const OpenShock::Serialization::Local::AccessPointSettings *>(VT_ACCESS_POINT);
   }
+  const OpenShock::Serialization::Local::LedSettings *led() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedSettings *>(VT_LED);
+  }
+  const OpenShock::Serialization::Local::LedStatus *led_status() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedStatus *>(VT_LED_STATUS);
+  }
+  /// This connection's id, as LedOverride.owner and the owner fields of LED events name it
+  uint8_t client_id() const {
+    return GetField<uint8_t>(VT_CLIENT_ID, 0);
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -493,6 +1070,11 @@ struct ReadyMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            verifier.VerifyTable(ota()) &&
            VerifyOffset(verifier, VT_ACCESS_POINT) &&
            verifier.VerifyTable(access_point()) &&
+           VerifyOffset(verifier, VT_LED) &&
+           verifier.VerifyTable(led()) &&
+           VerifyOffset(verifier, VT_LED_STATUS) &&
+           verifier.VerifyTable(led_status()) &&
+           VerifyField<uint8_t>(verifier, VT_CLIENT_ID, 1) &&
            verifier.EndTable();
   }
 };
@@ -537,6 +1119,15 @@ struct ReadyMessageBuilder {
   void add_access_point(::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point) {
     fbb_.AddOffset(ReadyMessage::VT_ACCESS_POINT, access_point);
   }
+  void add_led(::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led) {
+    fbb_.AddOffset(ReadyMessage::VT_LED, led);
+  }
+  void add_led_status(::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> led_status) {
+    fbb_.AddOffset(ReadyMessage::VT_LED_STATUS, led_status);
+  }
+  void add_client_id(uint8_t client_id) {
+    fbb_.AddElement<uint8_t>(ReadyMessage::VT_CLIENT_ID, client_id, 0);
+  }
   explicit ReadyMessageBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -561,14 +1152,20 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessage(
     int8_t estop_gpio_pin = -1,
     ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<::flatbuffers::String>>> saved_ssids = 0,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> led_status = 0,
+    uint8_t client_id = 0) {
   ReadyMessageBuilder builder_(_fbb);
+  builder_.add_led_status(led_status);
+  builder_.add_led(led);
   builder_.add_access_point(access_point);
   builder_.add_ota(ota);
   builder_.add_saved_ssids(saved_ssids);
   builder_.add_gpio_valid_outputs(gpio_valid_outputs);
   builder_.add_gpio_valid_inputs(gpio_valid_inputs);
   builder_.add_connected_wifi(connected_wifi);
+  builder_.add_client_id(client_id);
   builder_.add_estop_gpio_pin(estop_gpio_pin);
   builder_.add_estop_enabled(estop_enabled);
   builder_.add_rf_tx_pin(rf_tx_pin);
@@ -596,7 +1193,10 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
     int8_t estop_gpio_pin = -1,
     const std::vector<::flatbuffers::Offset<::flatbuffers::String>> *saved_ssids = nullptr,
     ::flatbuffers::Offset<OpenShock::Serialization::Local::OtaSettings> ota = 0,
-    ::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point = 0) {
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::AccessPointSettings> access_point = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> led_status = 0,
+    uint8_t client_id = 0) {
   auto gpio_valid_inputs__ = gpio_valid_inputs ? _fbb.CreateVector<int8_t>(*gpio_valid_inputs) : 0;
   auto gpio_valid_outputs__ = gpio_valid_outputs ? _fbb.CreateVector<int8_t>(*gpio_valid_outputs) : 0;
   auto saved_ssids__ = saved_ssids ? _fbb.CreateVector<::flatbuffers::Offset<::flatbuffers::String>>(*saved_ssids) : 0;
@@ -613,7 +1213,10 @@ inline ::flatbuffers::Offset<ReadyMessage> CreateReadyMessageDirect(
       estop_gpio_pin,
       saved_ssids__,
       ota,
-      access_point);
+      access_point,
+      led,
+      led_status,
+      client_id);
 }
 
 struct ErrorMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -924,6 +1527,137 @@ inline ::flatbuffers::Offset<WifiLostIpEvent> CreateWifiLostIpEventDirect(
       ip__);
 }
 
+/// Sent to every connected client when the LED settings change, from any source (the portal, the serial console)
+struct LedSettingsChangedEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedSettingsChangedEventBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedSettingsChangedEvent";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_LED = 4
+  };
+  const OpenShock::Serialization::Local::LedSettings *led() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedSettings *>(VT_LED);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_LED) &&
+           verifier.VerifyTable(led()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedSettingsChangedEventBuilder {
+  typedef LedSettingsChangedEvent Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_led(::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led) {
+    fbb_.AddOffset(LedSettingsChangedEvent::VT_LED, led);
+  }
+  explicit LedSettingsChangedEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedSettingsChangedEvent> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedSettingsChangedEvent>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedSettingsChangedEvent> CreateLedSettingsChangedEvent(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedSettings> led = 0) {
+  LedSettingsChangedEventBuilder builder_(_fbb);
+  builder_.add_led(led);
+  return builder_.Finish();
+}
+
+struct LedSettingsChangedEvent::Traits {
+  using type = LedSettingsChangedEvent;
+  static auto constexpr Create = CreateLedSettingsChangedEvent;
+};
+
+/// Sent to every connected client when what the LEDs show changes, an override starts or ends, or an LED request
+/// fails. Not sent for every frame of a dragged control: a client's repeated messages change nothing here.
+struct LedStatusEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef LedStatusEventBuilder Builder;
+  struct Traits;
+  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
+    return "OpenShock.Serialization.Local.LedStatusEvent";
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_STATUS = 4,
+    VT_ENDED = 6,
+    VT_FAILED = 8
+  };
+  const OpenShock::Serialization::Local::LedStatus *status() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedStatus *>(VT_STATUS);
+  }
+  /// Present when this event reports an override ending
+  const OpenShock::Serialization::Local::LedOverrideEnded *ended() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedOverrideEnded *>(VT_ENDED);
+  }
+  /// Present when this event reports a request failing
+  const OpenShock::Serialization::Local::LedRequestFailed *failed() const {
+    return GetPointer<const OpenShock::Serialization::Local::LedRequestFailed *>(VT_FAILED);
+  }
+  template <bool B = false>
+  bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_STATUS) &&
+           verifier.VerifyTable(status()) &&
+           VerifyOffset(verifier, VT_ENDED) &&
+           verifier.VerifyTable(ended()) &&
+           VerifyOffset(verifier, VT_FAILED) &&
+           verifier.VerifyTable(failed()) &&
+           verifier.EndTable();
+  }
+};
+
+struct LedStatusEventBuilder {
+  typedef LedStatusEvent Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_status(::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> status) {
+    fbb_.AddOffset(LedStatusEvent::VT_STATUS, status);
+  }
+  void add_ended(::flatbuffers::Offset<OpenShock::Serialization::Local::LedOverrideEnded> ended) {
+    fbb_.AddOffset(LedStatusEvent::VT_ENDED, ended);
+  }
+  void add_failed(::flatbuffers::Offset<OpenShock::Serialization::Local::LedRequestFailed> failed) {
+    fbb_.AddOffset(LedStatusEvent::VT_FAILED, failed);
+  }
+  explicit LedStatusEventBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<LedStatusEvent> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<LedStatusEvent>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<LedStatusEvent> CreateLedStatusEvent(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedStatus> status = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedOverrideEnded> ended = 0,
+    ::flatbuffers::Offset<OpenShock::Serialization::Local::LedRequestFailed> failed = 0) {
+  LedStatusEventBuilder builder_(_fbb);
+  builder_.add_failed(failed);
+  builder_.add_ended(ended);
+  builder_.add_status(status);
+  return builder_.Finish();
+}
+
+struct LedStatusEvent::Traits {
+  using type = LedStatusEvent;
+  static auto constexpr Create = CreateLedStatusEvent;
+};
+
 /// Sent when the auth token status changes (set, cleared, or validated on gateway connect)
 struct AccountLinkStatusEvent FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef AccountLinkStatusEventBuilder Builder;
@@ -1014,6 +1748,12 @@ struct HubToLocalMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   const OpenShock::Serialization::Local::AccountLinkStatusEvent *payload_as_AccountLinkStatusEvent() const {
     return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::AccountLinkStatusEvent ? static_cast<const OpenShock::Serialization::Local::AccountLinkStatusEvent *>(payload()) : nullptr;
   }
+  const OpenShock::Serialization::Local::LedSettingsChangedEvent *payload_as_LedSettingsChangedEvent() const {
+    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::LedSettingsChangedEvent ? static_cast<const OpenShock::Serialization::Local::LedSettingsChangedEvent *>(payload()) : nullptr;
+  }
+  const OpenShock::Serialization::Local::LedStatusEvent *payload_as_LedStatusEvent() const {
+    return payload_type() == OpenShock::Serialization::Local::HubToLocalMessagePayload::LedStatusEvent ? static_cast<const OpenShock::Serialization::Local::LedStatusEvent *>(payload()) : nullptr;
+  }
   template <bool B = false>
   bool Verify(::flatbuffers::VerifierTemplate<B> &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1050,6 +1790,14 @@ template<> inline const OpenShock::Serialization::Local::WifiLostIpEvent *HubToL
 
 template<> inline const OpenShock::Serialization::Local::AccountLinkStatusEvent *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::AccountLinkStatusEvent>() const {
   return payload_as_AccountLinkStatusEvent();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedSettingsChangedEvent *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::LedSettingsChangedEvent>() const {
+  return payload_as_LedSettingsChangedEvent();
+}
+
+template<> inline const OpenShock::Serialization::Local::LedStatusEvent *HubToLocalMessage::payload_as<OpenShock::Serialization::Local::LedStatusEvent>() const {
+  return payload_as_LedStatusEvent();
 }
 
 struct HubToLocalMessageBuilder {
@@ -1120,6 +1868,14 @@ inline bool VerifyHubToLocalMessagePayload(::flatbuffers::VerifierTemplate<B> &v
     }
     case HubToLocalMessagePayload::AccountLinkStatusEvent: {
       auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::AccountLinkStatusEvent *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case HubToLocalMessagePayload::LedSettingsChangedEvent: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedSettingsChangedEvent *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case HubToLocalMessagePayload::LedStatusEvent: {
+      auto ptr = reinterpret_cast<const OpenShock::Serialization::Local::LedStatusEvent *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

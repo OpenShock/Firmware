@@ -9,6 +9,7 @@ const char* const TAG = "CaptivePortalWs";
 #include "message_handlers/WebSocket.h"
 #include "rfc8908/RFC8908Handler.h"
 #include "serialization/WSLocal.h"
+#include "visual/VisualStateManager.h"
 #include "wifi/WiFiManager.h"
 #include "wifi/WiFiScanManager.h"
 
@@ -326,7 +327,7 @@ void CaptivePortal::WebSocketEndpoint::handleWebSocketClientConnected(httpd_req_
     connectedNetworkPtr = &connectedNetwork;
   }
 
-  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), sendBin);
+  Serialization::Local::SerializeReadyMessage(connectedNetworkPtr, GatewayConnectionManager::IsLinked(), socketId, sendBin);
 
   // Send all previously scanned wifi networks
   auto networks = OpenShock::WiFiManager::GetDiscoveredWiFiNetworks();
@@ -341,6 +342,10 @@ void CaptivePortal::WebSocketEndpoint::handleWebSocketClientConnected(httpd_req_
 void CaptivePortal::WebSocketEndpoint::handleWebSocketClientDisconnected(uint8_t socketId)
 {
   OS_LOGD(TAG, "WebSocket client #%u disconnected", socketId);
+
+  // A preview or unsaved brightness it left behind ends now rather than at its timeout. On the httpd task, like the
+  // connect handler, so no new client has taken the id yet.
+  VisualStateManager::ReleaseLedOverrides(socketId);
 }
 
 // ---------------------------------------------------------------------------

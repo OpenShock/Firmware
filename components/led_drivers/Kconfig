@@ -1,0 +1,17 @@
+menu "OpenShock LED drivers"
+
+    config OPENSHOCK_RGB_LED_DITHERING
+        bool "10-bit dithering on the RGB LED"
+        default y
+        help
+            The WS2812B takes 8 bits per color. With dithering the driver shows 10: it sends
+            4 frames that each round a channel to one of the two nearest 8-bit levels, and the
+            RMT hardware repeats them on its own while the color holds, so the average lands
+            on the quarter step in between at no CPU cost.
+
+            The looped frames need several RMT memory blocks. Chips without a transmit channel
+            to spare for the RF transmitter after that (ESP32-C3) round to 8 bits regardless.
+
+            Off, each color is rounded to the nearest 8-bit level.
+
+endmenu

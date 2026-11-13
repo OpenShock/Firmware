@@ -16,7 +16,7 @@ namespace ConfigTest {
   bool Full::SaveNvs(const char* partition) const
   {
     return rf.SaveNvs(partition, nullptr) && wifi.SaveNvs(partition, nullptr) && captivePortal.SaveNvs(partition, nullptr) && backend.SaveNvs(partition, nullptr) && serialInput.SaveNvs(partition, nullptr) && otaUpdate.SaveNvs(partition, nullptr)
-        && estop.SaveNvs(partition, nullptr);
+        && estop.SaveNvs(partition, nullptr) && led.SaveNvs(partition, nullptr);
   }
 
   Full MakeSampleConfig()
@@ -36,6 +36,7 @@ namespace ConfigTest {
     config.serialInput   = Config::SerialInputConfig(false);
     config.otaUpdate     = Config::OtaUpdateConfig(false, "fw.example.org", OtaUpdateChannel::Develop, true, true, 120, false, true, 4242, OtaUpdateStep::Validating);
     config.estop         = Config::EStopConfig(true, GPIO_NUM_13, true);
+    config.led           = Config::LedConfig(LedMode::CriticalOnly, 40000, 0, 5140, 300);
 
     return config;
   }
@@ -89,6 +90,7 @@ namespace ConfigTest {
     config.serialInput   = Config::GetSerialInputConfig();
     config.otaUpdate     = Config::GetOtaUpdateConfig();
     config.estop         = Config::GetEStopConfig();
+    config.led           = Config::GetLedConfig();
     return config;
   }
 
@@ -137,5 +139,11 @@ namespace ConfigTest {
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.enabled, actual.estop.enabled, "estop.enabled");
     TEST_ASSERT_EQUAL_INT_MESSAGE(expected.estop.gpioPin, actual.estop.gpioPin, "estop.gpioPin");
     TEST_ASSERT_EQUAL_MESSAGE(expected.estop.latching, actual.estop.latching, "estop.latching");
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(static_cast<int>(expected.led.mode), static_cast<int>(actual.led.mode), "led.mode");
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(expected.led.monoCriticalBrightness, actual.led.monoCriticalBrightness, "led.monoCriticalBrightness");
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(expected.led.monoNormalBrightness, actual.led.monoNormalBrightness, "led.monoNormalBrightness");
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(expected.led.rgbCriticalBrightness, actual.led.rgbCriticalBrightness, "led.rgbCriticalBrightness");
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(expected.led.rgbNormalBrightness, actual.led.rgbNormalBrightness, "led.rgbNormalBrightness");
   }
 }  // namespace ConfigTest

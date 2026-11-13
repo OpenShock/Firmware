@@ -25,4 +25,4 @@ idf_component_register(
 )
 
 # Match core: IDF compiles application components with -Werror, the legacy build did not.
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error -Werror=switch)  # -Wswitch stays fatal: exhaustive enum switches rely on it

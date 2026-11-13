@@ -5,6 +5,8 @@
 import * as flatbuffers from 'flatbuffers';
 
 import { AccessPointSettings } from '../../../open-shock/serialization/local/access-point-settings';
+import { LedSettings } from '../../../open-shock/serialization/local/led-settings';
+import { LedStatus } from '../../../open-shock/serialization/local/led-status';
 import { OtaSettings } from '../../../open-shock/serialization/local/ota-settings';
 import { WifiNetwork } from '../../../open-shock/serialization/types/wifi-network';
 
@@ -117,8 +119,26 @@ accessPoint(obj?:AccessPointSettings):AccessPointSettings|null {
   return offset ? (obj || new AccessPointSettings()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
 }
 
+led(obj?:LedSettings):LedSettings|null {
+  const offset = this.bb!.__offset(this.bb_pos, 28);
+  return offset ? (obj || new LedSettings()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
+ledStatus(obj?:LedStatus):LedStatus|null {
+  const offset = this.bb!.__offset(this.bb_pos, 30);
+  return offset ? (obj || new LedStatus()).__init(this.bb!.__indirect(this.bb_pos + offset), this.bb!) : null;
+}
+
+/**
+ * This connection's id, as LedOverride.owner and the owner fields of LED events name it
+ */
+clientId():number {
+  const offset = this.bb!.__offset(this.bb_pos, 32);
+  return offset ? this.bb!.readUint8(this.bb_pos + offset) : 0;
+}
+
 static startReadyMessage(builder:flatbuffers.Builder) {
-  builder.startObject(12);
+  builder.startObject(15);
 }
 
 static addPoggies(builder:flatbuffers.Builder, poggies:boolean) {
@@ -213,6 +233,18 @@ static addOta(builder:flatbuffers.Builder, otaOffset:flatbuffers.Offset) {
 
 static addAccessPoint(builder:flatbuffers.Builder, accessPointOffset:flatbuffers.Offset) {
   builder.addFieldOffset(11, accessPointOffset, 0);
+}
+
+static addLed(builder:flatbuffers.Builder, ledOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(12, ledOffset, 0);
+}
+
+static addLedStatus(builder:flatbuffers.Builder, ledStatusOffset:flatbuffers.Offset) {
+  builder.addFieldOffset(13, ledStatusOffset, 0);
+}
+
+static addClientId(builder:flatbuffers.Builder, clientId:number) {
+  builder.addFieldInt8(14, clientId, 0);
 }
 
 static endReadyMessage(builder:flatbuffers.Builder):flatbuffers.Offset {

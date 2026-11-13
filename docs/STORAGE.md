@@ -37,6 +37,7 @@ always kept free for compaction) it holds the whole config with some 32 long WiF
 | `serialInput` | serial_console (`serial_console/SerialInputConfig.h`) | `serial` |
 | `otaUpdate` | core (`OtaUpdateConfig.h`) | `ota` |
 | `estop` | device_control (`estop/EStopConfig.h`) | `estop` |
+| `led` | device_control (`visual/LedConfig.h`) | `led` |
 
 Namespace and key names are at
 most 15 characters and are permanent once hubs hold them: renaming one is a migration, not an edit. A missing key

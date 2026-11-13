@@ -3,32 +3,56 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 import { ShockerCommandList } from '../../../open-shock/serialization/common/shocker-command-list';
+import { LedCommitDraftMessage } from '../../../open-shock/serialization/local/led-commit-draft-message';
+import { LedDraftMessage } from '../../../open-shock/serialization/local/led-draft-message';
+import { LedOverrideStopMessage } from '../../../open-shock/serialization/local/led-override-stop-message';
+import { LedPreviewColorMessage } from '../../../open-shock/serialization/local/led-preview-color-message';
+import { LedPreviewPatternMessage } from '../../../open-shock/serialization/local/led-preview-pattern-message';
+import { LedSetModeMessage } from '../../../open-shock/serialization/local/led-set-mode-message';
 
 
 export enum LocalToHubMessagePayload {
   NONE = 0,
-  Common_ShockerCommandList = 1
+  Common_ShockerCommandList = 1,
+  LedPreviewPatternMessage = 2,
+  LedPreviewColorMessage = 3,
+  LedDraftMessage = 4,
+  LedOverrideStopMessage = 5,
+  LedCommitDraftMessage = 6,
+  LedSetModeMessage = 7
 }
 
 export function unionToLocalToHubMessagePayload(
   type: LocalToHubMessagePayload,
-  accessor: (obj:ShockerCommandList) => ShockerCommandList|null
-): ShockerCommandList|null {
+  accessor: (obj:LedCommitDraftMessage|LedDraftMessage|LedOverrideStopMessage|LedPreviewColorMessage|LedPreviewPatternMessage|LedSetModeMessage|ShockerCommandList) => LedCommitDraftMessage|LedDraftMessage|LedOverrideStopMessage|LedPreviewColorMessage|LedPreviewPatternMessage|LedSetModeMessage|ShockerCommandList|null
+): LedCommitDraftMessage|LedDraftMessage|LedOverrideStopMessage|LedPreviewColorMessage|LedPreviewPatternMessage|LedSetModeMessage|ShockerCommandList|null {
   switch(LocalToHubMessagePayload[type]) {
     case 'NONE': return null; 
     case 'Common_ShockerCommandList': return accessor(new ShockerCommandList())! as ShockerCommandList;
+    case 'LedPreviewPatternMessage': return accessor(new LedPreviewPatternMessage())! as LedPreviewPatternMessage;
+    case 'LedPreviewColorMessage': return accessor(new LedPreviewColorMessage())! as LedPreviewColorMessage;
+    case 'LedDraftMessage': return accessor(new LedDraftMessage())! as LedDraftMessage;
+    case 'LedOverrideStopMessage': return accessor(new LedOverrideStopMessage())! as LedOverrideStopMessage;
+    case 'LedCommitDraftMessage': return accessor(new LedCommitDraftMessage())! as LedCommitDraftMessage;
+    case 'LedSetModeMessage': return accessor(new LedSetModeMessage())! as LedSetModeMessage;
     default: return null;
   }
 }
 
 export function unionListToLocalToHubMessagePayload(
   type: LocalToHubMessagePayload, 
-  accessor: (index: number, obj:ShockerCommandList) => ShockerCommandList|null, 
+  accessor: (index: number, obj:LedCommitDraftMessage|LedDraftMessage|LedOverrideStopMessage|LedPreviewColorMessage|LedPreviewPatternMessage|LedSetModeMessage|ShockerCommandList) => LedCommitDraftMessage|LedDraftMessage|LedOverrideStopMessage|LedPreviewColorMessage|LedPreviewPatternMessage|LedSetModeMessage|ShockerCommandList|null, 
   index: number
-): ShockerCommandList|null {
+): LedCommitDraftMessage|LedDraftMessage|LedOverrideStopMessage|LedPreviewColorMessage|LedPreviewPatternMessage|LedSetModeMessage|ShockerCommandList|null {
   switch(LocalToHubMessagePayload[type]) {
     case 'NONE': return null; 
     case 'Common_ShockerCommandList': return accessor(index, new ShockerCommandList())! as ShockerCommandList;
+    case 'LedPreviewPatternMessage': return accessor(index, new LedPreviewPatternMessage())! as LedPreviewPatternMessage;
+    case 'LedPreviewColorMessage': return accessor(index, new LedPreviewColorMessage())! as LedPreviewColorMessage;
+    case 'LedDraftMessage': return accessor(index, new LedDraftMessage())! as LedDraftMessage;
+    case 'LedOverrideStopMessage': return accessor(index, new LedOverrideStopMessage())! as LedOverrideStopMessage;
+    case 'LedCommitDraftMessage': return accessor(index, new LedCommitDraftMessage())! as LedCommitDraftMessage;
+    case 'LedSetModeMessage': return accessor(index, new LedSetModeMessage())! as LedSetModeMessage;
     default: return null;
   }
 }

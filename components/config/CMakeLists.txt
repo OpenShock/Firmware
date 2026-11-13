@@ -18,4 +18,4 @@ idf_component_register(
   PRIV_REQUIRES logging                            # OS_LOG*/OS_PANIC
 )
 
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error)
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-error -Werror=switch)  # -Wswitch stays fatal: exhaustive enum switches rely on it

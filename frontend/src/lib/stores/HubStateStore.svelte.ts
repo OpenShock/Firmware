@@ -1,6 +1,7 @@
 import { WifiAuthMode } from '#lib/_fbs/open-shock/serialization/types/wifi-auth-mode.js';
 import type { WifiScanStatus } from '#lib/_fbs/open-shock/serialization/types/wifi-scan-status.js';
 import type { Config } from '#lib/mappers/ConfigMapper.js';
+import type { LedStatus } from '#lib/mappers/LedStatusMapper.js';
 import type { WiFiNetwork, WiFiNetworkGroup } from '#lib/types/index.js';
 import { SvelteMap } from 'svelte/reactivity';
 
@@ -62,6 +63,13 @@ export class HubStateStore {
   accountLinked = $state(false);
   hasPredefinedPins = $state(false);
   config = $state<Config | null>(null);
+  // What the status LEDs show; null from firmware that doesn't report it
+  ledStatus = $state<LedStatus | null>(null);
+  // This connection's id on the hub, which LED overrides name as their owner.
+  // It is the hub's socket slot, so a reconnect often gets the same id back.
+  clientId = $state<number | null>(null);
+  // Counts Ready messages, so a reconnect is noticed even when it gets the same clientId.
+  connectionEpoch = $state(0);
   gpioValidInputs = $state<Int8Array>(new Int8Array());
   gpioValidOutputs = $state<Int8Array>(new Int8Array());
 

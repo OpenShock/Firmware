@@ -11,9 +11,13 @@ const char* const TAG = "CaptivePortal";
 #include "captiveportal/CaptivePortalConfig.h"
 #include "captiveportal/CaptivePortalInstance.h"
 #include "CommandHandler.h"
+#include "events/Events.h"
+#include "FormatHelpers.h"
 #include "GatewayConnectionManager.h"
 #include "Logging.h"
+#include "serialization/WSLocal.h"
 #include "Temporal.h"
+#include "visual/LedOverrides.h"
 #include "wifi/AccessPoint.h"
 #include "wifi/WiFiConfig.h"
 
@@ -453,6 +457,19 @@ static void captiveportal_managertask(void* arg)
   }
 }
 
+// Open portals get the LED settings and status once on connect; a change from anywhere (another client, the serial
+// console, an override timing out) is sent to them as it happens. Broadcasting with no portal open is a no-op.
+static void handleLedConfigChanged(void*, esp_event_base_t, int32_t, void*)
+{
+  Serialization::Local::SerializeLedSettingsChangedEvent(CaptivePortal::BroadcastMessageBIN);
+}
+
+static void handleLedStatusChanged(void*, esp_event_base_t, int32_t, void* eventData)
+{
+  const auto& notice = *static_cast<const VisualStateManager::LedStatusNotice*>(eventData);
+  Serialization::Local::SerializeLedStatusEvent(notice, CaptivePortal::BroadcastMessageBIN);
+}
+
 // esp_timer callback (runs on the esp_timer task, 3.5KB stack). Must stay trivial:
 // it only kicks the manager task, which does the real work on its own stack.
 static void captiveportal_timernotify(void*)
@@ -492,6 +509,17 @@ bool CaptivePortal::Init()
 
   AppHooks::RegisterCaptivePortal(CaptivePortal::BroadcastMessageBIN, CaptivePortal::SetAlwaysEnabled, CaptivePortal::IsRunning);
 
+  esp_err_t err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_LED_CONFIG_CHANGED, handleLedConfigChanged, nullptr);
+  if (err != ESP_OK) {
+    // Portals still get the settings on connect
+    OS_LOGE(TAG, "Failed to register for LED settings changes: %s", esp_err_to_name(err));
+  }
+  err = esp_event_handler_register(OPENSHOCK_EVENTS, OPENSHOCK_EVENT_LED_STATUS_CHANGED, handleLedStatusChanged, nullptr);
+  if (err != ESP_OK) {
+    // Portals still get the status on connect
+    OS_LOGE(TAG, "Failed to register for LED status changes: %s", esp_err_to_name(err));
+  }
+
   esp_timer_create_args_t args = {
     .callback              = captiveportal_timernotify,
     .arg                   = nullptr,
@@ -499,8 +527,6 @@ bool CaptivePortal::Init()
     .name                  = "captive_portal_update",
     .skip_unhandled_events = true,
   };
-
-  esp_err_t err;
 
   err = esp_timer_create(&args, &s_captivePortalUpdateLoopTimer);
   if (err != ESP_OK) {
