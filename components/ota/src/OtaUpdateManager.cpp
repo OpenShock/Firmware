@@ -289,7 +289,7 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
   return true;
 }
 
-static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32], OpenShock::GzipInflater& inflater)
 {
   OS_LOGD(TAG, "Flashing www partition");
 
@@ -317,7 +317,18 @@ static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
+  bool flashed = OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition);
+
+  // The gzip decoder is held through this download but not used by it, and its memory may be what the download was
+  // short of: give it back and try once more, the app image then comes uncompressed. A wrong image would only be
+  // refused again.
+  if (!flashed && !formatMismatch && inflater.valid()) {
+    OS_LOGW(TAG, "Failed to flash www partition, retrying without the gzip decoder held");
+    inflater.release();
+    flashed = OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition);
+  }
+
+  if (!flashed) {
     OS_LOGE(TAG, "Failed to flash www partition");
     if (formatMismatch) {
       _sendFailureMessage("The downloaded image is not a www image");
@@ -549,7 +560,7 @@ static void otaum_updatetask(void* arg)
     const bool wwwCurrent = Www::ImageSha256(wwwPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.wwwBinaryHash, 32) == 0;
     if (wwwCurrent) {
       OS_LOGI(TAG, "The www image is already current, not flashing it");
-    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl.c_str(), release.wwwBinaryHash)) {
+    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl.c_str(), release.wwwBinaryHash, inflater)) {
       continue;
     }
     if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash, inflater)) {
