@@ -8,6 +8,7 @@ const char* const TAG = "OtaUpdateManager";
 #include "BoardDescriptor.h"
 #include "captiveportal/Manager.h"
 #include "GatewayConnectionManager.h"
+#include "GzipInflater.h"
 #include "Hashing.h"
 #include "http/ContentTypes.h"
 #include "http/HTTPRequestManager.h"
@@ -215,7 +216,23 @@ static bool otaum_slot_matches_this_board(const esp_partition_t* slot, const cha
   return true;
 }
 
-static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
+/// @brief The gzip image sits next to the plain one: the same URL with ".gz" on the path (before any query).
+static std::string otaum_gzip_url_for(std::string_view url)
+{
+  std::size_t pathEnd = url.find_first_of("?#");
+  if (pathEnd == std::string_view::npos) {
+    pathEnd = url.size();
+  }
+
+  std::string gzipUrl;
+  gzipUrl.reserve(url.size() + 3);
+  gzipUrl.append(url.substr(0, pathEnd)).append(".gz").append(url.substr(pathEnd));
+  return gzipUrl;
+}
+
+/// @param inflater Holds the memory to decompress the gzip image with; released once the gzip attempt is over, so the
+///        plain fallback and everything after the download run without it.
+static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const std::string& remoteUrl, const uint8_t (&remoteHash)[32], OpenShock::GzipInflater& inflater)
 {
   OS_LOGD(TAG, "Flashing app partition");
 
@@ -231,7 +248,21 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress)) {
+  // Not every release has a gzip image, and the manifest does not say: try it, and on any failure (a 404 for a release
+  // without one, or anything else) fall back to the plain image. Only the inactive slot was written by then.
+  bool flashed = false;
+  if constexpr (OpenShock::GzipInflater::kEnabled) {
+    if (inflater.valid()) {
+      std::string gzipUrl = otaum_gzip_url_for(remoteUrl);
+      flashed             = OpenShock::FlashPartitionFromUrl(client, partition, gzipUrl.c_str(), remoteHash, onProgress, std::nullopt, &inflater);
+      if (!flashed) {
+        OS_LOGW(TAG, "No usable gzip app image, downloading the uncompressed one");
+      }
+    }
+    inflater.release();
+  }
+
+  if (!flashed && !OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl.c_str(), remoteHash, onProgress)) {
     OS_LOGE(TAG, "Failed to flash app partition");
     _sendFailureMessage("Failed to flash app partition");
     return false;
@@ -258,7 +289,7 @@ static bool otaum_flash_app_partition(OpenShock::HTTP::Client& client, const esp
   return true;
 }
 
-static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32])
+static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp_partition_t* partition, const char* remoteUrl, const uint8_t (&remoteHash)[32], OpenShock::GzipInflater& inflater)
 {
   OS_LOGD(TAG, "Flashing www partition");
 
@@ -286,7 +317,18 @@ static bool otaum_flash_www_partition(OpenShock::HTTP::Client& client, const esp
     return true;
   };
 
-  if (!OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition)) {
+  bool flashed = OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition);
+
+  // The gzip decoder is held through this download but not used by it, and its memory may be what the download was
+  // short of: give it back and try once more, the app image then comes uncompressed. A wrong image would only be
+  // refused again.
+  if (!flashed && !formatMismatch && inflater.valid()) {
+    OS_LOGW(TAG, "Failed to flash www partition, retrying without the gzip decoder held");
+    inflater.release();
+    flashed = OpenShock::FlashPartitionFromUrl(client, partition, remoteUrl, remoteHash, onProgress, matchesPartition);
+  }
+
+  if (!flashed) {
     OS_LOGE(TAG, "Failed to flash www partition");
     if (formatMismatch) {
       _sendFailureMessage("The downloaded image is not a www image");
@@ -509,15 +551,19 @@ static void otaum_updatetask(void* arg)
       continue;
     }
 
+    // Allocated before the downloads connect to the artifact host, so whether to fetch the gzip image is decided on
+    // memory already held rather than found missing mid-download. Kept only if enough is left for TLS.
+    OpenShock::GzipInflater inflater;  // a never-valid stub without CONFIG_OPENSHOCK_OTA_GZIP
+
     // Flash the app and www partitions. An unchanged www image (the same hash) is not written again.
     std::array<uint8_t, 32> currentWwwHash {};
     const bool wwwCurrent = Www::ImageSha256(wwwPartition, currentWwwHash) && memcmp(currentWwwHash.data(), release.wwwBinaryHash, 32) == 0;
     if (wwwCurrent) {
       OS_LOGI(TAG, "The www image is already current, not flashing it");
-    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl.c_str(), release.wwwBinaryHash)) {
+    } else if (!otaum_flash_www_partition(client, wwwPartition, release.wwwBinaryUrl.c_str(), release.wwwBinaryHash, inflater)) {
       continue;
     }
-    if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl.c_str(), release.appBinaryHash)) {
+    if (!otaum_flash_app_partition(client, appPartition, release.appBinaryUrl, release.appBinaryHash, inflater)) {
       continue;
     }
 

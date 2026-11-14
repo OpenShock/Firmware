@@ -1,0 +1,3 @@
+# zlib decompresses gzip app images during OTA (src/GzipInflater.cpp).
+dependencies:
+  espressif/zlib: "^1.3.2"

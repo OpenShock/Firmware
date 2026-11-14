@@ -1,0 +1,20 @@
+menu "OpenShock OTA"
+
+    config OPENSHOCK_OTA_GZIP
+        bool "Try the gzip app image (the binary URL + .gz) first"
+        default y
+        help
+            Decompressed with zlib (espressif/zlib), compressed with a 4 KB window. The decoder and its
+            window are allocated before the downloads start; without the memory the plain image is
+            downloaded instead.
+
+    config OPENSHOCK_OTA_GZIP_MIN_FREE_BLOCK
+        int "Largest free block to keep after allocating the gzip decoder (bytes)"
+        range 16384 131072
+        default 40960
+        help
+            The decoder is freed again, and the plain image downloaded, unless this much contiguous
+            internal RAM is left for the TLS connections to the download host. Unused without
+            OPENSHOCK_OTA_GZIP; not hidden behind it, so the decoder compiles either way.
+
+endmenu
