@@ -50,10 +50,13 @@ bool OpenShock::FlashPartitionFromUrl(
   bool gzip            = false;
   int64_t inflateSpent = 0;  // us, excluding the flash work done from inside the inflater
 
-  auto sizeValidator = [partition, &contentLength, progressCallback, &lastProgress, &spent](std::size_t size) -> bool {
-    // A gzip body larger than the partition is not a sensible image either; the decompressed size is bounded by
-    // writeOut
-    if (size > partition->size) {
+  // Whether the body may be gzip. Its headers arrive before its first byte, so they can't tell yet.
+  const bool mayBeGzip = GzipInflater::kEnabled && inflater != nullptr && inflater->valid();
+
+  auto sizeValidator = [partition, mayBeGzip, &contentLength, progressCallback, &lastProgress, &spent](std::size_t size) -> bool {
+    // Only a plain body is refused on its size here. A compressed one may be larger than the image it decodes to,
+    // and writeOut bounds what is written either way.
+    if (!mayBeGzip && size > partition->size) {
       OS_LOGE(TAG, "Remote partition binary is too large");
       return false;
     }
