@@ -258,11 +258,11 @@ importers:
         specifier: ~0.8.1
         version: 0.8.1(prettier-plugin-organize-imports@4.3.0(prettier@3.9.9)(typescript@6.0.3))(prettier-plugin-svelte@4.1.1(prettier@3.9.9)(svelte@5.57.1(@typescript-eslint/types@8.71.1)))(prettier@3.9.9)
       rollup-plugin-license:
-        specifier: ^3.7.1
-        version: 3.7.1(picomatch@4.0.7)(rollup@4.64.0)
+        specifier: ^3.7.2
+        version: 3.7.2(picomatch@4.0.7)(rollup@4.64.0)
       rollup-plugin-visualizer:
-        specifier: ^7.1.2
-        version: 7.1.2(rolldown@1.2.12)(rollup@4.64.0)
+        specifier: ^7.1.3
+        version: 7.1.3(rolldown@1.2.12)(rollup@4.64.0)
       svelte:
         specifier: ^5.57.1
         version: 5.57.1(@typescript-eslint/types@8.71.1)
@@ -2107,14 +2107,14 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
-  rollup-plugin-license@3.7.1:
-    resolution: {integrity: sha512-FcGXUbAmPvRSLxjVdjp/r/MUtKBlttVQd+ApUyvKfREnsoAfAZA6Ic2fE1Tz4RL0f9XqEQU9UIRNUMdtQtliDw==}
+  rollup-plugin-license@3.7.2:
+    resolution: {integrity: sha512-xsEifZTR9xIFzgXqhNEoWmdM8mwLyEynXr50krGTCv/OhBAXS8+YFDWpD7pdT3Q1DZdt9T9yu7sACEfYiRdq8A==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       rollup: ^1.0.0 || ^2.0.0 || ^3.0.0 || ^4.0.0
 
-  rollup-plugin-visualizer@7.1.2:
-    resolution: {integrity: sha512-+yrEz9LJ7fxd7T0yj4GPvcKHKfJNzTzKT7FHiF3f/US+7EaWlgB8PoGbUOlobD4Al8v6TeCCl/Fgbov5FV/DaA==}
+  rollup-plugin-visualizer@7.1.3:
+    resolution: {integrity: sha512-P7G0p9RowDd0ahXXBtx4MOHlSVzclyW5pDeZ2Z0HensWSI9vJdu2bqdZDsD375g+0AxND8VJzWYuKD9yH38etw==}
     engines: {node: '>=22'}
     hasBin: true
     peerDependencies:
@@ -3930,7 +3930,7 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.2.12
       '@rolldown/binding-win32-x64-msvc': 1.2.12
 
-  rollup-plugin-license@3.7.1(picomatch@4.0.7)(rollup@4.64.0):
+  rollup-plugin-license@3.7.2(picomatch@4.0.7)(rollup@4.64.0):
     dependencies:
       commenting: 1.1.0
       fdir: 6.5.0(picomatch@4.0.7)
@@ -3944,7 +3944,7 @@ snapshots:
     transitivePeerDependencies:
       - picomatch
 
-  rollup-plugin-visualizer@7.1.2(rolldown@1.2.12)(rollup@4.64.0):
+  rollup-plugin-visualizer@7.1.3(rolldown@1.2.12)(rollup@4.64.0):
     dependencies:
       open: 11.0.4
       picomatch: 4.0.7
