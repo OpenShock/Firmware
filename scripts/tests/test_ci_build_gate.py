@@ -140,7 +140,7 @@ NON_SOURCE_CHANGES = [
     '.gitkeep',
     '.claude/settings.json',
     '.github/ISSUE_TEMPLATE/bug_report.yml',
-    '.github/dependabot.yml',
+    'renovate.json',
     'schemas',
     'schemas/HubToGatewayMessage.fbs',
     'scripts/fetch_flatc.py',
