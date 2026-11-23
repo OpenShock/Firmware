@@ -7,6 +7,15 @@ menu "OpenShock radio"
         help
             Commands waiting for the transmitter task. A full queue drops the command.
 
+    config OPENSHOCK_RF_MIN_COMMAND_DURATION_MS
+        int "Minimum command duration (ms)"
+        range 100 2000
+        default 300
+        help
+            Shortest duration a command is transmitted for. A stop is sent as a
+            zero-intensity command of this length, and the serial console rejects
+            commands shorter than this.
+
     config OPENSHOCK_RF_TERMINATOR_DURATION_MS
         int "Stop terminator duration (ms)"
         range 100 2000

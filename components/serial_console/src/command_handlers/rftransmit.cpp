@@ -4,6 +4,12 @@
 #include "serialization/JsonSerial.h"
 #include "json/Json.h"
 
+#include <sdkconfig.h>
+
+#define STRINGIFY_(x)    #x
+#define STRINGIFY(x)     STRINGIFY_(x)
+#define MIN_DURATION_STR STRINGIFY(CONFIG_OPENSHOCK_RF_MIN_COMMAND_DURATION_MS)
+
 static void handleRFTransmitCommand(std::string_view arg, bool isAutomated)
 {
   if (arg.empty()) {
@@ -40,7 +46,7 @@ OpenShock::SerialCmds::CommandGroup OpenShock::SerialCmds::CommandHandlers::RfTr
     "id         (number) ID of the shocker                       (0-65535)",
     "type       (string) Type of the command                     (\"shock\", \"vibrate\", \"sound\", \"light\", \"stop\")",
     "intensity  (number) Intensity of the command                (0-255)",
-    "durationMs (number) Duration of the command in milliseconds (0-65535)"
+    "durationMs (number) Duration of the command in milliseconds (" MIN_DURATION_STR "-65535, ignored for \"stop\")"
   };
 
   auto& cmd = group.addCommand("Transmit a RF command", handleRFTransmitCommand);

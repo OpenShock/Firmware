@@ -82,21 +82,25 @@ std::optional<JsonSerial::ShockerCommand> JsonSerial::ParseShockerCommand(JSON::
   }
   uint8_t intensityU8 = static_cast<uint8_t>(*intensityInt);
 
-  JSON::JsonView durationMs = root["durationMs"];
-  if (!durationMs.valid()) {
-    OS_LOGE(TAG, "missing 'durationMs' field");
-    return std::nullopt;
+  // A stop has no duration, so the field is neither required nor validated for it.
+  uint16_t durationMsU16 = 0;
+  if (*commandType != ShockerCommandType::Stop) {
+    JSON::JsonView durationMs = root["durationMs"];
+    if (!durationMs.valid()) {
+      OS_LOGE(TAG, "missing 'durationMs' field");
+      return std::nullopt;
+    }
+    auto durationMsInt = durationMs.tryGetI64();
+    if (!durationMsInt) {
+      OS_LOGE(TAG, "value at 'durationMs' is not a number");
+      return std::nullopt;
+    }
+    if (*durationMsInt < CONFIG_OPENSHOCK_RF_MIN_COMMAND_DURATION_MS || *durationMsInt > UINT16_MAX) {
+      OS_LOGE(TAG, "value at 'durationMs' is out of range (%d-65535)", CONFIG_OPENSHOCK_RF_MIN_COMMAND_DURATION_MS);
+      return std::nullopt;
+    }
+    durationMsU16 = static_cast<uint16_t>(*durationMsInt);
   }
-  auto durationMsInt = durationMs.tryGetI64();
-  if (!durationMsInt) {
-    OS_LOGE(TAG, "value at 'durationMs' is not a number");
-    return std::nullopt;
-  }
-  if (*durationMsInt < 0 || *durationMsInt > UINT16_MAX) {
-    OS_LOGE(TAG, "value at 'durationMs' is out of range (0-65535)");
-    return std::nullopt;
-  }
-  uint16_t durationMsU16 = static_cast<uint16_t>(*durationMsInt);
 
   return ShockerCommand {
     .model      = *modelType,
