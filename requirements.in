@@ -2,4 +2,4 @@ cryptography==50.0.2
 esptool==5.6.0
 # .github/workflows run scripts/ci_build_gate.py, get_vars.py and repo_server_*.py against the GitHub and repository-server APIs
 requests==2.34.2
-semver==3.1.0
+semver==3.1.2
