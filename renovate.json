@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["local>OpenShock/org-config//renovate/default", "local>OpenShock/org-config//renovate/automerge"],
+  "cloneSubmodules": true,
+  "cloneSubmodulesFilter": ["frontend/packages/svelte-core"],
   "packageRules": [
     {
       "description": "One PR for all non-major Python updates",
