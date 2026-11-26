@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["local>OpenShock/org-config//renovate/default", "local>OpenShock/org-config//renovate/automerge"],
+  "packageRules": [
+    {
+      "description": "One PR for all non-major Python updates",
+      "matchManagers": ["pip_requirements", "pep621"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "python non-major"
+    }
+  ]
+}

@@ -1,6 +1,4 @@
-# Default owners: requested for review on every pull request.
-* @OpenShock/maintainer
-
-# Security policy and repository automation.
-/SECURITY.md       @OpenShock/maintainer
-/.github/          @OpenShock/maintainer
+# Owners must have write access to the repo, otherwise GitHub ignores the line.
+*            @hhvrc @nullstalgia @LucHeart
+/SECURITY.md @hhvrc @LucHeart
+/.github/    @hhvrc @LucHeart

@@ -334,7 +334,7 @@ pnpm install
 pnpm run check && pnpm run lint
 ```
 
-Commit `package.json` and `pnpm-lock.yaml`. Dependabot also opens bumps for these.
+Commit `package.json` and `pnpm-lock.yaml`. Renovate also opens bumps for these.
 
 ### FlatBuffers schemas
 
