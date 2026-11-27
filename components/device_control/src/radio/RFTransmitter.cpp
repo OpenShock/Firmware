@@ -126,7 +126,7 @@ bool RFTransmitter::SendCommand(ShockerModelType model, uint16_t shockerId, Shoc
 
     type       = ShockerCommandType::Vibrate;
     intensity  = 0;
-    durationMs = 300;
+    durationMs = CONFIG_OPENSHOCK_RF_MIN_COMMAND_DURATION_MS;
     flags      = kFlagOverwrite | kFlagStop;
   } else {
     OS_LOGD(TAG, "Command received: %u %u %u %u", std::to_underlying(model), shockerId, std::to_underlying(type), intensity);
